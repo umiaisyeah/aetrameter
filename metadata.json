@@ -1,0 +1,6 @@
+{
+  "name": "Admin SIMBA-IN - PT Aetra Air Tangerang",
+  "description": "Sistem Informasi Monitoring Billing Air Industri (SIMBA-IN) PT Aetra Air Tangerang untuk verifikasi meter reading, kalkulasi billing volume air industri, manajemen cycle, dan audit log.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
