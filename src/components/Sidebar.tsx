@@ -1,6 +1,6 @@
 import React from 'react';
 import { AetraLogo } from './AetraLogo';
-import { BarChart3, Database, CheckCircle2, Receipt, History, Building2 } from 'lucide-react';
+import { BarChart3, Database, CheckCircle2, Receipt, History, Building2, Calendar } from 'lucide-react';
 import { UserProfile } from '../types';
 
 interface SidebarProps {
@@ -13,28 +13,28 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, workflowFilter, onSelectTab, currentUser }) => {
   const navItems = [
     {
-      id: 'overview',
-      label: 'Overview SIMBA-IN',
-      icon: BarChart3,
-      statusFilter: 'ALL'
-    },
-    {
       id: 'database',
       label: 'Database & Input Cycle',
       icon: Database
     },
     {
+      id: 'monitoring',
+      label: 'Monitoring Pembacaan Cycle',
+      icon: Calendar,
+      statusFilter: 'ALL'
+    },
+    {
       id: 'pending',
       label: 'Verifikasi Reading',
       icon: CheckCircle2,
-      targetTab: 'overview',
+      targetTab: 'monitoring',
       statusFilter: 'Pending Verification'
     },
     {
       id: 'verified',
       label: 'Billing & Invoicing',
       icon: Receipt,
-      targetTab: 'overview',
+      targetTab: 'monitoring',
       statusFilter: 'Verified'
     },
     {
@@ -55,17 +55,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, workflowFilter, onS
           {navItems.map((item) => {
             const Icon = item.icon;
             let isActive = false;
-            if (item.id === 'overview') {
+            if (item.id === 'database') {
+              isActive = activeTab === 'database';
+            } else if (item.id === 'monitoring') {
               isActive =
-                activeTab === 'overview' &&
+                activeTab === 'monitoring' &&
                 (workflowFilter === 'ALL' ||
                   (workflowFilter !== 'Pending Verification' && workflowFilter !== 'Verified'));
             } else if (item.id === 'pending') {
-              isActive = activeTab === 'overview' && workflowFilter === 'Pending Verification';
+              isActive = activeTab === 'monitoring' && workflowFilter === 'Pending Verification';
             } else if (item.id === 'verified') {
-              isActive = activeTab === 'overview' && workflowFilter === 'Verified';
-            } else if (item.id === 'database') {
-              isActive = activeTab === 'database';
+              isActive = activeTab === 'monitoring' && workflowFilter === 'Verified';
             } else if (item.id === 'audit') {
               isActive = activeTab === 'audit';
             }

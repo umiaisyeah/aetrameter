@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { IndustryCustomer, UserProfile } from '../types';
 import { X, AlertTriangle, Info, Mail, Printer, CheckCircle, Camera, FileCheck } from 'lucide-react';
+import meterGaugeImg from '../assets/images/meter_industrial_gauge_1790243358407.jpg';
+import bpmDocImg from '../assets/images/meter_bpm_document_1790243369057.jpg';
 
 interface DetailModalProps {
   isOpen: boolean;
@@ -93,7 +95,9 @@ export const DetailModal: React.FC<DetailModalProps> = ({
         skrg: currentStand,
         status: 'Pending Verification',
         catatan: catatan.trim() || `Diverifikasi di lapangan oleh ${currentUser.name}`,
-        history: updatedHistory
+        history: updatedHistory,
+        fotoMeter: customer.fotoMeter || meterGaugeImg,
+        fotoBPM: customer.fotoBPM || bpmDocImg
       };
 
       onSaveReading(updated);
@@ -220,39 +224,81 @@ export const DetailModal: React.FC<DetailModalProps> = ({
           {/* Photo inspection cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div className="bg-slate-50 dark:bg-slate-700/50 p-3 border border-slate-200 dark:border-slate-600 rounded-xl">
-              <p className="text-[10px] font-bold text-slate-500 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                <Camera className="w-3.5 h-3.5 text-[#0055A5] dark:text-blue-400" />
-                <span>Foto Fisik Meteran Air di Lokasi</span>
-              </p>
-              <div className="h-40 w-full overflow-hidden rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-900 relative">
-                <img
-                  src={customer.fotoMeter}
-                  alt={`Meteran ${customer.nama}`}
-                  referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                />
-                <span className="absolute bottom-2 left-2 bg-slate-900/80 text-white text-[9px] font-mono px-1.5 py-0.5 rounded">
-                  SN: MTR-{customer.id.replace('IND-', '')}-2026
-                </span>
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-[10px] font-bold text-slate-500 dark:text-slate-300 flex items-center gap-1.5">
+                  <Camera className="w-3.5 h-3.5 text-[#0055A5] dark:text-blue-400" />
+                  <span>Foto Fisik Meteran Air di Lokasi</span>
+                </p>
+                {(!customer.fotoMeter || customer.status === 'Belum Dibaca') && (
+                  <span className="text-[9px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 px-1.5 py-0.5 rounded">
+                    Menunggu Pengisian
+                  </span>
+                )}
               </div>
+              {customer.status === 'Belum Dibaca' || !customer.fotoMeter ? (
+                <div className="h-40 w-full rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800/60 flex flex-col items-center justify-center p-4 text-center">
+                  <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center mb-2 text-slate-400">
+                    <Camera className="w-5 h-5" />
+                  </div>
+                  <p className="font-bold text-slate-700 dark:text-slate-200 text-xs">
+                    Belum Ada Foto Meteran
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-1 max-w-[220px]">
+                    Status industri masih <strong>Belum Dibaca</strong>. Foto akan diunggah setelah pencatat meter lapangan ({customer.petugasBaca || 'Petugas'}) membaca stand meter.
+                  </p>
+                </div>
+              ) : (
+                <div className="h-40 w-full overflow-hidden rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-900 relative">
+                  <img
+                    src={customer.fotoMeter}
+                    alt={`Meteran ${customer.nama}`}
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                  />
+                  <span className="absolute bottom-2 left-2 bg-slate-900/80 text-white text-[9px] font-mono px-1.5 py-0.5 rounded">
+                    SN: MTR-{customer.id.replace('IND-', '')}-2026
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="bg-slate-50 dark:bg-slate-700/50 p-3 border border-slate-200 dark:border-slate-600 rounded-xl">
-              <p className="text-[10px] font-bold text-slate-500 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                <FileCheck className="w-3.5 h-3.5 text-[#E86216]" />
-                <span>Foto Dokumen BPM (Bukti Pembacaan Meter)</span>
-              </p>
-              <div className="h-40 w-full overflow-hidden rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-900 relative">
-                <img
-                  src={customer.fotoBPM}
-                  alt={`BPM ${customer.nama}`}
-                  referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                />
-                <span className="absolute bottom-2 left-2 bg-slate-900/80 text-white text-[9px] font-mono px-1.5 py-0.5 rounded">
-                  BPM Validated & Stamped
-                </span>
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-[10px] font-bold text-slate-500 dark:text-slate-300 flex items-center gap-1.5">
+                  <FileCheck className="w-3.5 h-3.5 text-[#E86216]" />
+                  <span>Foto Dokumen BPM (Bukti Pembacaan Meter)</span>
+                </p>
+                {(!customer.fotoBPM || customer.status === 'Belum Dibaca') && (
+                  <span className="text-[9px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 px-1.5 py-0.5 rounded">
+                    Menunggu Validasi
+                  </span>
+                )}
               </div>
+              {customer.status === 'Belum Dibaca' || !customer.fotoBPM ? (
+                <div className="h-40 w-full rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800/60 flex flex-col items-center justify-center p-4 text-center">
+                  <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center mb-2 text-slate-400">
+                    <FileCheck className="w-5 h-5" />
+                  </div>
+                  <p className="font-bold text-slate-700 dark:text-slate-200 text-xs">
+                    Belum Ada Dokumen BPM Fisik
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-1 max-w-[220px]">
+                    Lembar BPM fisik belum ditandatangani di lokasi industri. Akan otomatis tersedia setelah verifikasi lapangan selesai.
+                  </p>
+                </div>
+              ) : (
+                <div className="h-40 w-full overflow-hidden rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-900 relative">
+                  <img
+                    src={customer.fotoBPM}
+                    alt={`BPM ${customer.nama}`}
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                  />
+                  <span className="absolute bottom-2 left-2 bg-slate-900/80 text-white text-[9px] font-mono px-1.5 py-0.5 rounded">
+                    BPM Validated &amp; Stamped
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 

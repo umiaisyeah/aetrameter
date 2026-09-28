@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Sun, Moon, LogOut, Clock, Calendar } from 'lucide-react';
-import { UserProfile } from '../types';
+import { Search, Sun, Moon, LogOut, Clock, Calendar, Database } from 'lucide-react';
+import { UserProfile, CycleSchedule } from '../types';
 
 interface HeaderProps {
   searchQuery: string;
@@ -15,6 +15,9 @@ interface HeaderProps {
   onToggleDarkMode: () => void;
   currentUser: UserProfile;
   onLogout: () => void;
+  cycleSchedules?: CycleSchedule[];
+  onOpenSupabaseModal?: () => void;
+  isSupabaseConnected?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -29,7 +32,10 @@ export const Header: React.FC<HeaderProps> = ({
   isDarkMode,
   onToggleDarkMode,
   currentUser,
-  onLogout
+  onLogout,
+  cycleSchedules,
+  onOpenSupabaseModal,
+  isSupabaseConnected = false
 }) => {
   const [timeStr, setTimeStr] = useState('');
   const [dateStr, setDateStr] = useState('');
@@ -102,16 +108,25 @@ export const Header: React.FC<HeaderProps> = ({
           <option value="Bronze">Bronze</option>
         </select>
 
-        {/* Bulan Filter */}
+        {/* Bulan Filter (1 Tahun Penuh - 12 Bulan) */}
         <select
           value={selectedBulan}
           onChange={(e) => onBulanChange(e.target.value)}
           className="px-2.5 py-1.5 text-xs font-semibold bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl text-slate-700 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#0055A5]"
         >
-          <option value="ALL">Semua Bulan</option>
-          <option value="September 2026">September 2026</option>
-          <option value="Agustus 2026">Agustus 2026</option>
+          <option value="ALL">Semua Bulan (1 Tahun)</option>
+          <option value="Januari 2026">Januari 2026</option>
+          <option value="Februari 2026">Februari 2026</option>
+          <option value="Maret 2026">Maret 2026</option>
+          <option value="April 2026">April 2026</option>
+          <option value="Mei 2026">Mei 2026</option>
+          <option value="Juni 2026">Juni 2026</option>
           <option value="Juli 2026">Juli 2026</option>
+          <option value="Agustus 2026">Agustus 2026</option>
+          <option value="September 2026">September 2026</option>
+          <option value="Oktober 2026">Oktober 2026</option>
+          <option value="November 2026">November 2026</option>
+          <option value="Desember 2026">Desember 2026</option>
         </select>
 
         {/* Dark Mode Toggle */}
@@ -133,6 +148,27 @@ export const Header: React.FC<HeaderProps> = ({
             </>
           )}
         </button>
+
+        {/* Supabase Backend Live Status & Config Button */}
+        {onOpenSupabaseModal && (
+          <button
+            type="button"
+            onClick={onOpenSupabaseModal}
+            className={`px-3 py-1.5 text-xs font-bold border rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs ${
+              isSupabaseConnected
+                ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800 hover:bg-emerald-100'
+                : 'bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800 hover:bg-amber-100'
+            }`}
+            title="Pengaturan & Status Integrasi Supabase Backend Realtime"
+          >
+            <Database className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Supabase:</span>
+            <span className="flex items-center gap-1">
+              <span className={`w-2 h-2 rounded-full ${isSupabaseConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
+              <span>{isSupabaseConnected ? 'Live' : 'Config'}</span>
+            </span>
+          </button>
+        )}
 
         <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 hidden xl:block"></div>
 
