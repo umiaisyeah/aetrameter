@@ -25,11 +25,14 @@ import {
   Building,
   RotateCcw,
   Sparkles,
-  Receipt
+  Receipt,
+  Search,
+  Trash2
 } from 'lucide-react';
 import { CycleProgressChart } from './CycleProgressChart';
 import { MeterReaderProgressSection } from './MeterReaderProgressSection';
 import { ImportCycleScheduleModal } from './ImportCycleScheduleModal';
+import { OfficialAetraInvoiceModal } from './OfficialAetraInvoiceModal';
 
 interface OverviewViewProps {
   customers: IndustryCustomer[];
@@ -41,10 +44,12 @@ interface OverviewViewProps {
   onWorkflowFilterChange: (status: string) => void;
   onSelectCycle: (cycle: string) => void;
   onOpenDetail: (customer: IndustryCustomer) => void;
-  onOpenPrintReport: () => void;
+  onOpenPrintReport?: () => void;
   onExportCSV: () => void;
   onImportCycleSchedules: (schedules: CycleSchedule[]) => void;
   onBatchUpdateStatus: (ids: string[], newStatus: WorkflowStatus, note?: string) => void;
+  onDeleteCustomer?: (id: string) => void;
+  onDeleteBatchCustomers?: (ids: string[]) => void;
   currentUser: UserProfile;
 }
 
@@ -62,9 +67,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   onExportCSV,
   onImportCycleSchedules,
   onBatchUpdateStatus,
+  onDeleteCustomer,
+  onDeleteBatchCustomers,
   currentUser
 }) => {
   const [isImportScheduleOpen, setIsImportScheduleOpen] = useState<boolean>(false);
+  const [industrySearchQuery, setIndustrySearchQuery] = useState<string>('');
 
   // Full dataset access for cycle-wide operations
   const fullDataset = allCustomers || customers;
@@ -82,6 +90,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
   // Row selection state for table batch actions
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState<{
+    isOpen: boolean;
+    type: 'batch' | 'single';
+    id?: string;
+    name?: string;
+    count?: number;
+  } | null>(null);
 
   // Confirmation modal state for 1-click cycle batch
   const [confirmBatchModal, setConfirmBatchModal] = useState<{
@@ -92,6 +107,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     affectedNames: string[];
     scopeLabel?: string;
   } | null>(null);
+
+  const [selectedInvoiceCustomer, setSelectedInvoiceCustomer] = useState<IndustryCustomer | null>(null);
 
   // Synchronize batchTargetCycle when selectedCycle changes from props
   React.useEffect(() => {
@@ -104,11 +121,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     onSelectCycle(newCycle);
   };
 
-  // Filtered rows for the table
+  // Filtered rows for the table including industry progress search
   const filteredCustomers = useMemo(() => {
     return customers.filter((c) => {
       // 1. Workflow filter
       if (workflowFilter !== 'ALL' && c.status !== workflowFilter) return false;
+      
       // 2. Automatically sync with batchReaderScope if selected
       if (batchReaderScope === 'Kontraktor') {
         const isContractor =
@@ -122,9 +140,23 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           (!c.kategoriPetugas && c.kelas === 'Premium');
         if (!isKA) return false;
       }
+
+      // 3. Search query filter for industry progress
+      if (industrySearchQuery.trim()) {
+        const q = industrySearchQuery.toLowerCase().trim();
+        const matchQ =
+          c.nama.toLowerCase().includes(q) ||
+          c.id.toLowerCase().includes(q) ||
+          (c.petugasBaca && c.petugasBaca.toLowerCase().includes(q)) ||
+          c.cycle.toLowerCase().includes(q) ||
+          c.status.toLowerCase().includes(q) ||
+          (c.lokasi && c.lokasi.toLowerCase().includes(q));
+        if (!matchQ) return false;
+      }
+
       return true;
     });
-  }, [customers, workflowFilter, batchReaderScope]);
+  }, [customers, workflowFilter, batchReaderScope, industrySearchQuery]);
 
   // Raw customers in the target cycle (all readers)
   const batchCycleAllCustomers = useMemo(() => {
@@ -286,6 +318,33 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     setTimeout(() => setBatchFeedback(null), 5000);
   };
 
+  const executeConfirmedDelete = () => {
+    if (!deleteConfirmModal) return;
+
+    if (deleteConfirmModal.type === 'batch') {
+      const count = selectedRowIds.length;
+      if (onDeleteBatchCustomers) {
+        onDeleteBatchCustomers(selectedRowIds);
+      }
+      setSelectedRowIds([]);
+      setBatchFeedback({
+        type: 'success',
+        message: `✓ Berhasil menghapus ${count} industri terpilih dari daftar.`
+      });
+    } else if (deleteConfirmModal.type === 'single' && deleteConfirmModal.id) {
+      if (onDeleteCustomer) {
+        onDeleteCustomer(deleteConfirmModal.id);
+      }
+      setBatchFeedback({
+        type: 'success',
+        message: `✓ Berhasil menghapus industri ${deleteConfirmModal.name || deleteConfirmModal.id} dari daftar.`
+      });
+    }
+
+    setDeleteConfirmModal(null);
+    setTimeout(() => setBatchFeedback(null), 5000);
+  };
+
   const allFilteredSelected =
     filteredCustomers.length > 0 &&
     filteredCustomers.every((c) => selectedRowIds.includes(c.id));
@@ -387,13 +446,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={onOpenPrintReport}
-              className="px-3.5 py-2 rounded-xl bg-white text-emerald-900 font-bold text-xs hover:bg-emerald-50 transition shadow-xs flex items-center gap-2 cursor-pointer"
-            >
-              <FileText className="w-4 h-4 text-emerald-700" />
-              <span>Cetak Rekap Billing</span>
-            </button>
             <button
               onClick={onExportCSV}
               className="px-3.5 py-2 rounded-xl bg-emerald-700/80 text-white font-bold text-xs hover:bg-emerald-600 transition border border-emerald-500/40 shadow-xs flex items-center gap-2 cursor-pointer"
@@ -624,7 +676,27 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
+            {/* Search bar progress tiap industri */}
+            <div className="relative flex-1 sm:w-64 min-w-[180px]">
+              <input
+                type="text"
+                value={industrySearchQuery}
+                onChange={(e) => setIndustrySearchQuery(e.target.value)}
+                placeholder="Cari industri (ID / Nama / Petugas)..."
+                className="w-full pl-8 pr-7 py-1.5 text-xs font-medium bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0055A5]"
+              />
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+              {industrySearchQuery && (
+                <button
+                  onClick={() => setIndustrySearchQuery('')}
+                  className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 dark:hover:text-white text-xs"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
             <select
               value={workflowFilter}
               onChange={(e) => onWorkflowFilterChange(e.target.value)}
@@ -638,16 +710,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </select>
 
             <button
-              onClick={onOpenPrintReport}
-              className="px-3 py-1.5 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-xl transition shadow-xs flex items-center gap-1.5"
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span>Cetak PDF</span>
-            </button>
-
-            <button
               onClick={onExportCSV}
-              className="px-3 py-1.5 text-xs font-bold bg-[#0055A5] hover:bg-[#003E78] text-white rounded-xl transition shadow-xs flex items-center gap-1.5"
+              className="px-3 py-1.5 text-xs font-bold bg-[#0055A5] hover:bg-[#003E78] text-white rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Ekspor CSV</span>
@@ -663,7 +727,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 {selectedRowIds.length}
               </span>
               <span className="font-bold text-slate-800 dark:text-slate-200">
-                Industri terpilih untuk pembaruan status massal
+                Industri terpilih untuk tindakan massal
               </span>
             </div>
 
@@ -683,6 +747,23 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 <Clock className="w-3.5 h-3.5" />
                 <span>Tandai Terpilih sbg 'Pending'</span>
               </button>
+
+              {onDeleteBatchCustomers && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteConfirmModal({
+                      isOpen: true,
+                      type: 'batch',
+                      count: selectedRowIds.length
+                    });
+                  }}
+                  className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Hapus Terpilih ({selectedRowIds.length})</span>
+                </button>
+              )}
 
               <button
                 onClick={() => setSelectedRowIds([])}
@@ -713,6 +794,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 <th className="p-3.5 text-right">Stand Lalu (m³)</th>
                 <th className="p-3.5 text-right">Stand Skrg (m³)</th>
                 <th className="p-3.5 text-right">Volume (m³)</th>
+                <th className="p-3.5 text-right">Tagihan Air (Rp)</th>
                 <th className="p-3.5 text-right">Bea Materai (Rp)</th>
                 <th className="p-3.5 text-right">Total Tagihan (Rp)</th>
                 <th className="p-3.5">Status Alur Kerja &amp; Catatan</th>
@@ -722,17 +804,19 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700 font-medium">
               {filteredCustomers.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="p-8 text-center text-slate-400">
-                    Tidak ada data industri yang sesuai dengan kriteria filter.
+                  <td colSpan={11} className="p-8 text-center text-slate-400">
+                    Tidak ada data industri yang sesuai dengan kriteria filter atau pencarian.
                   </td>
                 </tr>
               ) : (
                 filteredCustomers.map((item) => {
                   const isSelected = selectedRowIds.includes(item.id);
                   const vol = Math.max(0, item.skrg - item.lalu);
-                  const estTagihan = vol * 12500;
-                  const materai = vol > 1000 ? 10000 : 0;
-                  const totalTagihan = estTagihan + materai;
+                  const tagihanAir = vol * 17872;
+                  // UU Bea Meterai: Dokumen tagihan > 5 Juta otomatis dikenakan Bea Materai Rp 10.000
+                  const isMaterai = tagihanAir > 5000000;
+                  const materai = isMaterai ? 10000 : 0;
+                  const totalTagihan = tagihanAir + materai;
 
                   let badgeColor =
                     'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300';
@@ -799,8 +883,16 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                       <td className="p-3.5 font-mono text-right font-black text-[#E86216] tabular-nums">
                         {vol.toLocaleString()}
                       </td>
+                      <td className="p-3.5 font-mono text-right font-black text-[#0055A5] dark:text-blue-400 tabular-nums">
+                        Rp {tagihanAir.toLocaleString()}
+                      </td>
                       <td className="p-3.5 font-mono text-right tabular-nums text-slate-600 dark:text-slate-300">
-                        Rp {materai.toLocaleString()}
+                        <div>Rp {materai.toLocaleString()}</div>
+                        {isMaterai && (
+                          <span className="inline-block text-[8px] font-black text-indigo-600 dark:text-indigo-400 font-sans uppercase bg-indigo-50 dark:bg-indigo-950/60 px-1 py-0.2 rounded mt-0.5">
+                            e-Materai (&gt;5Jt)
+                          </span>
+                        )}
                       </td>
                       <td className="p-3.5 font-mono text-right font-bold tabular-nums text-slate-900 dark:text-white">
                         Rp {totalTagihan.toLocaleString()}
@@ -834,6 +926,14 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                           >
                             🔍 Detail
                           </button>
+                          <button
+                            onClick={() => setSelectedInvoiceCustomer(item)}
+                            className="px-2.5 py-1 bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600 hover:text-white rounded-lg text-xs font-bold transition shadow-xs whitespace-nowrap cursor-pointer flex items-center gap-1"
+                            title="Cetak Invoice PDF Sesuai Template Resmi PT Aetra"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>Invoice</span>
+                          </button>
                           {item.status !== 'Verified' && item.status !== 'Invoiced' && (
                             <button
                               onClick={() =>
@@ -844,9 +944,26 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                                 )
                               }
                               title="Tandai Verified"
-                              className="p-1 bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600 hover:text-white rounded-lg transition"
+                              className="p-1 bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600 hover:text-white rounded-lg transition cursor-pointer"
                             >
                               <CheckCircle className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {onDeleteCustomer && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDeleteConfirmModal({
+                                  isOpen: true,
+                                  type: 'single',
+                                  id: item.id,
+                                  name: item.nama
+                                });
+                              }}
+                              title="Hapus Data Industri"
+                              className="p-1 text-rose-500 hover:text-white hover:bg-rose-600 rounded-lg transition cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           )}
                         </div>
@@ -986,6 +1103,72 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             });
             setTimeout(() => setBatchFeedback(null), 5000);
           }}
+        />
+      )}
+
+      {/* IN-APP CONFIRMATION MODAL DIALOG FOR DELETION (Non-blocking in iframes) */}
+      {deleteConfirmModal && deleteConfirmModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 max-w-md w-full p-5 space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950/60 flex items-center justify-center">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
+                  Konfirmasi Penghapusan
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Tindakan ini tidak dapat dibatalkan
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 dark:bg-slate-900/60 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-200">
+              {deleteConfirmModal.type === 'batch' ? (
+                <p>
+                  Apakah Anda yakin ingin menghapus{' '}
+                  <span className="font-black text-rose-600 dark:text-rose-400">
+                    {deleteConfirmModal.count} industri terpilih
+                  </span>{' '}
+                  dari daftar monitoring &amp; alur kerja?
+                </p>
+              ) : (
+                <p>
+                  Apakah Anda yakin ingin menghapus data industri{' '}
+                  <span className="font-black text-slate-900 dark:text-white">
+                    {deleteConfirmModal.name}
+                  </span>{' '}
+                  (ID: {deleteConfirmModal.id}) dari sistem?
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmModal(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer"
+              >
+                Batalkan
+              </button>
+              <button
+                type="button"
+                onClick={executeConfirmedDelete}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-extrabold shadow-md transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Ya, Hapus Sekarang</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedInvoiceCustomer && (
+        <OfficialAetraInvoiceModal
+          customer={selectedInvoiceCustomer}
+          onClose={() => setSelectedInvoiceCustomer(null)}
         />
       )}
     </div>

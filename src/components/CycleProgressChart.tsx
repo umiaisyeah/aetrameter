@@ -533,9 +533,6 @@ export const CycleProgressChart: React.FC<CycleProgressChartProps> = ({
               <Users className="w-3.5 h-3.5 text-[#0284c7]" />
               Kontraktor / Vendor
             </span>
-            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300">
-              Pelaksana Lapangan
-            </span>
           </div>
           <div className="flex items-baseline justify-between">
             <div className="text-xl font-black text-slate-800 dark:text-white font-mono">
@@ -570,9 +567,6 @@ export const CycleProgressChart: React.FC<CycleProgressChartProps> = ({
             <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
               <Shield className="w-3.5 h-3.5 text-indigo-500" />
               Key Account Officer
-            </span>
-            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
-              Akun Strategis &amp; VIP
             </span>
           </div>
           <div className="flex items-baseline justify-between">

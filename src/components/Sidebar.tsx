@@ -1,6 +1,6 @@
 import React from 'react';
 import { AetraLogo } from './AetraLogo';
-import { BarChart3, Database, CheckCircle2, Receipt, History, Building2, Calendar } from 'lucide-react';
+import { BarChart3, Database, CheckCircle2, Receipt, History, Calendar } from 'lucide-react';
 import { UserProfile } from '../types';
 
 interface SidebarProps {
@@ -94,11 +94,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, workflowFilter, onS
         </nav>
       </div>
 
-      <div className="pt-4 border-t border-blue-800/60 dark:border-slate-800 px-1 space-y-2">
-        <div className="flex items-center gap-2 text-[11px] text-blue-200/80">
-          <Building2 className="w-3.5 h-3.5 text-orange-400" />
-          <span className="truncate">Unit Pelayanan Industri</span>
-        </div>
+      <div className="pt-4 border-t border-blue-800/60 dark:border-slate-800 px-1">
         <p className="text-[10px] text-blue-300/60">PT Aetra Air Tangerang © 2026</p>
       </div>
     </aside>

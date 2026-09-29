@@ -20,8 +20,10 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
   const tarifPerM3 = 12500;
   const biayaAir = vol * tarifPerM3;
   const biayaBebanPipa = 75000;
-  const materai = vol > 1000 ? 10000 : 0;
   const subtotal = biayaAir + biayaBebanPipa;
+  // UU Bea Meterai: Dokumen tagihan > Rp 5.000.000 otomatis dikenakan e-Materai Rp 10.000
+  const isMateraiRequired = subtotal > 5000000;
+  const materai = isMateraiRequired ? 10000 : 0;
   const totalTagihan = subtotal + materai;
 
   const invoiceNumber = `INV/AETRA/${customer.cycle.replace(' ', '')}/${customer.id}/${new Date().getFullYear()}`;
@@ -166,9 +168,16 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
                 <span>Biaya Pemeliharaan Meter:</span>
                 <span className="font-mono font-bold">Rp {biayaBebanPipa.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between text-slate-600 pb-1 border-b border-slate-100">
-                <span>Bea Materai (Lunas):</span>
-                <span className="font-mono font-bold">Rp {materai.toLocaleString()}</span>
+              <div className="flex justify-between text-slate-600 pb-1 border-b border-slate-100 items-center">
+                <span className="flex items-center gap-1">
+                  <span>Bea Materai:</span>
+                  {isMateraiRequired && (
+                    <span className="text-[9px] font-black bg-indigo-100 text-indigo-700 px-1.5 py-0.2 rounded">
+                      e-Materai Rp 10.000 (Otomatis &gt; Rp 5 Jt)
+                    </span>
+                  )}
+                </span>
+                <span className="font-mono font-bold">{materai > 0 ? `Rp ${materai.toLocaleString()}` : 'Rp 0'}</span>
               </div>
               <div className="flex justify-between text-base font-black text-[#0055A5] pt-1 border-t-2 border-[#0055A5]">
                 <span>TOTAL PEMBAYARAN:</span>
@@ -177,7 +186,7 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
             </div>
           </div>
 
-          {/* Payment Instructions & Official Stamp */}
+          {/* Payment Instructions & Official Stamp with e-Materai */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-200 text-xs">
             <div className="bg-blue-50/60 p-3 rounded-lg border border-blue-100">
               <p className="font-bold text-[#0055A5] text-[11px] mb-1">Rekening Pembayaran Resmi:</p>
@@ -190,6 +199,14 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
             </div>
 
             <div className="flex items-center justify-around text-center">
+              {isMateraiRequired && (
+                <div className="border border-indigo-300 bg-indigo-50/60 p-2 rounded-lg text-center font-mono">
+                  <div className="text-[9px] font-black text-indigo-800 tracking-wider">E-MATERAI RESMI</div>
+                  <div className="text-[8px] text-indigo-600">REPUBLIK INDONESIA</div>
+                  <div className="text-[11px] font-black text-indigo-900 my-0.5">10000</div>
+                  <div className="text-[7px] text-slate-400 font-mono">DIGITAL-SEAL-2026</div>
+                </div>
+              )}
               <div>
                 <p className="text-[10px] text-slate-400">Tangerang, {new Date().toLocaleDateString('id-ID')}</p>
                 <div className="w-24 h-16 my-1 border-b border-slate-300 relative flex items-center justify-center">

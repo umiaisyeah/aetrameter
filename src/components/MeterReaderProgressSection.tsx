@@ -81,11 +81,15 @@ export const MeterReaderProgressSection: React.FC<MeterReaderProgressSectionProp
       }
 
       // Status
-      let statusLabel: 'Selesai' | 'Sedang Berjalan' | 'Belum Dimulai' = 'Belum Dimulai';
-      if (total > 0 && completed === total) {
-        statusLabel = 'Selesai';
-      } else if (completed > 0 || cycleCustomers.some((c) => c.status === 'Pending Verification')) {
-        statusLabel = 'Sedang Berjalan';
+      let statusLabel: 'Selesai' | 'Sedang Berjalan' | 'Belum Dimulai' | 'Belum Ada Data' = 'Belum Ada Data';
+      if (total > 0) {
+        if (completed === total) {
+          statusLabel = 'Selesai';
+        } else if (completed > 0 || cycleCustomers.some((c) => c.status === 'Pending Verification')) {
+          statusLabel = 'Sedang Berjalan';
+        } else {
+          statusLabel = 'Belum Dimulai';
+        }
       }
 
       return {
@@ -107,25 +111,55 @@ export const MeterReaderProgressSection: React.FC<MeterReaderProgressSectionProp
 
   // Reader overall stats
   const readerStats = useMemo(() => {
+    const sortCycles = (cycles: string[]): string[] => {
+      return [...cycles].sort((a, b) => {
+        const numA = parseInt(a.replace(/\D/g, '')) || 0;
+        const numB = parseInt(b.replace(/\D/g, '')) || 0;
+        return numA - numB;
+      });
+    };
+
     return meterReaders.map((reader) => {
-      const assigned = cycleProgressList.filter((item) =>
-        reader.assignedCycles.some((ac) => ac.toLowerCase() === item.cycle.toLowerCase())
+      // Sinkronisasi otomatis dari Database Industri yang diinput
+      const dbAssignedCycles = Array.from(
+        new Set(
+          customers
+            .filter((c) => c.petugasBaca && c.petugasBaca.toLowerCase() === reader.nama.toLowerCase())
+            .map((c) => c.cycle)
+            .filter(Boolean)
+        )
       );
-      const totalIndustri = assigned.reduce((acc, curr) => acc + curr.total, 0);
-      const totalCompleted = assigned.reduce((acc, curr) => acc + curr.completed, 0);
-      const totalPending = assigned.reduce((acc, curr) => acc + curr.pending, 0);
+
+      const validAssignedCycles = dbAssignedCycles.length > 0
+        ? dbAssignedCycles
+        : (reader.assignedCycles || []).filter((ac) =>
+            customers.some((c) => c.cycle.toLowerCase() === ac.toLowerCase())
+          );
+
+      const sortedCycles = sortCycles(validAssignedCycles);
+      const assignedCusts = customers.filter((c) =>
+        (c.petugasBaca && c.petugasBaca.toLowerCase() === reader.nama.toLowerCase()) ||
+        sortedCycles.some((ac) => ac.toLowerCase() === c.cycle.toLowerCase())
+      );
+      const totalIndustri = assignedCusts.length;
+      const totalCompleted = assignedCusts.filter(
+        (c) => c.status === 'Verified' || c.status === 'Invoiced'
+      ).length;
+      const totalPending = assignedCusts.filter(
+        (c) => c.status === 'Pending Verification' || c.status === 'Belum Dibaca'
+      ).length;
       const overallPercent = totalIndustri > 0 ? Math.round((totalCompleted / totalIndustri) * 100) : 0;
 
       return {
         reader,
-        assignedCycleCount: assigned.length,
+        assignedCycleCount: sortedCycles.length,
         totalIndustri,
         totalCompleted,
         totalPending,
         overallPercent
       };
     });
-  }, [meterReaders, cycleProgressList]);
+  }, [meterReaders, cycleProgressList, customers]);
 
   // Filtered cycle list
   const filteredCycles = useMemo(() => {
@@ -433,7 +467,11 @@ export const MeterReaderProgressSection: React.FC<MeterReaderProgressSectionProp
                       </span>
                     </td>
                     <td className="p-3 text-center font-bold font-mono text-slate-700 dark:text-slate-200">
-                      {row.total}
+                      {row.total > 0 ? (
+                        row.total
+                      ) : (
+                        <span className="text-slate-400 text-[11px] font-normal italic">0 Industri</span>
+                      )}
                     </td>
                     <td className="p-3 text-center font-bold font-mono text-emerald-600 dark:text-emerald-400">
                       {row.completed}
@@ -467,6 +505,8 @@ export const MeterReaderProgressSection: React.FC<MeterReaderProgressSectionProp
                             ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
                             : row.statusLabel === 'Sedang Berjalan'
                             ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400'
+                            : row.statusLabel === 'Belum Ada Data'
+                            ? 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
                             : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
                         }`}
                       >
@@ -483,11 +523,16 @@ export const MeterReaderProgressSection: React.FC<MeterReaderProgressSectionProp
                     <td className="p-3 text-center">
                       <button
                         onClick={() => onSelectCycle(row.cycle)}
-                        className="px-2.5 py-1 text-[11px] font-bold text-[#0055A5] dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 rounded-lg transition inline-flex items-center gap-1"
-                        title="Tampilkan pelanggan industri cycle ini"
+                        disabled={row.total === 0}
+                        className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition inline-flex items-center gap-1 ${
+                          row.total > 0
+                            ? 'text-[#0055A5] dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 cursor-pointer'
+                            : 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                        }`}
+                        title={row.total > 0 ? 'Tampilkan pelanggan industri cycle ini' : 'Belum ada data industri yang diinput admin'}
                       >
-                        <span>Filter</span>
-                        <ArrowUpRight className="w-3 h-3" />
+                        <span>{row.total > 0 ? 'Filter' : 'Kosong'}</span>
+                        {row.total > 0 && <ArrowUpRight className="w-3 h-3" />}
                       </button>
                     </td>
                   </tr>

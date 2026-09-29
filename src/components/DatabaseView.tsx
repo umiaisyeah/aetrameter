@@ -67,6 +67,17 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
 
   // Checkbox selection state
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState<{
+    isOpen: boolean;
+    type: 'batch' | 'single';
+    id?: string;
+    name?: string;
+    count?: number;
+  } | null>(null);
+  const [actionFeedback, setActionFeedback] = useState<{
+    type: 'success' | 'warning' | 'info';
+    message: string;
+  } | null>(null);
 
   const cycles = Array.from({ length: 15 }, (_, i) => `Cycle ${i + 1}`);
 
@@ -81,6 +92,56 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
       }
     }
     return null;
+  };
+
+  const downloadUnifiedExcelTemplate = () => {
+    const templateData = [
+      {
+        'ID Pelanggan': 'IND-2001',
+        'Nama Perusahaan Industri': 'PT Astra Honda Motor Plant Cikupa',
+        'Cycle': 'Cycle 1',
+        'Kelas': 'Premium',
+        'Stand Lalu (m³)': 45000,
+        'Pembaca Meter': 'Anjarini Sukamto'
+      },
+      {
+        'ID Pelanggan': 'IND-2002',
+        'Nama Perusahaan Industri': 'PT Mayora Indah Divisi Wafer',
+        'Cycle': 'Cycle 2',
+        'Kelas': 'Platinum',
+        'Stand Lalu (m³)': 38200,
+        'Pembaca Meter': 'Anjarini Sukamto'
+      },
+      {
+        'ID Pelanggan': 'IND-2003',
+        'Nama Perusahaan Industri': 'PT Torabika Eka Semesta',
+        'Cycle': 'Cycle 3',
+        'Kelas': 'Gold',
+        'Stand Lalu (m³)': 18400,
+        'Pembaca Meter': 'Anjarini Sukamto'
+      },
+      {
+        'ID Pelanggan': 'IND-2004',
+        'Nama Perusahaan Industri': 'PT Unilever Oleochemical Balaraja',
+        'Cycle': 'Cycle 4',
+        'Kelas': 'Premium',
+        'Stand Lalu (m³)': 28900,
+        'Pembaca Meter': 'Febriadi'
+      },
+      {
+        'ID Pelanggan': 'IND-2005',
+        'Nama Perusahaan Industri': 'PT Gajah Tunggal Tbk Plant 2',
+        'Cycle': 'Cycle 5',
+        'Kelas': 'Silver',
+        'Stand Lalu (m³)': 12500,
+        'Pembaca Meter': 'Febriadi'
+      }
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Database Industri & Cycle');
+    XLSX.writeFile(wb, 'Format_Import_Industri_Cycle_SIMBA_IN.xlsx');
   };
 
   const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -102,10 +163,12 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
         }
 
         const imported: IndustryCustomer[] = rows.map((item, index) => {
+          // 1. ID Pelanggan
           const idPel =
-            getExcelValue(item, ['idPelanggan', 'id_pelanggan', 'id', 'id pelanggan', 'nomor pelanggan', 'nopol']) ||
+            getExcelValue(item, ['idPelanggan', 'id_pelanggan', 'id', 'id pelanggan', 'nomor pelanggan', 'nopol', 'customer id']) ||
             `IND-${1100 + index}`;
 
+          // 2. Nama Perusahaan Industri
           const nmPerusahaan =
             getExcelValue(item, [
               'nama_perusahaan_industri',
@@ -120,10 +183,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
               'nama'
             ]) || `Industri ${idPel}`;
 
-          const mail =
-            getExcelValue(item, ['emailIndustri', 'email', 'surel', 'email perusahaan']) ||
-            'finance@industri.co.id';
-
+          // 3. Cycle
           const cycVal = getExcelValue(item, ['pilihCycle', 'cycle', 'siklus', 'c', 'jadwal']);
           const cyc = cycVal
             ? String(cycVal).toLowerCase().includes('cycle')
@@ -131,27 +191,52 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
               : `Cycle ${cycVal}`
             : 'Cycle 1';
 
+          // 4. Kelas
           const klsVal = getExcelValue(item, ['kelasPelanggan', 'kelas', 'class', 'kategori']);
           const rawKls = klsVal ? String(klsVal).replace(/kelas\s*/gi, '').trim() : 'Gold';
           const kls: CustomerClass = ['Premium', 'Platinum', 'Gold', 'Silver', 'Bronze'].includes(rawKls)
             ? (rawKls as CustomerClass)
             : 'Gold';
 
+          // 5. Pembaca Meter
+          const readerVal =
+            getExcelValue(item, [
+              'pembaca_meter',
+              'pembaca meter',
+              'pembacameter',
+              'petugas_baca',
+              'petugas baca',
+              'petugas',
+              'reader',
+              'pic'
+            ]) || 'Pak Joko Widodo';
+
+          const mail =
+            getExcelValue(item, ['emailIndustri', 'email', 'surel', 'email perusahaan']) ||
+            `billing@${String(nmPerusahaan).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 12) || 'industri'}.co.id`;
+
           const laluVal =
             Number(getExcelValue(item, ['standLalu', 'stand_lalu', 'lalu', 'meter lalu', 'stand bulan lalu'])) ||
             10000;
 
+          const isKA =
+            String(readerVal).toLowerCase().includes('dani') ||
+            String(readerVal).toLowerCase().includes('dewi') ||
+            kls === 'Premium';
+
           return {
-            id: String(idPel),
-            nama: String(nmPerusahaan),
-            email: String(mail),
-            cycle: String(cyc),
+            id: String(idPel).trim().toUpperCase(),
+            nama: String(nmPerusahaan).trim(),
+            email: String(mail).trim(),
+            cycle: String(cyc).trim(),
             kelas: kls,
+            petugasBaca: String(readerVal).trim(),
+            kategoriPetugas: isKA ? 'Key Account' : 'Kontraktor',
             lalu: laluVal,
             skrg: laluVal,
             status: 'Belum Dibaca' as const,
             bulan: 'September 2026',
-            catatan: 'Diimpor dari file Excel (Belum dibaca).',
+            catatan: `Diimpor dari file Excel. Petugas: ${readerVal} (Belum dibaca).`,
             history: [Math.max(0, laluVal - 600), Math.max(0, laluVal - 300), laluVal],
             fotoMeter: '',
             fotoBPM: ''
@@ -159,7 +244,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
         });
 
         onImportCustomers(imported);
-        alert(`Berhasil mengimpor ${imported.length} data industri dari file Excel dengan status Belum Dibaca (menunggu pembacaan meter lapangan)!`);
+        alert(`✓ Berhasil mengimpor ${imported.length} data industri gabungan (ID, Nama, Cycle, Kelas, Pembaca Meter) dengan status Belum Dibaca!`);
       } catch (err) {
         console.error(err);
         alert('Gagal membaca file Excel. Pastikan format file .xlsx atau .xls valid.');
@@ -242,13 +327,50 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
 
   const handleDeleteSelected = () => {
     if (selectedIds.length === 0) {
-      alert('Pilih setidaknya satu industri menggunakan checklist untuk dihapus.');
+      setActionFeedback({
+        type: 'warning',
+        message: '⚠️ Pilih setidaknya satu industri menggunakan kotak centang (checklist) untuk dihapus.'
+      });
+      setTimeout(() => setActionFeedback(null), 4000);
       return;
     }
-    if (confirm(`Yakin ingin menghapus ${selectedIds.length} data industri yang dipilih?`)) {
+    setDeleteConfirmModal({
+      isOpen: true,
+      type: 'batch',
+      count: selectedIds.length
+    });
+  };
+
+  const handleOpenSingleDelete = (id: string, name: string) => {
+    setDeleteConfirmModal({
+      isOpen: true,
+      type: 'single',
+      id,
+      name
+    });
+  };
+
+  const executeConfirmedDelete = () => {
+    if (!deleteConfirmModal) return;
+
+    if (deleteConfirmModal.type === 'batch') {
+      const count = selectedIds.length;
       onDeleteBatchCustomers(selectedIds);
       setSelectedIds([]);
+      setActionFeedback({
+        type: 'success',
+        message: `✓ Berhasil menghapus ${count} data industri terpilih dari database.`
+      });
+    } else if (deleteConfirmModal.type === 'single' && deleteConfirmModal.id) {
+      onDeleteCustomer(deleteConfirmModal.id);
+      setActionFeedback({
+        type: 'success',
+        message: `✓ Berhasil menghapus industri ${deleteConfirmModal.name || deleteConfirmModal.id} dari database.`
+      });
     }
+
+    setDeleteConfirmModal(null);
+    setTimeout(() => setActionFeedback(null), 5000);
   };
 
   return (
@@ -307,7 +429,16 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                   Tambahkan akun industri baru ke dalam database pencatatan meter atau impor secara massal dari Excel.
                 </p>
               </div>
-              <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={downloadUnifiedExcelTemplate}
+                  className="bg-[#0055A5] hover:bg-[#003E78] text-white text-xs font-bold px-3.5 py-2.5 rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer"
+                  title="Unduh Format Excel 5 Kolom: ID Pelanggan, Nama Perusahaan Industri, Cycle, Kelas, Pembaca Meter"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>Unduh Format Excel Gabungan</span>
+                </button>
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -316,8 +447,9 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                   onChange={handleExcelImport}
                 />
                 <button
+                  type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-xs transition flex items-center gap-2"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer"
                 >
                   <Upload className="w-4 h-4" />
                   <span>Impor Excel (.xlsx, .xls)</span>
@@ -326,7 +458,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
             </div>
 
             {/* Manual registration form */}
-            <form onSubmit={handleManualAdd} className="grid grid-cols-1 md:grid-cols-3 gap-3.5 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+            <form onSubmit={handleManualAdd} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3.5 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
               <div>
                 <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">
                   ID Pelanggan
@@ -381,6 +513,18 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
               </div>
               <div>
                 <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">
+                  Stand Bulan Lalu (m³)
+                </label>
+                <input
+                  type="number"
+                  value={newStandLalu}
+                  onChange={(e) => setNewStandLalu(e.target.value)}
+                  placeholder="10000"
+                  className="w-full p-2.5 border border-slate-300 dark:border-slate-600 rounded-xl text-xs bg-white dark:bg-slate-800 font-mono font-bold text-emerald-600 dark:text-emerald-400"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">
                   Kelas Pelanggan
                 </label>
                 <select
@@ -395,10 +539,10 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                   <option value="Bronze">Bronze</option>
                 </select>
               </div>
-              <div className="flex items-end">
+              <div className="md:col-span-3 lg:col-span-6 flex justify-end">
                 <button
                   type="submit"
-                  className="w-full py-2.5 bg-[#E86216] hover:bg-orange-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5"
+                  className="w-full sm:w-auto px-6 py-2.5 bg-[#E86216] hover:bg-orange-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Simpan ke Database Cycle</span>
@@ -496,8 +640,9 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                   <div className="ml-auto flex items-center gap-2">
                     {selectedIds.length > 0 && (
                       <button
+                        type="button"
                         onClick={handleDeleteSelected}
-                        className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shadow-xs transition flex items-center gap-1.5"
+                        className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1.5 cursor-pointer animate-in fade-in"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                         <span>Hapus Terpilih ({selectedIds.length})</span>
@@ -507,28 +652,26 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                 </div>
               </div>
 
-              <div className="overflow-x-auto max-h-[320px] overflow-y-auto border border-slate-100 dark:border-slate-700 rounded-xl">
+              <div className="overflow-x-auto max-h-[340px] overflow-y-auto border border-slate-100 dark:border-slate-700 rounded-xl">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="bg-slate-100 dark:bg-slate-700/50 text-slate-700 dark:text-slate-200 uppercase font-extrabold text-[10px] sticky top-0 z-10">
                       <th className="p-3 w-10 text-center">
-                        <button
-                          type="button"
-                          onClick={handleToggleSelectAll}
-                          className="text-slate-500 hover:text-slate-800 dark:hover:text-white"
-                          title="Pilih Semua"
-                        >
-                          {selectedIds.length === filteredList.length && filteredList.length > 0 ? (
-                            <CheckSquare className="w-4 h-4 text-[#0055A5] dark:text-blue-400" />
-                          ) : (
-                            <Square className="w-4 h-4" />
-                          )}
-                        </button>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.length === filteredList.length && filteredList.length > 0}
+                          onChange={handleToggleSelectAll}
+                          title="Pilih / Batalkan semua baris tabel"
+                          aria-label="Pilih semua baris tabel"
+                          className="w-4 h-4 rounded text-[#0055A5] focus:ring-[#0055A5] cursor-pointer"
+                        />
                       </th>
                       <th className="p-3">ID Pelanggan</th>
                       <th className="p-3">Nama Perusahaan Industri</th>
                       <th className="p-3">Cycle</th>
                       <th className="p-3">Kelas</th>
+                      <th className="p-3">Stand Bulan Lalu</th>
+                      <th className="p-3">Pembaca Meter</th>
                       <th className="p-3">Status Workflow</th>
                       <th className="p-3 text-center">Aksi</th>
                     </tr>
@@ -536,7 +679,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-700 font-medium">
                     {filteredList.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="p-6 text-center text-slate-400">
+                        <td colSpan={9} className="p-6 text-center text-slate-400">
                           Tidak ada data industri yang cocok dengan filter.
                         </td>
                       </tr>
@@ -547,21 +690,17 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                           <tr
                             key={item.id}
                             className={`hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors ${
-                              isChecked ? 'bg-blue-50/50 dark:bg-blue-950/30' : ''
+                              isChecked ? 'bg-blue-50/70 dark:bg-blue-950/40' : ''
                             }`}
                           >
                             <td className="p-3 text-center">
-                              <button
-                                type="button"
-                                onClick={() => handleToggleRow(item.id)}
-                                className="text-slate-500 hover:text-slate-800"
-                              >
-                                {isChecked ? (
-                                  <CheckSquare className="w-4 h-4 text-[#0055A5] dark:text-blue-400" />
-                                ) : (
-                                  <Square className="w-4 h-4" />
-                                )}
-                              </button>
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => handleToggleRow(item.id)}
+                                aria-label={`Pilih industri ${item.nama}`}
+                                className="w-4 h-4 rounded text-[#0055A5] focus:ring-[#0055A5] cursor-pointer"
+                              />
                             </td>
                             <td className="p-3 font-mono font-bold text-[#E86216]">{item.id}</td>
                             <td className="p-3 font-bold text-slate-800 dark:text-slate-100">
@@ -575,18 +714,27 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                             </td>
                             <td className="p-3 text-slate-600 dark:text-slate-300">{item.kelas}</td>
                             <td className="p-3">
+                              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-xs">
+                                {Number(item.lalu || 0).toLocaleString('id-ID')} m³
+                              </span>
+                            </td>
+                            <td className="p-3">
+                              <span className="font-semibold text-slate-800 dark:text-slate-200">
+                                {item.petugasBaca || 'Pak Joko Widodo'}
+                              </span>
+                              <span className="block text-[9px] text-slate-400">
+                                {item.kategoriPetugas || 'Kontraktor'}
+                              </span>
+                            </td>
+                            <td className="p-3">
                               <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
                                 {item.status}
                               </span>
                             </td>
                             <td className="p-3 text-center">
                               <button
-                                onClick={() => {
-                                  if (confirm(`Yakin ingin menghapus industri ${item.nama} (${item.id})?`)) {
-                                    onDeleteCustomer(item.id);
-                                  }
-                                }}
-                                className="text-rose-500 hover:text-rose-700 p-1 font-semibold text-xs transition"
+                                onClick={() => handleOpenSingleDelete(item.id, item.nama)}
+                                className="text-rose-500 hover:text-white hover:bg-rose-600 p-1.5 rounded-lg font-semibold text-xs transition cursor-pointer"
                                 title="Hapus Industri"
                               >
                                 <Trash2 className="w-4 h-4 inline" />
@@ -633,9 +781,93 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
           onClose={() => setIsImportScheduleModalOpen(false)}
           onImport={(schedules) => {
             onImportCycleSchedules(schedules);
-            alert(`Berhasil mengimpor tanggal pembacaan untuk ${schedules.length} cycle via Excel!`);
+            setActionFeedback({
+              type: 'success',
+              message: `✓ Berhasil mengimpor tanggal pembacaan untuk ${schedules.length} cycle via Excel!`
+            });
+            setTimeout(() => setActionFeedback(null), 5000);
           }}
         />
+      )}
+
+      {/* Action Feedback Floating Banner */}
+      {actionFeedback && (
+        <div
+          className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-2xl shadow-2xl border text-xs font-bold flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-5 duration-200 ${
+            actionFeedback.type === 'success'
+              ? 'bg-emerald-900/95 text-emerald-100 border-emerald-500'
+              : actionFeedback.type === 'warning'
+              ? 'bg-amber-900/95 text-amber-100 border-amber-500'
+              : 'bg-blue-900/95 text-blue-100 border-blue-500'
+          }`}
+        >
+          <span>{actionFeedback.message}</span>
+          <button
+            onClick={() => setActionFeedback(null)}
+            className="ml-2 text-white/80 hover:text-white font-mono"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* IN-APP CONFIRMATION MODAL DIALOG (Non-blocking in iframes) */}
+      {deleteConfirmModal && deleteConfirmModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 max-w-md w-full p-5 space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950/60 flex items-center justify-center">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
+                  Konfirmasi Penghapusan
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Tindakan ini tidak dapat dibatalkan
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 dark:bg-slate-900/60 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-200">
+              {deleteConfirmModal.type === 'batch' ? (
+                <p>
+                  Apakah Anda yakin ingin menghapus{' '}
+                  <span className="font-black text-rose-600 dark:text-rose-400">
+                    {deleteConfirmModal.count} data industri
+                  </span>{' '}
+                  yang dipilih dari database sistem?
+                </p>
+              ) : (
+                <p>
+                  Apakah Anda yakin ingin menghapus data industri{' '}
+                  <span className="font-black text-slate-900 dark:text-white">
+                    {deleteConfirmModal.name}
+                  </span>{' '}
+                  (ID: {deleteConfirmModal.id}) dari database sistem?
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmModal(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer"
+              >
+                Batalkan
+              </button>
+              <button
+                type="button"
+                onClick={executeConfirmedDelete}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-extrabold shadow-md transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Ya, Hapus Sekarang</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

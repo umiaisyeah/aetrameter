@@ -43,7 +43,9 @@ export const DetailModal: React.FC<DetailModalProps> = ({
   const currentStand = Number(inputSkrg) || 0;
   const vol = Math.max(0, currentStand - lalu);
   const estTagihan = vol * 12500;
-  const materai = vol > 1000 ? 10000 : 0;
+  // UU Bea Meterai: Dokumen tagihan / invoice di atas Rp 5.000.000 dikenakan Bea Meterai Rp 10.000
+  const isMateraiRequired = estTagihan > 5000000;
+  const materai = isMateraiRequired ? 10000 : 0;
   const totalTagihan = estTagihan + materai;
 
   // Anomaly calculation
@@ -383,8 +385,22 @@ export const DetailModal: React.FC<DetailModalProps> = ({
             </div>
 
             <div>
+              <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px] flex items-center justify-between">
+                <span>Bea Materai</span>
+                {isMateraiRequired && (
+                  <span className="text-[9px] font-black bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 px-1.5 py-0.2 rounded font-sans">
+                    e-Materai Otomatis (&gt;5 Jt)
+                  </span>
+                )}
+              </p>
+              <p className="text-sm font-black text-slate-800 dark:text-slate-100 font-mono tabular-nums">
+                {materai > 0 ? `Rp ${materai.toLocaleString()}` : 'Rp 0 (Bebas)'}
+              </p>
+            </div>
+
+            <div>
               <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px]">
-                Total Tagihan ({materai > 0 ? '+Materai' : 'No Materai'})
+                Total Tagihan {isMateraiRequired ? '(+ e-Materai)' : ''}
               </p>
               <p className="text-sm font-black text-[#0055A5] dark:text-blue-400 font-mono tabular-nums">
                 Rp {totalTagihan.toLocaleString()}

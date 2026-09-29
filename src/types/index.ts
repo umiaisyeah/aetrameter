@@ -1,4 +1,4 @@
-export type UserRole = 'yaya' | 'solihin' | 'kabul';
+export type UserRole = 'yaya' | 'solihin' | 'kabul' | 'field_reader';
 
 export interface UserProfile {
   role: UserRole;
@@ -6,13 +6,16 @@ export interface UserProfile {
   title: string;
   avatar: string;
   division: string;
+  readerId?: string;
+  kategori?: string;
+  perusahaan?: string;
 }
 
 export type CustomerClass = 'Premium' | 'Platinum' | 'Gold' | 'Silver' | 'Bronze';
 
 export type WorkflowStatus = 'Belum Dibaca' | 'Pending Verification' | 'Verified' | 'Invoiced';
 
-export type ReaderCategory = 'Kontraktor' | 'Key Account' | string;
+export type ReaderCategory = 'Kontraktor (PT Hideco)' | 'Key Account' | 'Kontraktor' | string;
 
 export interface MeterReader {
   id: string;
@@ -25,6 +28,8 @@ export interface MeterReader {
   status: 'Aktif' | 'Cuti' | 'Nonaktif';
   email?: string;
   wilayah?: string;
+  joinDate?: string;
+  password?: string;
 }
 
 export interface CycleSchedule {
@@ -40,6 +45,14 @@ export interface CycleSchedule {
   tglBilling?: number; // Invoicing day
   targetPelanggan?: number;
   catatan?: string;
+  // Pergeseran Hari Baca untuk Pemenuhan Target Volume
+  adaPergeseran?: boolean;
+  hariHOriginal?: number;
+  selisihHariPergeseran?: number; // e.g. +1, +2, -1
+  keteranganPergeseran?: string; // Penjelasan pergeseran untuk pemenuhan target volume
+  targetVolumeTambahanM3?: number;
+  tanggalPergeseranBaru?: string;
+  alasanPergeseran?: 'Target Volume Industri' | 'Penyesuaian Hari Kerja/Libur' | 'Maintenance Jaringan Pipa' | 'Permintaan Khusus Pelanggan' | 'Lainnya';
 }
 
 export interface IndustryCustomer {
@@ -60,6 +73,8 @@ export interface IndustryCustomer {
   diameterPipa?: string;
   petugasBaca?: string;
   kategoriPetugas?: ReaderCategory;
+  lokasiGps?: string;
+  waktuBaca?: string;
 }
 
 export interface AuditLog {

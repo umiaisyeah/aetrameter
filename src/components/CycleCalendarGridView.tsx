@@ -213,9 +213,6 @@ export const CycleCalendarGridView: React.FC<CycleCalendarGridViewProps> = ({
                     const isValidDay = day <= daysInMonth;
 
                     const isHariH = day === sch.hariH;
-                    const isPraBaca = day === sch.tglPraBaca;
-                    const isVerifikasi = day === sch.tglVerifikasi;
-                    const isBilling = day === sch.tglBilling;
 
                     // If not a valid day in this month
                     if (!isValidDay) {
@@ -237,7 +234,7 @@ export const CycleCalendarGridView: React.FC<CycleCalendarGridViewProps> = ({
                       );
                     }
 
-                    // Workflow Colored Cells
+                    // Workflow Colored Cells (Hari H Only)
                     if (isHariH) {
                       return (
                         <td
@@ -250,36 +247,6 @@ export const CycleCalendarGridView: React.FC<CycleCalendarGridViewProps> = ({
                         >
                           <span className="font-extrabold">{cycleNum}</span>
                         </td>
-                      );
-                    }
-
-                    if (isPraBaca) {
-                      return (
-                        <td
-                          key={day}
-                          className="border-r border-slate-300 dark:border-slate-700 bg-[#70529C] text-white text-[10px]"
-                          title={`Pra-baca / Persiapan ${sch.cycle}`}
-                        ></td>
-                      );
-                    }
-
-                    if (isVerifikasi) {
-                      return (
-                        <td
-                          key={day}
-                          className="border-r border-slate-300 dark:border-slate-700 bg-[#00AEEF] text-white text-[10px]"
-                          title={`Verifikasi Reading ${sch.cycle}`}
-                        ></td>
-                      );
-                    }
-
-                    if (isBilling) {
-                      return (
-                        <td
-                          key={day}
-                          className="border-r border-slate-300 dark:border-slate-700 bg-[#7B3F00] text-white text-[10px]"
-                          title={`Billing & Terbit Invoice ${sch.cycle}`}
-                        ></td>
                       );
                     }
 
@@ -330,27 +297,12 @@ export const CycleCalendarGridView: React.FC<CycleCalendarGridViewProps> = ({
           </span>
 
           <div className="flex items-center gap-1.5">
-            <span className="w-4 h-4 rounded-xs bg-[#70529C] inline-block shadow-2xs"></span>
-            <span className="text-slate-600 dark:text-slate-300 text-[11px]">Pra-Baca</span>
-          </div>
-
-          <div className="flex items-center gap-1.5">
             <span className="w-4 h-4 rounded-xs bg-[#FFF200] border border-amber-300 font-black text-[9px] flex items-center justify-center text-black shadow-2xs">
               N
             </span>
             <span className="text-slate-800 dark:text-white font-bold text-[11px]">
               Hari H Pembacaan Meter (Nomor Cycle)
             </span>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <span className="w-4 h-4 rounded-xs bg-[#00AEEF] inline-block shadow-2xs"></span>
-            <span className="text-slate-600 dark:text-slate-300 text-[11px]">Verifikasi Stand</span>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <span className="w-4 h-4 rounded-xs bg-[#7B3F00] inline-block shadow-2xs"></span>
-            <span className="text-slate-600 dark:text-slate-300 text-[11px]">Billing / Invoicing</span>
           </div>
 
           <div className="flex items-center gap-1.5">

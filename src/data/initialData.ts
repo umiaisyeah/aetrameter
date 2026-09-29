@@ -598,8 +598,102 @@ export const INITIAL_AUDIT_LOGS: AuditLog[] = [
   }
 ];
 
-// Kosongkan daftar petugas dan perusahaan sesuai permintaan pengguna sampai data asli diinput
-export const INITIAL_METER_READERS: MeterReader[] = [];
+export const INITIAL_METER_READERS: MeterReader[] = [
+  // 5 Petugas Key Account (PT Aetra Air Tangerang)
+  {
+    id: 'KA-001',
+    nama: 'Anjarini Sukamto',
+    password: 'ANJAR123',
+    nip: 'AET-KA-2026-101',
+    noHp: '0812-8821-4401',
+    kategori: 'Key Account',
+    perusahaan: 'PT Aetra Air Tangerang (Key Account)',
+    assignedCycles: ['Cycle 1', 'Cycle 2', 'Cycle 3'],
+    status: 'Aktif',
+    email: 'anjarini.sukamto@aetratangerang.co.id',
+    wilayah: 'Pelanggan Key Account & Kawasan Manis'
+  },
+  {
+    id: 'KA-002',
+    nama: 'Febriadi',
+    password: 'FEBRI123',
+    nip: 'AET-KA-2026-102',
+    noHp: '0813-9932-5502',
+    kategori: 'Key Account',
+    perusahaan: 'PT Aetra Air Tangerang (Key Account)',
+    assignedCycles: ['Cycle 4', 'Cycle 5', 'Cycle 6'],
+    status: 'Aktif',
+    email: 'febriadi@aetratangerang.co.id',
+    wilayah: 'Pelanggan Key Account & Kawasan Jatake'
+  },
+  {
+    id: 'KA-003',
+    nama: 'Harsindi',
+    password: 'SINDI123',
+    nip: 'AET-KA-2026-103',
+    noHp: '0857-1122-3344',
+    kategori: 'Key Account',
+    perusahaan: 'PT Aetra Air Tangerang (Key Account)',
+    assignedCycles: ['Cycle 7', 'Cycle 8', 'Cycle 9'],
+    status: 'Aktif',
+    email: 'harsindi@aetratangerang.co.id',
+    wilayah: 'Pelanggan Key Account & Pasar Kemis'
+  },
+  {
+    id: 'KA-004',
+    nama: 'Wahyu Hidayat',
+    password: 'WAHYU123',
+    nip: 'AET-KA-2026-104',
+    noHp: '0811-9876-5432',
+    kategori: 'Key Account',
+    perusahaan: 'PT Aetra Air Tangerang (Key Account)',
+    assignedCycles: ['Cycle 10', 'Cycle 11', 'Cycle 12'],
+    status: 'Aktif',
+    email: 'wahyu.hidayat@aetratangerang.co.id',
+    wilayah: 'Pelanggan Strategis & Industri Premium'
+  },
+  {
+    id: 'KA-005',
+    nama: 'Yugo Apriadi',
+    password: 'YUGO123',
+    nip: 'AET-KA-2026-105',
+    noHp: '0812-3456-7890',
+    kategori: 'Key Account',
+    perusahaan: 'PT Aetra Air Tangerang (Key Account)',
+    assignedCycles: ['Cycle 13', 'Cycle 14', 'Cycle 15'],
+    status: 'Aktif',
+    email: 'yugo.apriadi@aetratangerang.co.id',
+    wilayah: 'Pelanggan Prioritas & Industri Platinum'
+  },
+
+  // 2 Petugas Kontraktor (PT Hideco)
+  {
+    id: 'KONT-001',
+    nama: 'Bambang Pamungkas',
+    password: 'BAMBANG123',
+    nip: 'AET-KONT-2026-001',
+    noHp: '0812-7711-2233',
+    kategori: 'Kontraktor (PT Hideco)',
+    perusahaan: 'PT Hideco',
+    assignedCycles: ['Cycle 1', 'Cycle 2', 'Cycle 3', 'Cycle 4'],
+    status: 'Aktif',
+    email: 'bambang.pamungkas@hideco.co.id',
+    wilayah: 'Kawasan Industri Manis & Balaraja'
+  },
+  {
+    id: 'KONT-002',
+    nama: 'Kevin Gideon',
+    password: 'KEVIN123',
+    nip: 'AET-KONT-2026-002',
+    noHp: '0813-6644-5566',
+    kategori: 'Kontraktor (PT Hideco)',
+    perusahaan: 'PT Hideco',
+    assignedCycles: ['Cycle 5', 'Cycle 6', 'Cycle 7', 'Cycle 8'],
+    status: 'Aktif',
+    email: 'kevin.gideon@hideco.co.id',
+    wilayah: 'Kawasan Industri Bitung & Cikupa Mas'
+  }
+];
 
 export const INITIAL_CYCLE_SCHEDULES: CycleSchedule[] = [
   {
@@ -611,7 +705,7 @@ export const INITIAL_CYCLE_SCHEDULES: CycleSchedule[] = [
     tglBilling: 9,
     tanggalMulai: '07 Sep 2026',
     tanggalSelesai: '08 Sep 2026',
-    petugasUtama: 'Belum Ditugaskan',
+    petugasUtama: 'Anjarini Sukamto',
     catatan: 'Kawasan Manis & Bitung'
   },
   {
@@ -623,7 +717,7 @@ export const INITIAL_CYCLE_SCHEDULES: CycleSchedule[] = [
     tglBilling: 10,
     tanggalMulai: '08 Sep 2026',
     tanggalSelesai: '09 Sep 2026',
-    petugasUtama: 'Belum Ditugaskan',
+    petugasUtama: 'Anjarini Sukamto',
     catatan: 'Kawasan Jatake & Jl. Serang'
   },
   {
@@ -635,8 +729,14 @@ export const INITIAL_CYCLE_SCHEDULES: CycleSchedule[] = [
     tglBilling: 11,
     tanggalMulai: '09 Sep 2026',
     tanggalSelesai: '10 Sep 2026',
-    petugasUtama: 'Belum Ditugaskan',
-    catatan: 'Kawasan Pasar Kemis Raya'
+    petugasUtama: 'Anjarini Sukamto',
+    catatan: 'Kawasan Pasar Kemis Raya',
+    adaPergeseran: true,
+    hariHOriginal: 8,
+    selisihHariPergeseran: 1,
+    alasanPergeseran: 'Target Volume Industri',
+    targetVolumeTambahanM3: 4500,
+    keteranganPergeseran: 'Pergeseran H+1 hari untuk mengakomodasi akumulasi jam kerja shift pabrik demi pemenuhan target volume bulanan.'
   },
   {
     cycle: 'Cycle 4',
@@ -647,7 +747,7 @@ export const INITIAL_CYCLE_SCHEDULES: CycleSchedule[] = [
     tglBilling: 12,
     tanggalMulai: '10 Sep 2026',
     tanggalSelesai: '11 Sep 2026',
-    petugasUtama: 'Belum Ditugaskan',
+    petugasUtama: 'Febriadi',
     catatan: 'Kawasan Balaraja & Pasar Kemis'
   },
   {
@@ -659,7 +759,7 @@ export const INITIAL_CYCLE_SCHEDULES: CycleSchedule[] = [
     tglBilling: 13,
     tanggalMulai: '11 Sep 2026',
     tanggalSelesai: '12 Sep 2026',
-    petugasUtama: 'Belum Ditugaskan',
+    petugasUtama: 'Febriadi',
     catatan: 'Kawasan Daan Mogot & Cikupa Mas'
   },
   {
@@ -671,7 +771,7 @@ export const INITIAL_CYCLE_SCHEDULES: CycleSchedule[] = [
     tglBilling: 16,
     tanggalMulai: '14 Sep 2026',
     tanggalSelesai: '15 Sep 2026',
-    petugasUtama: 'Belum Ditugaskan',
+    petugasUtama: 'Febriadi',
     catatan: 'Kawasan Jatake & Manis'
   },
   {
@@ -683,20 +783,26 @@ export const INITIAL_CYCLE_SCHEDULES: CycleSchedule[] = [
     tglBilling: 17,
     tanggalMulai: '15 Sep 2026',
     tanggalSelesai: '16 Sep 2026',
-    petugasUtama: 'Belum Ditugaskan',
+    petugasUtama: 'Harsindi',
     catatan: 'Kawasan Bitung & Serang'
   },
   {
     cycle: 'Cycle 8',
     bulan: 'September 2026',
-    hariH: 16,
-    tglPraBaca: 15,
-    tglVerifikasi: 17,
-    tglBilling: 18,
-    tanggalMulai: '16 Sep 2026',
-    tanggalSelesai: '17 Sep 2026',
-    petugasUtama: 'Belum Ditugaskan',
-    catatan: 'Kawasan Jatake & Serang'
+    hariH: 18,
+    tglPraBaca: 16,
+    tglVerifikasi: 19,
+    tglBilling: 20,
+    tanggalMulai: '18 Sep 2026',
+    tanggalSelesai: '19 Sep 2026',
+    petugasUtama: 'Harsindi',
+    catatan: 'Kawasan Jatake & Serang',
+    adaPergeseran: true,
+    hariHOriginal: 16,
+    selisihHariPergeseran: 2,
+    alasanPergeseran: 'Target Volume Industri',
+    targetVolumeTambahanM3: 8200,
+    keteranganPergeseran: 'Pergeseran H+2 hari untuk memaksimalkan capture meteran proses boiler kimia & utilitas demi pencapaian target volume kuartal.'
   },
   {
     cycle: 'Cycle 9',
@@ -707,7 +813,7 @@ export const INITIAL_CYCLE_SCHEDULES: CycleSchedule[] = [
     tglBilling: 19,
     tanggalMulai: '17 Sep 2026',
     tanggalSelesai: '18 Sep 2026',
-    petugasUtama: 'Belum Ditugaskan',
+    petugasUtama: 'Harsindi',
     catatan: 'Kawasan Balaraja & Serang'
   },
   {
@@ -719,7 +825,7 @@ export const INITIAL_CYCLE_SCHEDULES: CycleSchedule[] = [
     tglBilling: 20,
     tanggalMulai: '18 Sep 2026',
     tanggalSelesai: '19 Sep 2026',
-    petugasUtama: 'Belum Ditugaskan',
+    petugasUtama: 'Wahyu Hidayat',
     catatan: 'Kawasan Daan Mogot & Manis'
   },
   {
@@ -731,7 +837,7 @@ export const INITIAL_CYCLE_SCHEDULES: CycleSchedule[] = [
     tglBilling: 23,
     tanggalMulai: '21 Sep 2026',
     tanggalSelesai: '22 Sep 2026',
-    petugasUtama: 'Belum Ditugaskan',
+    petugasUtama: 'Wahyu Hidayat',
     catatan: 'Kawasan Jatake & Cikupa Mas'
   },
   {
@@ -743,7 +849,7 @@ export const INITIAL_CYCLE_SCHEDULES: CycleSchedule[] = [
     tglBilling: 24,
     tanggalMulai: '22 Sep 2026',
     tanggalSelesai: '23 Sep 2026',
-    petugasUtama: 'Belum Ditugaskan',
+    petugasUtama: 'Wahyu Hidayat',
     catatan: 'Kawasan Serang & Jatake'
   },
   {
@@ -755,7 +861,7 @@ export const INITIAL_CYCLE_SCHEDULES: CycleSchedule[] = [
     tglBilling: 25,
     tanggalMulai: '23 Sep 2026',
     tanggalSelesai: '24 Sep 2026',
-    petugasUtama: 'Belum Ditugaskan',
+    petugasUtama: 'Yugo Apriadi',
     catatan: 'Kawasan Manis Pusat'
   },
   {
@@ -767,7 +873,7 @@ export const INITIAL_CYCLE_SCHEDULES: CycleSchedule[] = [
     tglBilling: 26,
     tanggalMulai: '24 Sep 2026',
     tanggalSelesai: '25 Sep 2026',
-    petugasUtama: 'Belum Ditugaskan',
+    petugasUtama: 'Yugo Apriadi',
     catatan: 'Kawasan MM2100 & Serang'
   },
   {
@@ -779,7 +885,7 @@ export const INITIAL_CYCLE_SCHEDULES: CycleSchedule[] = [
     tglBilling: 27,
     tanggalMulai: '25 Sep 2026',
     tanggalSelesai: '26 Sep 2026',
-    petugasUtama: 'Belum Ditugaskan',
+    petugasUtama: 'Yugo Apriadi',
     catatan: 'Kawasan Bandara Mas & Dadap'
   }
 ];

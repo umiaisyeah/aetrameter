@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { IndustryCustomer, AuditLog, UserProfile, MeterReader, CycleSchedule, WorkflowStatus } from './types';
+import { IndustryCustomer, AuditLog, UserProfile, MeterReader, CycleSchedule, WorkflowStatus, ReaderCategory } from './types';
 import {
   INITIAL_CUSTOMERS,
   INITIAL_AUDIT_LOGS,
@@ -17,6 +17,8 @@ import { DetailModal } from './components/DetailModal';
 import { PrintInvoiceModal } from './components/PrintInvoiceModal';
 import { ImportCycleScheduleModal } from './components/ImportCycleScheduleModal';
 import { SupabaseConfigModal } from './components/SupabaseConfigModal';
+import { FieldReaderApp } from './components/FieldReaderApp';
+import { SectionNavBar } from './components/SectionNavBar';
 import { getSupabaseConfig } from './services/supabaseClient';
 import {
   testSupabaseConnection,
@@ -46,8 +48,6 @@ export default function App() {
         if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed.map((c: any) => ({
             ...c,
-            petugasBaca: undefined,
-            kategoriPetugas: undefined,
             catatan: c.catatan
               ? c.catatan
                   .replace(/Ahmad Fauzi|Bambang Sutrisno|Rudi Hartono|Dani Permana|Budi Santoso|Dewi Lestari|PT Hideco|Kontraktor \(PT Hideco\)/gi, '')
@@ -57,7 +57,7 @@ export default function App() {
         }
       } catch {}
     }
-    return INITIAL_CUSTOMERS;
+    return [];
   });
 
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => {
@@ -78,25 +78,32 @@ export default function App() {
   });
 
   const [meterReaders, setMeterReaders] = useState<MeterReader[]>(() => {
-    const saved = localStorage.getItem('aetra_meter_readers');
+    const saved = localStorage.getItem('aetra_meter_readers_official') || localStorage.getItem('aetra_meter_readers');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          // Discard old mock names or PT Hideco if present
-          const hasMock = parsed.some((r: any) =>
-            ['ahmad fauzi', 'bambang sutrisno', 'rudi hartono', 'dani permana', 'budi santoso', 'dewi lestari'].includes(
-              (r.nama || '').toLowerCase()
-            ) || (r.perusahaan || '').toLowerCase().includes('hideco')
-          );
-          if (!hasMock) {
-            return parsed;
-          }
+        if (Array.isArray(parsed) && parsed.length >= 7) {
+          // Normalize and verify categories
+          return parsed.map((r: MeterReader) => {
+            const isKA = ['anjarini sukamto', 'febriadi', 'harsindi', 'yugo apriadi', 'wahyu hidayat'].includes(
+              r.nama.toLowerCase()
+            ) || r.kategori === 'Key Account' || r.id.startsWith('KA-');
+            return {
+              ...r,
+              kategori: isKA ? 'Key Account' : 'Kontraktor (PT Hideco)',
+              perusahaan: isKA ? 'PT Aetra Air Tangerang (Key Account)' : 'PT Hideco'
+            };
+          });
         }
       } catch {}
     }
-    return INITIAL_METER_READERS; // []
+    return INITIAL_METER_READERS;
   });
+
+  useEffect(() => {
+    localStorage.setItem('aetra_meter_readers_official', JSON.stringify(meterReaders));
+    localStorage.setItem('aetra_meter_readers', JSON.stringify(meterReaders));
+  }, [meterReaders]);
 
   const [cycleSchedules, setCycleSchedules] = useState<CycleSchedule[]>(() => {
     const saved = localStorage.getItem('aetra_cycle_schedules');
@@ -314,7 +321,59 @@ export default function App() {
   const handleImportCustomers = (importedList: IndustryCustomer[]) => {
     setCustomers((prev) => [...importedList, ...prev]);
     importedList.forEach((c) => upsertSupabaseCustomer(c).catch(() => {}));
-    logActivity(`Mengimpor ${importedList.length} data industri via file Excel.`, 'import');
+
+    // Auto-sync meter readers and cycle assignments from imported customers
+    setMeterReaders((prevReaders) => {
+      const updatedReaders = [...prevReaders];
+
+      importedList.forEach((cust, idx) => {
+        const readerName = cust.petugasBaca?.trim();
+        if (!readerName) return;
+
+        const existingIdx = updatedReaders.findIndex(
+          (r) => r.nama.toLowerCase() === readerName.toLowerCase()
+        );
+
+        const isKeyAccount =
+          cust.kategoriPetugas?.toLowerCase().includes('key') ||
+          cust.kelas === 'Platinum' ||
+          cust.kelas === 'Premium';
+
+        const category: ReaderCategory = isKeyAccount ? 'Key Account' : 'Kontraktor (PT Hideco)';
+        const company = isKeyAccount ? 'PT Aetra Air Tangerang (Key Account)' : 'PT Hideco';
+
+        if (existingIdx >= 0) {
+          const existing = updatedReaders[existingIdx];
+          if (cust.cycle && !existing.assignedCycles.includes(cust.cycle)) {
+            updatedReaders[existingIdx] = {
+              ...existing,
+              assignedCycles: [...existing.assignedCycles, cust.cycle]
+            };
+          }
+        } else {
+          const newId = `RDR-${String(updatedReaders.length + 1).padStart(3, '0')}`;
+          updatedReaders.push({
+            id: newId,
+            nama: readerName,
+            nip: `AET-${isKeyAccount ? 'KEY' : 'KONT'}-2026-${String(updatedReaders.length + 1).padStart(3, '0')}`,
+            noHp: '0812-88' + Math.floor(10 + Math.random() * 89) + '-' + Math.floor(1000 + Math.random() * 9000),
+            email: `${readerName.toLowerCase().replace(/[^a-z0-9]/g, '')}@aetra-tangerang.co.id`,
+            kategori: category,
+            perusahaan: company,
+            assignedCycles: cust.cycle ? [cust.cycle] : [],
+            status: 'Aktif',
+            joinDate: '2026-01-15'
+          });
+        }
+      });
+
+      return updatedReaders;
+    });
+
+    logActivity(
+      `Mengimpor ${importedList.length} data industri via Excel & otomatis sinkronisasi penugasan pembaca meter lapangan.`,
+      'import'
+    );
   };
 
   const handleDeleteCustomer = (id: string) => {
@@ -518,10 +577,44 @@ export default function App() {
       });
   }, [customers, searchQuery, selectedCycle, selectedKelas, selectedBulan]);
 
+  // Field Reader standalone full app experience
+  if (currentUser.role === 'field_reader') {
+    return (
+      <div className="min-h-screen bg-slate-900 text-slate-100 font-sans antialiased">
+        <FieldReaderApp
+          currentUser={currentUser}
+          customers={customers}
+          meterReaders={meterReaders}
+          cycleSchedules={cycleSchedules}
+          onSaveReading={handleSaveReading}
+          onLogout={handleLogout}
+          onSwitchToAdmin={() => {
+            const adminUser = USER_PROFILES.yaya;
+            setCurrentUser(adminUser);
+            logActivity(`Beralih dari mode pembaca meter ke Dashboard Admin (${adminUser.name})`);
+          }}
+        />
+        {isLoginModalOpen && (
+          <ModalLogin
+            isOpen={true}
+            onLogin={handleLogin}
+            meterReaders={meterReaders}
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen overflow-hidden bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-sans antialiased transition-colors duration-200">
       {/* Login Modal */}
-      {isLoginModalOpen && <ModalLogin isOpen={true} onLogin={handleLogin} />}
+      {isLoginModalOpen && (
+        <ModalLogin
+          isOpen={true}
+          onLogin={handleLogin}
+          meterReaders={meterReaders}
+        />
+      )}
 
       {/* Detail & Inspection Modal */}
       {selectedCustomerForDetail && (
@@ -575,10 +668,34 @@ export default function App() {
           cycleSchedules={cycleSchedules}
           onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
           isSupabaseConnected={isSupabaseConnected}
+          onSwitchToFieldReader={() => {
+            const firstReader = meterReaders[0];
+            const fieldUser: UserProfile = {
+              role: 'field_reader',
+              name: firstReader?.nama || 'Anjarini Sukamto',
+              title: `Pembaca Meter (${firstReader?.kategori || 'Kontraktor (PT Hideco)'})`,
+              avatar: (firstReader?.nama || 'AS').substring(0, 2).toUpperCase(),
+              division: firstReader?.perusahaan || 'PT Hideco',
+              readerId: firstReader?.id || 'RDR-001',
+              kategori: firstReader?.kategori || 'Kontraktor (PT Hideco)',
+              perusahaan: firstReader?.perusahaan || 'PT Hideco'
+            };
+            setCurrentUser(fieldUser);
+            logActivity(`Beralih ke Aplikasi Pembaca Meter Lapangan (${fieldUser.name})`);
+          }}
+        />
+
+        {/* Responsive Section Bar for 1-Click Navigation on Any Screen Size */}
+        <SectionNavBar
+          activeTab={activeTab}
+          workflowFilter={workflowFilter}
+          onSelectTab={handleSelectTab}
+          customers={customers}
+          currentUser={currentUser}
         />
 
         {/* Tab View Contents */}
-        <main className="p-4 sm:p-6 space-y-6 flex-1">
+        <main className="p-3.5 sm:p-6 space-y-6 flex-1">
           {(activeTab === 'monitoring' || activeTab === 'overview') && (
             <OverviewView
               customers={filteredCustomers}
@@ -594,6 +711,8 @@ export default function App() {
               onExportCSV={handleExportCSV}
               onImportCycleSchedules={handleImportCycleSchedules}
               onBatchUpdateStatus={handleBatchUpdateStatus}
+              onDeleteCustomer={handleDeleteCustomer}
+              onDeleteBatchCustomers={handleDeleteBatchCustomers}
               currentUser={currentUser}
             />
           )}

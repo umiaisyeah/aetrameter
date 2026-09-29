@@ -6,16 +6,24 @@ import {
   Plus,
   Phone,
   Mail,
-  MapPin,
   Check,
   Trash2,
   Edit2,
   Shield,
   Building2,
+  Building,
   Briefcase,
   FileSpreadsheet,
   Download,
-  Upload
+  Upload,
+  ChevronDown,
+  ChevronUp,
+  Layers,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+  Calendar,
+  Activity
 } from 'lucide-react';
 
 interface MeterReaderManagementSectionProps {
@@ -35,33 +43,57 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
 }) => {
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
   const [editingReader, setEditingReader] = useState<MeterReader | null>(null);
+  const [deletingReader, setDeletingReader] = useState<MeterReader | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>('ALL');
+  const [filterCycle, setFilterCycle] = useState<string>('ALL');
+  const [expandedReaders, setExpandedReaders] = useState<Record<string, boolean>>({});
 
-  // Form states
+  const toggleExpandReader = (readerId: string) => {
+    setExpandedReaders((prev) => ({
+      ...prev,
+      [readerId]: !prev[readerId]
+    }));
+  };
+
+  // Form states (perusahaan & wilayah removed as requested)
   const [nama, setNama] = useState('');
+  const [password, setPassword] = useState('');
   const [nip, setNip] = useState('');
   const [noHp, setNoHp] = useState('');
   const [email, setEmail] = useState('');
-  const [wilayah, setWilayah] = useState('');
-  const [perusahaanInput, setPerusahaanInput] = useState('');
-  const [kategori, setKategori] = useState<ReaderCategory>('Kontraktor');
+  const [kategori, setKategori] = useState<ReaderCategory>('Kontraktor (PT Hideco)');
   const [status, setStatus] = useState<'Aktif' | 'Cuti' | 'Nonaktif'>('Aktif');
   const [assignedCycles, setAssignedCycles] = useState<string[]>([]);
   const excelFileInputRef = useRef<HTMLInputElement>(null);
 
   const allCycles = Array.from({ length: 15 }, (_, i) => `Cycle ${i + 1}`);
 
+  const sortCycles = (cycles: string[]): string[] => {
+    return [...cycles].sort((a, b) => {
+      const numA = parseInt(a.replace(/\D/g, '')) || 0;
+      const numB = parseInt(b.replace(/\D/g, '')) || 0;
+      return numA - numB;
+    });
+  };
+
   const handleDownloadTemplate = () => {
     const templateData = [
       {
-        'Nama Petugas': 'Contoh Petugas',
-        'NIP': 'MR-2026-001',
-        'No HP': '0812-0000-0000',
-        'Kategori': 'Kontraktor',
-        'Perusahaan': 'Nama Perusahaan Kontraktor',
-        'Penugasan Cycle': 'Cycle 1, Cycle 2',
-        'Wilayah': 'Wilayah Operasional Industri',
-        'Email': 'petugas@perusahaan.com',
+        'Nama Petugas': 'Pak Joko Widodo',
+        'NIP': 'AET-KONT-2026-001',
+        'No HP': '0812-8821-4401',
+        'Kategori': 'Kontraktor (PT Hideco)',
+        'Penugasan Cycle': 'Cycle 1, Cycle 2, Cycle 3',
+        'Email': 'joko.meter@hideco.co.id',
+        'Status': 'Aktif'
+      },
+      {
+        'Nama Petugas': 'Pak Dani Permana',
+        'NIP': 'AET-KA-2026-101',
+        'No HP': '0811-9876-5432',
+        'Kategori': 'Key Account',
+        'Penugasan Cycle': 'Cycle 1, Cycle 2, Cycle 3, Cycle 4, Cycle 5',
+        'Email': 'dani.permana@aetratangerang.co.id',
         'Status': 'Aktif'
       }
     ];
@@ -101,10 +133,10 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
           const rawHp = row['No HP'] || row['noHp'] || row['Telepon'] || row['hp'] || '0812-0000-0000';
           const rawKat = String(row['Kategori'] || row['kategori'] || '').toLowerCase();
           const isKeyAccount = rawKat.includes('key') || rawKat.includes('aetra');
-          const kategoriVal: ReaderCategory = isKeyAccount ? 'Key Account' : (row['Kategori'] || 'Kontraktor');
-          const perusahaanVal = String(row['Perusahaan'] || row['perusahaan'] || row['Mitra'] || (isKeyAccount ? 'PT Aetra Air Tangerang (Key Account)' : 'Mitra Kontraktor')).trim();
+          const kategoriVal: ReaderCategory = isKeyAccount ? 'Key Account' : 'Kontraktor (PT Hideco)';
+          const perusahaanVal = isKeyAccount ? 'PT Aetra Air Tangerang (Key Account)' : 'PT Hideco';
 
-          // Parse cycle assignment (e.g. "Cycle 1, Cycle 2" or "1, 2, 3")
+          // Parse cycle assignment
           const rawCycles = String(row['Penugasan Cycle'] || row['Cycle'] || row['assignedCycles'] || row['siklus'] || '');
           let cyclesList: string[] = [];
           if (rawCycles.trim()) {
@@ -115,11 +147,10 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
               .map((c) => (c.toLowerCase().startsWith('cycle') ? c : `Cycle ${c.replace(/\D/g, '')}`));
           }
           if (cyclesList.length === 0) {
-            cyclesList = ['Cycle 1'];
+            cyclesList = [];
           }
 
-          const rawWilayah = row['Wilayah'] || row['wilayah'] || 'Wilayah Industri Tangerang';
-          const rawEmail = row['Email'] || row['email'] || `${readerName.toLowerCase().replace(/[^a-z]/g, '')}@${isKeyAccount ? 'aetratangerang.co.id' : 'hideco-meter.com'}`;
+          const rawEmail = row['Email'] || row['email'] || `${readerName.toLowerCase().replace(/[^a-z]/g, '')}@${isKeyAccount ? 'aetratangerang.co.id' : 'hideco.co.id'}`;
           const rawStatus = (row['Status'] || row['status'] || 'Aktif') as 'Aktif' | 'Cuti' | 'Nonaktif';
 
           // Check if reader already exists
@@ -134,7 +165,6 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
               ...existing,
               nip: String(rawNip),
               noHp: String(rawHp),
-              wilayah: String(rawWilayah),
               email: String(rawEmail),
               kategori: kategoriVal,
               perusahaan: perusahaanVal,
@@ -152,8 +182,7 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
               perusahaan: perusahaanVal,
               assignedCycles: cyclesList,
               status: rawStatus,
-              email: String(rawEmail),
-              wilayah: String(rawWilayah)
+              email: String(rawEmail)
             };
             onAddMeterReader(newR);
             createdCount++;
@@ -193,50 +222,75 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
     }
 
     const perusahaan =
-      perusahaanInput.trim() ||
-      (kategori === 'Key Account'
-        ? 'Key Account'
-        : 'Kontraktor');
+      kategori === 'Key Account'
+        ? 'PT Aetra Air Tangerang (Key Account)'
+        : 'PT Hideco';
 
+    const defaultPass = `${nama.trim().split(' ')[0].toUpperCase()}123`;
     const newReader: MeterReader = {
-      id: `${kategori === 'Key Account' ? 'KA' : 'MR'}-${Date.now().toString().slice(-4)}`,
+      id: `${kategori === 'Key Account' ? 'KA' : 'HDC'}-${Date.now().toString().slice(-4)}`,
       nama: nama.trim(),
+      password: password.trim().toUpperCase() || defaultPass,
       nip: nip.trim() || `MR-${Date.now().toString().slice(-4)}`,
       noHp: noHp.trim() || '0812-0000-0000',
-      email: email.trim(),
-      wilayah: wilayah.trim() || 'Wilayah Industri Tangerang',
+      email: email.trim() || `${nama.toLowerCase().replace(/[^a-z0-9]/g, '')}@${kategori === 'Key Account' ? 'aetratangerang.co.id' : 'hideco.co.id'}`,
       kategori,
       perusahaan,
       status,
-      assignedCycles: assignedCycles.length > 0 ? assignedCycles : ['Cycle 1']
+      assignedCycles: assignedCycles
     };
 
     onAddMeterReader(newReader);
     // Reset
     setNama('');
+    setPassword('');
     setNip('');
     setNoHp('');
     setEmail('');
-    setWilayah('');
-    setPerusahaanInput('');
-    setKategori('Kontraktor');
+    setKategori('Kontraktor (PT Hideco)');
     setAssignedCycles([]);
     setShowAddForm(false);
-    alert(`Petugas lapangan ${newReader.nama} berhasil ditambahkan!`);
+    alert(`Petugas lapangan ${newReader.nama} (${newReader.kategori}) berhasil ditambahkan!`);
   };
 
   const handleSaveEditReader = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingReader) return;
 
-    onUpdateMeterReader(editingReader);
+    const autoPerusahaan =
+      editingReader.kategori === 'Key Account'
+        ? 'PT Aetra Air Tangerang (Key Account)'
+        : 'PT Hideco';
+
+    onUpdateMeterReader({
+      ...editingReader,
+      perusahaan: autoPerusahaan
+    });
     setEditingReader(null);
     alert(`Data petugas ${editingReader.nama} berhasil diperbarui!`);
   };
 
   const filteredReaders = meterReaders.filter((r) => {
-    if (filterCategory === 'ALL') return true;
-    return r.kategori === filterCategory;
+    // 1. Category filter
+    let matchCategory = true;
+    if (filterCategory === 'Kontraktor') {
+      matchCategory = r.kategori === 'Kontraktor (PT Hideco)' || r.kategori === 'Kontraktor' || r.kategori.toLowerCase().includes('hideco');
+    } else if (filterCategory === 'Key Account') {
+      matchCategory = r.kategori === 'Key Account';
+    }
+
+    if (!matchCategory) return false;
+
+    // 2. Cycle assignment filter
+    if (filterCycle !== 'ALL') {
+      const hasCycle = r.assignedCycles?.some((c) => c.toLowerCase() === filterCycle.toLowerCase());
+      const hasCustomerInCycle = customers.some(
+        (c) => c.cycle.toLowerCase() === filterCycle.toLowerCase() && c.petugasBaca && c.petugasBaca.toLowerCase() === r.nama.toLowerCase()
+      );
+      if (!hasCycle && !hasCustomerInCycle) return false;
+    }
+
+    return true;
   });
 
   return (
@@ -301,45 +355,89 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
         </p>
       </div>
 
-      {/* Category Filter */}
-      <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
-        <span className="font-bold text-slate-600 dark:text-slate-300">Filter Kategori:</span>
-        <button
-          onClick={() => setFilterCategory('ALL')}
-          className={`px-3 py-1 rounded-lg font-bold transition ${
-            filterCategory === 'ALL'
-              ? 'bg-[#0055A5] text-white shadow-xs'
-              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-          }`}
-        >
-          Semua ({meterReaders.length})
-        </button>
-        <button
-          onClick={() => setFilterCategory('Kontraktor')}
-          className={`px-3 py-1 rounded-lg font-bold transition flex items-center gap-1.5 ${
-            filterCategory === 'Kontraktor'
-              ? 'bg-emerald-600 text-white shadow-xs'
-              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-          }`}
-        >
-          <Building2 className="w-3.5 h-3.5" />
-          <span>
-            Kontraktor / Mitra ({meterReaders.filter((r) => r.kategori === 'Kontraktor').length})
-          </span>
-        </button>
-        <button
-          onClick={() => setFilterCategory('Key Account')}
-          className={`px-3 py-1 rounded-lg font-bold transition flex items-center gap-1.5 ${
-            filterCategory === 'Key Account'
-              ? 'bg-purple-600 text-white shadow-xs'
-              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-          }`}
-        >
-          <Shield className="w-3.5 h-3.5" />
-          <span>
-            Key Account ({meterReaders.filter((r) => r.kategori === 'Key Account').length})
-          </span>
-        </button>
+      {/* Filter Section: Category & Cycle */}
+      <div className="space-y-2.5">
+        <div className="flex flex-wrap items-center gap-2 bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+          <span className="font-bold text-slate-600 dark:text-slate-300">Filter Kategori:</span>
+          <button
+            onClick={() => setFilterCategory('ALL')}
+            className={`px-3 py-1 rounded-lg font-bold transition ${
+              filterCategory === 'ALL'
+                ? 'bg-[#0055A5] text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+            }`}
+          >
+            Semua ({meterReaders.length})
+          </button>
+          <button
+            onClick={() => setFilterCategory('Kontraktor')}
+            className={`px-3 py-1 rounded-lg font-bold transition flex items-center gap-1.5 ${
+              filterCategory === 'Kontraktor'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5" />
+            <span>
+              Kontraktor (PT Hideco) ({meterReaders.filter((r) => r.kategori === 'Kontraktor (PT Hideco)' || r.kategori === 'Kontraktor' || r.kategori.toLowerCase().includes('hideco')).length})
+            </span>
+          </button>
+          <button
+            onClick={() => setFilterCategory('Key Account')}
+            className={`px-3 py-1 rounded-lg font-bold transition flex items-center gap-1.5 ${
+              filterCategory === 'Key Account'
+                ? 'bg-purple-600 text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+            }`}
+          >
+            <Shield className="w-3.5 h-3.5" />
+            <span>
+              Key Account ({meterReaders.filter((r) => r.kategori === 'Key Account').length})
+            </span>
+          </button>
+        </div>
+
+        {/* Cycle Assignment Filter Bar */}
+        <div className="flex flex-wrap items-center gap-1.5 bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+          <div className="flex items-center gap-1.5 pr-2 font-bold text-slate-600 dark:text-slate-300 shrink-0">
+            <Calendar className="w-3.5 h-3.5 text-[#0055A5] dark:text-blue-400" />
+            <span>Filter Penugasan Cycle:</span>
+          </div>
+          <button
+            onClick={() => setFilterCycle('ALL')}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${
+              filterCycle === 'ALL'
+                ? 'bg-[#0055A5] text-white shadow-xs'
+                : 'bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+            }`}
+          >
+            Semua Cycle
+          </button>
+          {allCycles.map((c) => {
+            const isSelected = filterCycle === c;
+            const countPetugas = meterReaders.filter(
+              (r) => r.assignedCycles?.some((ac) => ac.toLowerCase() === c.toLowerCase())
+            ).length;
+            return (
+              <button
+                key={c}
+                onClick={() => setFilterCycle(c)}
+                className={`px-2 py-0.5 rounded-lg text-[11px] font-bold border transition flex items-center gap-1 ${
+                  isSelected
+                    ? 'bg-[#E86216] border-[#E86216] text-white shadow-xs'
+                    : 'bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-400'
+                }`}
+              >
+                <span>{c}</span>
+                {countPetugas > 0 && (
+                  <span className={`px-1 py-0.2 rounded-full text-[9px] ${isSelected ? 'bg-white/20 text-white' : 'bg-blue-100 dark:bg-blue-900/60 text-[#0055A5] dark:text-blue-300'}`}>
+                    {countPetugas}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Add Form Accordion */}
@@ -352,7 +450,7 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
             Form Pendaftaran Petugas Pembaca Meter Lapangan Baru
           </h4>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             <div>
               <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">
                 Kategori Petugas *
@@ -362,9 +460,8 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
                 onChange={(e) => setKategori(e.target.value as ReaderCategory)}
                 className="w-full p-2.5 border border-slate-300 dark:border-slate-600 rounded-xl text-xs bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white font-bold"
               >
-                <option value="Kontraktor">Kontraktor / Vendor Eksternal</option>
-                <option value="Key Account">Tim Key Account Internal</option>
-                <option value="Lainnya">Lainnya</option>
+                <option value="Kontraktor (PT Hideco)">Kontraktor (PT Hideco)</option>
+                <option value="Key Account">Key Account (PT Aetra Air Tangerang)</option>
               </select>
             </div>
 
@@ -377,20 +474,7 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
                 required
                 value={nama}
                 onChange={(e) => setNama(e.target.value)}
-                placeholder="Contoh: Nama Petugas"
-                className="w-full p-2.5 border border-slate-300 dark:border-slate-600 rounded-xl text-xs bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white font-medium"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">
-                Nama Perusahaan / Kontraktor / Instansi
-              </label>
-              <input
-                type="text"
-                value={perusahaanInput}
-                onChange={(e) => setPerusahaanInput(e.target.value)}
-                placeholder="Contoh: PT Nama Perusahaan"
+                placeholder="Contoh: Pak Joko Widodo"
                 className="w-full p-2.5 border border-slate-300 dark:border-slate-600 rounded-xl text-xs bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white font-medium"
               />
             </div>
@@ -403,7 +487,7 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
                 type="text"
                 value={nip}
                 onChange={(e) => setNip(e.target.value)}
-                placeholder="MR-2026-001"
+                placeholder="AET-KONT-2026-001"
                 className="w-full p-2.5 border border-slate-300 dark:border-slate-600 rounded-xl text-xs bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white font-medium"
               />
             </div>
@@ -423,14 +507,27 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
 
             <div>
               <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">
-                Wilayah Tugas Operasional
+                Email Operasional (Opsional)
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="petugas@hideco.co.id"
+                className="w-full p-2.5 border border-slate-300 dark:border-slate-600 rounded-xl text-xs bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white font-medium"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">
+                Password Login Akun *
               </label>
               <input
                 type="text"
-                value={wilayah}
-                onChange={(e) => setWilayah(e.target.value)}
-                placeholder="Kawasan Industri Tangerang"
-                className="w-full p-2.5 border border-slate-300 dark:border-slate-600 rounded-xl text-xs bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white font-medium"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Contoh: ANJAR123"
+                className="w-full p-2.5 border border-slate-300 dark:border-slate-600 rounded-xl text-xs bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white font-mono uppercase font-bold"
               />
             </div>
 
@@ -517,9 +614,29 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
           </div>
         ) : (
           filteredReaders.map((reader) => {
-          const assignedCusts = customers.filter((c) =>
-            reader.assignedCycles.some((ac) => ac.toLowerCase() === c.cycle.toLowerCase())
+          // Sinkronisasi otomatis dari Database Industri yang diinput
+          const dbAssignedCycles = Array.from(
+            new Set(
+              customers
+                .filter((c) => c.petugasBaca && c.petugasBaca.toLowerCase() === reader.nama.toLowerCase())
+                .map((c) => c.cycle)
+                .filter(Boolean)
+            )
           );
+
+          // Jika ada penugasan langsung di database industri, utamakan itu
+          // Atau jika reader memiliki assignedCycles yang memang ada industrinya di database
+          const validAssignedCycles = dbAssignedCycles.length > 0
+            ? dbAssignedCycles
+            : (reader.assignedCycles || []).filter((ac) =>
+                customers.some((c) => c.cycle.toLowerCase() === ac.toLowerCase())
+              );
+
+          const sortedAssignedCycles = sortCycles(validAssignedCycles);
+          const assignedCusts = customers.filter((c) => {
+            if (c.petugasBaca && c.petugasBaca.toLowerCase() === reader.nama.toLowerCase()) return true;
+            return sortedAssignedCycles.some((ac) => ac.toLowerCase() === c.cycle.toLowerCase());
+          });
           const completedCount = assignedCusts.filter(
             (c) => c.status === 'Verified' || c.status === 'Invoiced'
           ).length;
@@ -573,7 +690,7 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
                   </span>
                 </div>
 
-                {/* Contact and Wilayah */}
+                {/* Contact */}
                 <div className="mt-3.5 space-y-1.5 text-xs text-slate-600 dark:text-slate-300">
                   <div className="flex items-center gap-2">
                     <Phone className="w-3.5 h-3.5 text-[#E86216]" />
@@ -585,34 +702,114 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
                       <span className="font-medium text-slate-500 dark:text-slate-400">{reader.email}</span>
                     </div>
                   )}
-                  {reader.wilayah && (
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-3.5 h-3.5 text-emerald-500" />
-                      <span className="font-medium text-slate-500 dark:text-slate-400">{reader.wilayah}</span>
-                    </div>
-                  )}
                 </div>
 
-                {/* Cycle Assignment Badges */}
-                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                      Penugasan Cycle ({reader.assignedCycles.length}):
+                {/* Progress Bar & Cycle Assignment Badges */}
+                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700 space-y-2.5">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Penugasan Cycle ({sortedAssignedCycles.length} Cycle):
                     </span>
-                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                      {completedCount} / {assignedCusts.length} Selesai Dibaca
+                    <span className="font-bold text-slate-700 dark:text-slate-200">
+                      {completedCount} / {assignedCusts.length} Industri Selesai (
+                      {assignedCusts.length > 0 ? Math.round((completedCount / assignedCusts.length) * 100) : 0}%)
                     </span>
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {reader.assignedCycles.map((c) => (
-                      <span
-                        key={c}
-                        className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-blue-50 dark:bg-blue-950/50 text-[#0055A5] dark:text-blue-300 border border-blue-200 dark:border-blue-800"
-                      >
-                        {c}
-                      </span>
-                    ))}
+
+                  {/* Progress bar */}
+                  <div className="w-full bg-slate-100 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-500 ${
+                        completedCount === assignedCusts.length && assignedCusts.length > 0
+                          ? 'bg-emerald-500'
+                          : 'bg-[#0055A5] dark:bg-blue-500'
+                      }`}
+                      style={{
+                        width: `${assignedCusts.length > 0 ? (completedCount / assignedCusts.length) * 100 : 0}%`
+                      }}
+                    />
                   </div>
+
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {sortedAssignedCycles.length > 0 ? (
+                      sortedAssignedCycles.map((c) => (
+                        <span
+                          key={c}
+                          className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-blue-50 dark:bg-blue-950/50 text-[#0055A5] dark:text-blue-300 border border-blue-200 dark:border-blue-800"
+                        >
+                          {c}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-[11px] text-slate-400 italic">Belum ada cycle yang ditugaskan</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Expandable Industry & Cycle List */}
+                <div className="mt-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleExpandReader(reader.id)}
+                    className="w-full py-2 px-3 bg-slate-50 dark:bg-slate-700/50 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-[#0055A5] dark:text-blue-300 flex items-center justify-between transition cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Building2 className="w-3.5 h-3.5 text-[#0055A5] dark:text-blue-400" />
+                      <span>Rincian Industri &amp; Status Baca ({assignedCusts.length} Pelanggan)</span>
+                    </div>
+                    {expandedReaders[reader.id] ? (
+                      <ChevronUp className="w-4 h-4 text-slate-400" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-slate-400" />
+                    )}
+                  </button>
+
+                  {expandedReaders[reader.id] && (
+                    <div className="mt-2 p-3 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-700 max-h-60 overflow-y-auto space-y-2 animate-in fade-in duration-150">
+                      {assignedCusts.length === 0 ? (
+                        <p className="text-[11px] text-slate-400 text-center py-2 italic">
+                          Belum ada industri dalam cycle yang ditugaskan kepada petugas ini.
+                        </p>
+                      ) : (
+                        assignedCusts.map((cust) => {
+                          const isDone = cust.status === 'Verified' || cust.status === 'Invoiced';
+                          const isPending = cust.status === 'Pending Verification';
+                          return (
+                            <div
+                              key={cust.id}
+                              className="p-2.5 bg-white dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 flex items-center justify-between gap-2 text-xs"
+                            >
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-bold text-slate-800 dark:text-white truncate">
+                                    {cust.nama}
+                                  </span>
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 dark:bg-blue-950 text-[#0055A5] dark:text-blue-300">
+                                    {cust.cycle}
+                                  </span>
+                                </div>
+                                <p className="text-[10px] text-slate-400 font-mono">
+                                  ID: {cust.id} · Stand: {cust.lalu} → {cust.skrg || '-'} m³
+                                </p>
+                              </div>
+
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
+                                  isDone
+                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
+                                    : isPending
+                                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400'
+                                    : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+                                }`}
+                              >
+                                {cust.status}
+                              </span>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -626,12 +823,9 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
                   <span>Ubah Data</span>
                 </button>
                 <button
-                  onClick={() => {
-                    if (confirm(`Yakin ingin menghapus petugas pembaca meter ${reader.nama}?`)) {
-                      onDeleteMeterReader(reader.id);
-                    }
-                  }}
-                  className="px-3 py-1.5 text-xs font-semibold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition flex items-center gap-1.5"
+                  type="button"
+                  onClick={() => setDeletingReader(reader)}
+                  className="px-3 py-1.5 text-xs font-semibold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition flex items-center gap-1.5 cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>Hapus</span>
@@ -661,39 +855,68 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
                   onChange={(e) =>
                     setEditingReader({
                       ...editingReader,
-                      kategori: e.target.value as ReaderCategory
+                      kategori: e.target.value as ReaderCategory,
+                      perusahaan: e.target.value === 'Key Account' ? 'PT Aetra Air Tangerang (Key Account)' : 'PT Hideco'
                     })
                   }
                   className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-xl text-xs bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white font-bold"
                 >
-                  <option value="Kontraktor">Kontraktor / Vendor Eksternal</option>
-                  <option value="Key Account">Tim Key Account Internal</option>
-                  <option value="Lainnya">Lainnya</option>
+                  <option value="Kontraktor (PT Hideco)">Kontraktor (PT Hideco)</option>
+                  <option value="Key Account">Key Account (PT Aetra Air Tangerang)</option>
                 </select>
               </div>
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">
-                  Nama Petugas
+                  Nama Petugas Lapangan
                 </label>
                 <input
                   type="text"
                   value={editingReader.nama}
                   onChange={(e) => setEditingReader({ ...editingReader, nama: e.target.value })}
-                  className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-xl text-xs bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white"
+                  className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-xl text-xs bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white font-medium"
                 />
               </div>
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">
-                  Nama Perusahaan / Instansi
+                  Nomor WhatsApp / HP Lapangan
                 </label>
                 <input
                   type="text"
-                  value={editingReader.perusahaan}
-                  onChange={(e) => setEditingReader({ ...editingReader, perusahaan: e.target.value })}
-                  placeholder="Nama Perusahaan / Instansi"
-                  className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-xl text-xs bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white"
+                  value={editingReader.noHp}
+                  onChange={(e) => setEditingReader({ ...editingReader, noHp: e.target.value })}
+                  className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-xl text-xs bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">
+                  Email Operasional
+                </label>
+                <input
+                  type="email"
+                  value={editingReader.email || ''}
+                  onChange={(e) => setEditingReader({ ...editingReader, email: e.target.value })}
+                  className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-xl text-xs bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">
+                  Password Login Akun
+                </label>
+                <input
+                  type="text"
+                  value={editingReader.password || ''}
+                  onChange={(e) =>
+                    setEditingReader({
+                      ...editingReader,
+                      password: e.target.value.toUpperCase()
+                    })
+                  }
+                  placeholder="ANJAR123"
+                  className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-xl text-xs bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white font-mono uppercase font-bold"
                 />
               </div>
 
@@ -749,16 +972,66 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
               <button
                 type="button"
                 onClick={() => setEditingReader(null)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl"
+                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl cursor-pointer"
               >
                 Batal
               </button>
               <button
                 type="button"
                 onClick={handleSaveEditReader}
-                className="px-5 py-2 text-xs font-bold bg-[#0055A5] hover:bg-blue-800 text-white rounded-xl shadow-xs transition"
+                className="px-5 py-2 text-xs font-bold bg-[#0055A5] hover:bg-blue-800 text-white rounded-xl shadow-xs transition cursor-pointer"
               >
                 Simpan Perubahan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Reader Confirmation Modal */}
+      {deletingReader && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 max-w-md w-full p-5 space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950/60 flex items-center justify-center">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
+                  Hapus Petugas Pembaca Meter
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Tindakan ini akan menghapus akun petugas dari daftar
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 dark:bg-slate-900/60 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-200">
+              <p>
+                Apakah Anda yakin ingin menghapus data petugas pembaca meter{' '}
+                <span className="font-black text-slate-900 dark:text-white">{deletingReader.nama}</span>{' '}
+                ({deletingReader.kategori})?
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeletingReader(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer"
+              >
+                Batalkan
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteMeterReader(deletingReader.id);
+                  setDeletingReader(null);
+                }}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-extrabold shadow-md transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Ya, Hapus Petugas</span>
               </button>
             </div>
           </div>

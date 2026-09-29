@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import defaultLogoImg from '../assets/images/aetra_logo_1790675722882.jpg';
 
 interface AetraLogoProps {
   className?: string;
@@ -6,61 +7,75 @@ interface AetraLogoProps {
 }
 
 export const AetraLogo: React.FC<AetraLogoProps> = ({ className = 'h-8', variant = 'full' }) => {
+  const [logoSrc, setLogoSrc] = useState<string>(() => {
+    return localStorage.getItem('custom_aetra_logo') || defaultLogoImg;
+  });
+
+  useEffect(() => {
+    const handleStorage = () => {
+      const custom = localStorage.getItem('custom_aetra_logo');
+      if (custom) setLogoSrc(custom);
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const result = event.target?.result as string;
+        if (result) {
+          localStorage.setItem('custom_aetra_logo', result);
+          setLogoSrc(result);
+          window.dispatchEvent(new Event('storage'));
+          alert('Logo resmi berhasil diperbarui dan diterapkan ke seluruh aplikasi!');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   if (variant === 'icon') {
     return (
-      <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-        <circle cx="50" cy="50" r="46" fill="#0055A5" />
-        {/* Wave and Droplet Symbol */}
-        <path
-          d="M50 20C50 20 32 44 32 58C32 67.9411 40.0589 76 50 76C59.9411 76 68 67.9411 68 58C68 44 50 20 50 20Z"
-          fill="#FFFFFF"
+      <label className="relative cursor-pointer group block" title="Klik untuk mengganti logo resmi">
+        <img
+          src={logoSrc}
+          alt="Aetra Tangerang Logo"
+          className={`object-contain rounded-lg ${className}`}
         />
-        <path
-          d="M50 40C46 50 42 58 42 63C42 67.4183 45.5817 71 50 71C54.4183 71 58 67.4183 58 63C58 58 54 50 50 40Z"
-          fill="#E86216"
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleFileUpload}
+          className="hidden"
         />
-        <path
-          d="M26 62C30 52 42 46 56 47C62 47.5 68 50 72 54"
-          stroke="#FFF2EA"
-          strokeWidth="4"
-          strokeLinecap="round"
-        />
-      </svg>
+      </label>
     );
   }
 
   return (
-    <div className={`flex items-center gap-2.5 select-none ${className}`}>
-      <div className="shrink-0 flex items-center justify-center">
-        <svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-9 h-9">
-          {/* Main water drop motif */}
-          <rect width="44" height="44" rx="10" fill="#0055A5" />
-          <path
-            d="M22 10C22 10 13 22 13 28C13 32.9706 17.0294 37 22 37C26.9706 37 31 32.9706 31 28C31 22 22 10 22 10Z"
-            fill="#FFFFFF"
-          />
-          <path
-            d="M22 21C20 25 18 29 18 31.5C18 33.7091 19.7909 35.5 22 35.5C24.2091 35.5 26 33.7091 26 31.5C26 29 24 25 22 21Z"
-            fill="#E86216"
-          />
-          <path
-            d="M10 26C13 23 18 22 23 23"
-            stroke="#FFF2EA"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-          />
-        </svg>
-      </div>
-      <div className="flex flex-col text-left leading-none">
-        <div className="flex items-baseline">
-          <span className="font-extrabold text-xl tracking-tight text-[#0055A5] dark:text-blue-400">
-            aetra
-          </span>
+    <div className={`flex items-center gap-2.5 select-none relative group ${className}`}>
+      <label className="cursor-pointer block relative" title="Klik untuk unggah logo resmi (PNG/JPG)">
+        <img
+          src={logoSrc}
+          alt="Aetra Tangerang Logo"
+          className="h-10 w-auto object-contain rounded-lg shadow-xs hover:opacity-90 transition"
+        />
+        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition rounded-lg flex items-center justify-center text-[9px] text-white font-bold text-center p-0.5">
+          Ganti Logo
         </div>
-        <span className="text-[9px] font-bold tracking-widest text-[#E86216] uppercase mt-0.5">
-          AIR TANGERANG
-        </span>
-      </div>
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleFileUpload}
+          className="hidden"
+        />
+      </label>
     </div>
   );
 };
+
+
+
