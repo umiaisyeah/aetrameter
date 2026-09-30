@@ -38,6 +38,7 @@ import {
   insertSupabaseAuditLog,
   subscribeToFieldReaderUpdates
 } from './services/supabaseService';
+import { fetchCloudState, pushCloudState } from './services/cloudSyncService';
 
 export default function App() {
   // Always show login page first upon opening the application
@@ -204,68 +205,97 @@ export default function App() {
     }
   }, [isDarkMode]);
 
-  // Supabase Initial Load & Realtime Subscription for Field Readers
+  // Cloud Backend & Supabase Initial Load & Realtime Sync across devices
   useEffect(() => {
     let unsubscribe: (() => void) | null = null;
+    let pollInterval: any = null;
 
-    const initSupabase = async () => {
+    const initCloudSync = async () => {
+      // 1. Fetch from cloud backend (/api/sync-state)
+      try {
+        const cloud = await fetchCloudState();
+        if (cloud) {
+          if (cloud.customers && cloud.customers.length > 0) setCustomers(cloud.customers);
+          if (cloud.meterReaders && cloud.meterReaders.length > 0) setMeterReaders(cloud.meterReaders);
+          if (cloud.cycleSchedules && cloud.cycleSchedules.length > 0) setCycleSchedules(cloud.cycleSchedules);
+          if (cloud.auditLogs && cloud.auditLogs.length > 0) setAuditLogs(cloud.auditLogs);
+        }
+      } catch {}
+
+      // 2. Supabase if configured
       const config = getSupabaseConfig();
-      if (!config.isConfigured) {
-        setIsSupabaseConnected(false);
-        return;
-      }
+      if (config.isConfigured) {
+        const test = await testSupabaseConnection();
+        if (test.success) {
+          setIsSupabaseConnected(true);
+          const remoteCusts = await fetchSupabaseCustomers();
+          if (remoteCusts && remoteCusts.length > 0) setCustomers(remoteCusts);
+          const remoteReaders = await fetchSupabaseMeterReaders();
+          if (remoteReaders && remoteReaders.length > 0) setMeterReaders(remoteReaders);
+          const remoteSchedules = await fetchSupabaseCycleSchedules();
+          if (remoteSchedules && remoteSchedules.length > 0) setCycleSchedules(remoteSchedules);
 
-      const test = await testSupabaseConnection();
-      if (test.success) {
-        setIsSupabaseConnected(true);
-
-        // Fetch live customers from Supabase
-        const remoteCusts = await fetchSupabaseCustomers();
-        if (remoteCusts && remoteCusts.length > 0) {
-          setCustomers(remoteCusts);
+          unsubscribe = subscribeToFieldReaderUpdates(
+            (updatedCust) => {
+              setCustomers((prev) => {
+                const exists = prev.some((c) => c.id === updatedCust.id);
+                if (exists) {
+                  return prev.map((c) => (c.id === updatedCust.id ? updatedCust : c));
+                }
+                return [updatedCust, ...prev];
+              });
+            },
+            (deletedId) => {
+              setCustomers((prev) => prev.filter((c) => c.id !== deletedId));
+            },
+            (newLog) => {
+              setAuditLogs((prev) => [newLog, ...prev]);
+            }
+          );
+        } else {
+          setIsSupabaseConnected(false);
         }
-
-        // Fetch live readers
-        const remoteReaders = await fetchSupabaseMeterReaders();
-        if (remoteReaders && remoteReaders.length > 0) {
-          setMeterReaders(remoteReaders);
-        }
-
-        // Fetch live schedules
-        const remoteSchedules = await fetchSupabaseCycleSchedules();
-        if (remoteSchedules && remoteSchedules.length > 0) {
-          setCycleSchedules(remoteSchedules);
-        }
-
-        // Realtime subscription: live updates when field meter readers input readings!
-        unsubscribe = subscribeToFieldReaderUpdates(
-          (updatedCust) => {
-            setCustomers((prev) => {
-              const exists = prev.some((c) => c.id === updatedCust.id);
-              if (exists) {
-                return prev.map((c) => (c.id === updatedCust.id ? updatedCust : c));
-              }
-              return [updatedCust, ...prev];
-            });
-          },
-          (deletedId) => {
-            setCustomers((prev) => prev.filter((c) => c.id !== deletedId));
-          },
-          (newLog) => {
-            setAuditLogs((prev) => [newLog, ...prev]);
-          }
-        );
       } else {
         setIsSupabaseConnected(false);
       }
+
+      // 3. Periodic background polling for cross-device sync (every 5 seconds)
+      pollInterval = setInterval(async () => {
+        try {
+          const cloud = await fetchCloudState();
+          if (cloud && cloud.customers && cloud.customers.length > 0) {
+            setCustomers(cloud.customers);
+          }
+          if (cloud && cloud.meterReaders && cloud.meterReaders.length > 0) {
+            setMeterReaders(cloud.meterReaders);
+          }
+          if (cloud && cloud.cycleSchedules && cloud.cycleSchedules.length > 0) {
+            setCycleSchedules(cloud.cycleSchedules);
+          }
+        } catch {}
+      }, 5000);
     };
 
-    initSupabase();
+    initCloudSync();
 
     return () => {
       if (unsubscribe) unsubscribe();
+      if (pollInterval) clearInterval(pollInterval);
     };
   }, []);
+
+  // Auto push state to cloud backend on change for cross-device sync
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      pushCloudState({
+        customers,
+        meterReaders,
+        cycleSchedules,
+        auditLogs
+      }).catch(() => {});
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [customers, meterReaders, cycleSchedules, auditLogs]);
 
   // Persist customers & audit logs
   useEffect(() => {
