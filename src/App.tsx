@@ -39,13 +39,9 @@ import {
 } from './services/supabaseService';
 
 export default function App() {
-  // Load state from localStorage or initial fallback
-  const [currentUser, setCurrentUser] = useState<UserProfile>(() => {
-    const saved = localStorage.getItem('aetra_current_user');
-    return saved ? JSON.parse(saved) : USER_PROFILES.yaya;
-  });
-
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
+  // Always show login page first upon opening the application
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(true);
 
   const [customers, setCustomers] = useState<IndustryCustomer[]>(() => {
     const saved = localStorage.getItem('aetra_industri_data');
@@ -301,8 +297,8 @@ export default function App() {
     const newLog: AuditLog = {
       id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       time: timeStr,
-      user: currentUser.name,
-      role: currentUser.title,
+      user: currentUser ? currentUser.name : 'Sistem Otomasi',
+      role: currentUser ? currentUser.title : 'System Operation',
       desc,
       type
     };
@@ -320,6 +316,7 @@ export default function App() {
 
   const handleLogout = () => {
     logActivity(`Keluar dari sistem.`);
+    setCurrentUser(null);
     setIsLoginModalOpen(true);
   };
 
@@ -611,6 +608,21 @@ export default function App() {
         return matchSearch && matchCycle && matchKelas && matchBulan;
       });
   }, [customers, searchQuery, selectedCycle, selectedKelas, selectedBulan]);
+
+  // If user is not logged in yet, show Login Screen immediately!
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center font-sans antialiased p-4">
+        <ModalLogin
+          isOpen={true}
+          onLogin={handleLogin}
+          meterReaders={meterReaders}
+        />
+        <ColorfulNotificationModal />
+        <ColorfulToastContainer />
+      </div>
+    );
+  }
 
   // Field Reader standalone full app experience
   if (currentUser.role === 'field_reader') {

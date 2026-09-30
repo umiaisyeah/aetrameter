@@ -773,18 +773,18 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Cari nama industri, ID pelanggan, cycle, lokasi..."
-                        className={`w-full pl-8 pr-8 py-2 rounded-xl text-xs font-medium border focus:outline-none focus:ring-2 focus:ring-[#0055A5] ${
+                        className={`w-full pl-8 pr-8 py-2 rounded-xl text-xs font-medium border focus:outline-none focus:ring-2 focus:ring-blue-400 ${
                           isFieldDarkMode
-                            ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-500'
+                            ? 'bg-slate-900 border-slate-700 text-white placeholder:text-slate-400'
                             : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400'
                         }`}
                       />
-                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                      <Search className="w-3.5 h-3.5 text-slate-400 dark:text-slate-300 absolute left-2.5 top-2.5" />
                       {searchQuery && (
                         <button
                           type="button"
                           onClick={() => setSearchQuery('')}
-                          className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 font-bold text-xs"
+                          className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 dark:hover:text-white font-bold text-xs"
                         >
                           ✕
                         </button>
@@ -793,10 +793,10 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
 
                     {/* Cycle Filter Dropdown (Menggunakan Dropdown Praktis Tanpa Digeser) */}
                     {readerAssignedCycles.length > 0 && (
-                      <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900/60 p-2 rounded-xl border border-slate-200 dark:border-slate-800">
+                      <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-700">
                         <label
                           htmlFor="reader-cycle-dropdown"
-                          className="text-[11px] font-bold text-slate-500 dark:text-slate-400 shrink-0 flex items-center gap-1.5"
+                          className="text-[11px] font-bold text-slate-600 dark:text-slate-200 shrink-0 flex items-center gap-1.5"
                         >
                           <Calendar className="w-3.5 h-3.5 text-[#0055A5] dark:text-blue-400" />
                           <span>Pilih Cycle:</span>
@@ -805,7 +805,7 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                           id="reader-cycle-dropdown"
                           value={selectedCycleFilter}
                           onChange={(e) => setSelectedCycleFilter(e.target.value)}
-                          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold border transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#0055A5] ${
+                          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold border transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${
                             isFieldDarkMode
                               ? 'bg-slate-800 border-slate-700 text-white'
                               : 'bg-white border-slate-200 text-slate-800 shadow-2xs'
@@ -843,12 +843,12 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                             key={st}
                             type="button"
                             onClick={() => setStatusFilter(st)}
-                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition cursor-pointer ${
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition cursor-pointer border ${
                               isSel
-                                ? 'bg-[#0055A5] text-white shadow-xs'
+                                ? 'bg-[#0055A5] dark:bg-blue-600 text-white shadow-xs border-blue-400 font-black'
                                 : isFieldDarkMode
-                                ? 'bg-slate-800 text-slate-400 hover:text-slate-200'
-                                : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+                                ? 'bg-slate-800 text-slate-200 hover:text-white border-slate-700/80 hover:bg-slate-750'
+                                : 'bg-slate-100 text-slate-700 hover:text-slate-900 border-slate-200'
                             }`}
                           >
                             {label}
