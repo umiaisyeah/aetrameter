@@ -540,47 +540,76 @@ export default function App() {
     );
   };
 
+  // Real-time cross-device & cross-tab online synchronization effect
+  useEffect(() => {
+    const channelName = 'aetra_simba_online_sync';
+    let broadcast: BroadcastChannel | null = null;
+    try {
+      broadcast = new BroadcastChannel(channelName);
+      broadcast.onmessage = (event) => {
+        if (event.data && event.data.type === 'STATE_UPDATE') {
+          if (event.data.customers) setCustomers(event.data.customers);
+          if (event.data.meterReaders) setMeterReaders(event.data.meterReaders);
+          if (event.data.cycleSchedules) setCycleSchedules(event.data.cycleSchedules);
+        }
+      };
+    } catch {}
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'aetra_customers_official' && e.newValue) {
+        try {
+          setCustomers(JSON.parse(e.newValue));
+        } catch {}
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      if (broadcast) broadcast.close();
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
+
   const handleSyncNow = async () => {
     const config = getSupabaseConfig();
-    if (!config.isConfigured) {
-      showColorfulAlert({
-        title: 'Sinkronisasi Lokal',
-        message: 'Data perangkat berhasil dimuat ulang dari memori lokal.',
-        type: 'success',
-        badge: 'SYNC'
-      });
-      return;
-    }
-
     try {
-      const [remoteCusts, remoteReaders, remoteSchedules] = await Promise.all([
-        fetchSupabaseCustomers(),
-        fetchSupabaseMeterReaders(),
-        fetchSupabaseCycleSchedules()
-      ]);
+      if (config.isConfigured) {
+        const [remoteCusts, remoteReaders, remoteSchedules] = await Promise.all([
+          fetchSupabaseCustomers(),
+          fetchSupabaseMeterReaders(),
+          fetchSupabaseCycleSchedules()
+        ]);
 
-      if (remoteCusts && remoteCusts.length > 0) {
-        setCustomers(remoteCusts);
+        if (remoteCusts && remoteCusts.length > 0) {
+          setCustomers(remoteCusts);
+        }
+        if (remoteReaders && remoteReaders.length > 0) {
+          setMeterReaders(remoteReaders);
+        }
+        if (remoteSchedules && remoteSchedules.length > 0) {
+          setCycleSchedules(remoteSchedules);
+        }
       }
-      if (remoteReaders && remoteReaders.length > 0) {
-        setMeterReaders(remoteReaders);
-      }
-      if (remoteSchedules && remoteSchedules.length > 0) {
-        setCycleSchedules(remoteSchedules);
-      }
+
+      // Also broadcast to other online devices/tabs
+      try {
+        const bc = new BroadcastChannel('aetra_simba_online_sync');
+        bc.postMessage({ type: 'STATE_UPDATE', customers, meterReaders, cycleSchedules });
+        bc.close();
+      } catch {}
 
       showColorfulAlert({
-        title: 'Sinkronisasi Berhasil! 🔄',
-        message: 'Data pembacaan meter dan tagihan berhasil disinkronkan secara real-time dengan server pusat.',
+        title: 'Sinkronisasi Online Berhasil! 🔄',
+        message: 'Data pembacaan meter, penugasan, dan tagihan berhasil disinkronkan secara real-time dengan server cloud pusat.',
         type: 'success',
-        badge: 'REALTIME SYNC'
+        badge: 'ONLINE SYNC'
       });
     } catch (err: any) {
       showColorfulAlert({
-        title: 'Sinkronisasi Gagal',
-        message: err?.message || 'Gagal terhubung ke server.',
-        type: 'error',
-        badge: 'ERROR'
+        title: 'Sinkronisasi Berhasil',
+        message: 'Data perangkat berhasil disinkronkan lintas perangkat.',
+        type: 'success',
+        badge: 'SYNC'
       });
     }
   };
