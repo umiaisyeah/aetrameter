@@ -11,7 +11,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Check,
-  CalendarDays
+  CalendarDays,
+  Menu
 } from 'lucide-react';
 import { UserProfile, CycleSchedule } from '../types';
 
@@ -32,6 +33,7 @@ interface HeaderProps {
   onOpenSupabaseModal?: () => void;
   isSupabaseConnected?: boolean;
   onSwitchToFieldReader?: () => void;
+  onToggleSidebar?: () => void;
 }
 
 const MONTH_NAMES = [
@@ -65,7 +67,8 @@ export const Header: React.FC<HeaderProps> = ({
   cycleSchedules,
   onOpenSupabaseModal,
   isSupabaseConnected = false,
-  onSwitchToFieldReader
+  onSwitchToFieldReader,
+  onToggleSidebar
 }) => {
   const [timeStr, setTimeStr] = useState('');
   const [dateStr, setDateStr] = useState('');
@@ -124,16 +127,27 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-3.5 md:p-4 flex flex-col md:flex-row items-center justify-between gap-3 sticky top-0 z-20 shadow-xs transition-colors duration-200">
-      {/* Search Input */}
-      <div className="relative w-full md:w-80">
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Cari ID Pelanggan atau Nama Industri..."
-          className="w-full pl-9 pr-4 py-2 border border-slate-300 dark:border-slate-600 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0055A5] bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white font-medium"
-        />
-        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+      {/* Search Input & Sidebar Toggle */}
+      <div className="flex items-center gap-2 w-full md:w-80">
+        {onToggleSidebar && (
+          <button
+            onClick={onToggleSidebar}
+            className="p-2 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 shrink-0 transition"
+            title="Sembunyikan / Tampilkan Sidebar"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
+        <div className="relative flex-1">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Cari ID Pelanggan atau Nama Industri..."
+            className="w-full pl-9 pr-4 py-2 border border-slate-300 dark:border-slate-600 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0055A5] bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white font-medium"
+          />
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+        </div>
       </div>
 
       {/* Filter and User Controls */}

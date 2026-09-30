@@ -352,52 +352,54 @@ export const DetailModal: React.FC<DetailModalProps> = ({
             </div>
           </div>
 
-          {/* Historical Usage Graph */}
-          <div className="bg-slate-50 dark:bg-slate-700/40 p-3.5 rounded-xl border border-slate-200 dark:border-slate-600">
-            <div className="flex justify-between items-center mb-1">
-              <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                📈 Tren Riwayat Pembacaan Meter (5 Periode Terakhir)
-              </p>
-              <span className="text-[10px] text-slate-400 font-mono">
-                Satuan: m³ (Meter Kubik)
-              </span>
+          {/* Historical Usage Graph (Sesuai Permintaan: Jangan ditampilkan pada tampilan Billing & Invoicing) */}
+          {!canManageBilling && (
+            <div className="bg-slate-50 dark:bg-slate-700/40 p-3.5 rounded-xl border border-slate-200 dark:border-slate-600">
+              <div className="flex justify-between items-center mb-1">
+                <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                  📈 Tren Riwayat Pembacaan Meter (5 Periode Terakhir)
+                </p>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  Satuan: m³ (Meter Kubik)
+                </span>
+              </div>
+              <div className="w-full h-24 bg-white dark:bg-slate-800 rounded-lg p-2 border border-slate-200 dark:border-slate-600 flex items-center justify-center">
+                <svg className="w-full h-full" viewBox={`0 0 ${chartWidth} ${chartHeight}`}>
+                  <polyline
+                    fill="none"
+                    stroke="#0055A5"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    points={points}
+                  />
+                  {historyData.map((val, idx) => {
+                    const x = (idx / (historyData.length - 1 || 1)) * (chartWidth - 20) + 10;
+                    const y =
+                      chartHeight -
+                      ((val - minHistoryVal) / (maxHistoryVal - minHistoryVal || 1)) *
+                        (chartHeight - 20) -
+                      10;
+                    return (
+                      <g key={idx}>
+                        <circle cx={x} cy={y} r="4" fill="#E86216" />
+                        <text
+                          x={x}
+                          y={y - 8}
+                          textAnchor="middle"
+                          fontSize="9"
+                          fill="#64748b"
+                          className="font-mono font-semibold"
+                        >
+                          {val.toLocaleString()}
+                        </text>
+                      </g>
+                    );
+                  })}
+                </svg>
+              </div>
             </div>
-            <div className="w-full h-24 bg-white dark:bg-slate-800 rounded-lg p-2 border border-slate-200 dark:border-slate-600 flex items-center justify-center">
-              <svg className="w-full h-full" viewBox={`0 0 ${chartWidth} ${chartHeight}`}>
-                <polyline
-                  fill="none"
-                  stroke="#0055A5"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  points={points}
-                />
-                {historyData.map((val, idx) => {
-                  const x = (idx / (historyData.length - 1 || 1)) * (chartWidth - 20) + 10;
-                  const y =
-                    chartHeight -
-                    ((val - minHistoryVal) / (maxHistoryVal - minHistoryVal || 1)) *
-                      (chartHeight - 20) -
-                    10;
-                  return (
-                    <g key={idx}>
-                      <circle cx={x} cy={y} r="4" fill="#E86216" />
-                      <text
-                        x={x}
-                        y={y - 8}
-                        textAnchor="middle"
-                        fontSize="9"
-                        fill="#64748b"
-                        className="font-mono font-semibold"
-                      >
-                        {val.toLocaleString()}
-                      </text>
-                    </g>
-                  );
-                })}
-              </svg>
-            </div>
-          </div>
+          )}
 
           {/* Calculations Box */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-[#E6F0FA] dark:bg-slate-700/70 p-4 rounded-2xl border border-blue-200 dark:border-slate-600">
@@ -433,26 +435,31 @@ export const DetailModal: React.FC<DetailModalProps> = ({
               </p>
             </div>
 
+            {/* Sesuai Permintaan: Untuk verifikasi reading, harga/tagihan tidak ditampilkan dulu. Harga baru muncul waktu di billing. */}
             <div>
               <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px] flex items-center justify-between">
                 <span>Bea Materai</span>
-                {isMateraiRequired && (
+                {canManageBilling && isMateraiRequired && (
                   <span className="text-[9px] font-black bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 px-1.5 py-0.2 rounded font-sans">
                     e-Materai Otomatis (&gt;5 Jt)
                   </span>
                 )}
               </p>
               <p className="text-sm font-black text-slate-800 dark:text-slate-100 font-mono tabular-nums">
-                {materai > 0 ? `Rp ${materai.toLocaleString()}` : 'Rp 0 (Bebas)'}
+                {canManageBilling
+                  ? materai > 0
+                    ? `Rp ${materai.toLocaleString()}`
+                    : 'Rp 0 (Bebas)'
+                  : '—'}
               </p>
             </div>
 
             <div>
               <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px]">
-                Total Tagihan {isMateraiRequired ? '(+ e-Materai)' : ''}
+                Total Tagihan {canManageBilling && isMateraiRequired ? '(+ e-Materai)' : ''}
               </p>
               <p className="text-sm font-black text-[#0055A5] dark:text-blue-400 font-mono tabular-nums">
-                Rp {totalTagihan.toLocaleString()}
+                {canManageBilling ? `Rp ${totalTagihan.toLocaleString()}` : 'Dihitung saat Billing'}
               </p>
             </div>
           </div>

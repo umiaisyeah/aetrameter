@@ -112,8 +112,10 @@ export default function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem('aetra_meter_readers_official', JSON.stringify(meterReaders));
-    localStorage.setItem('aetra_meter_readers', JSON.stringify(meterReaders));
+    try {
+      localStorage.setItem('aetra_meter_readers_official', JSON.stringify(meterReaders));
+      localStorage.setItem('aetra_meter_readers', JSON.stringify(meterReaders));
+    } catch {}
   }, [meterReaders]);
 
   // Automatically sync meter readers' assigned cycles and roles with inputted customer data (ZERO OVERLAP & 1 PERSON = 1 ROLE)
@@ -177,6 +179,7 @@ export default function App() {
   const [selectedKelas, setSelectedKelas] = useState<string>('ALL');
   const [selectedBulan, setSelectedBulan] = useState<string>('ALL');
   const [workflowFilter, setWorkflowFilter] = useState<string>('ALL');
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
 
   // Dark mode
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
@@ -818,6 +821,8 @@ export default function App() {
         workflowFilter={workflowFilter}
         onSelectTab={handleSelectTab}
         currentUser={currentUser}
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
       />
 
       {/* Main Content Area */}
@@ -839,6 +844,7 @@ export default function App() {
           cycleSchedules={cycleSchedules}
           onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
           isSupabaseConnected={isSupabaseConnected}
+          onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
           onSwitchToFieldReader={() => {
             const firstReader = meterReaders[0];
             const fieldUser: UserProfile = {

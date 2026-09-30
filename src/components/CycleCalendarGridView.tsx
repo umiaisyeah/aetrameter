@@ -25,7 +25,7 @@ export const CycleCalendarGridView: React.FC<CycleCalendarGridViewProps> = ({
   const currentMonthCode = MONTH_CODES[currentMonthIndex];
   const daysInMonth = new Date(year, currentMonthIndex + 1, 0).getDate();
 
-  // Find Sundays for this month
+  // Find Sunday / Red Days (Sunday=0) for this month
   const sundayDays = useMemo(() => {
     const sundays: number[] = [];
     for (let d = 1; d <= daysInMonth; d++) {
@@ -39,6 +39,16 @@ export const CycleCalendarGridView: React.FC<CycleCalendarGridViewProps> = ({
 
   // Map schedules for this month
   const monthSchedules = useMemo(() => {
+    // Get all working days (Monday-Friday) in the current month
+    const workingDays: number[] = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(year, currentMonthIndex, d);
+      const dayOfWeek = date.getDay();
+      if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+        workingDays.push(d);
+      }
+    }
+
     return Array.from({ length: 15 }, (_, i) => {
       const cName = `Cycle ${i + 1}`;
       const found = cycleSchedules.find(
@@ -49,19 +59,33 @@ export const CycleCalendarGridView: React.FC<CycleCalendarGridViewProps> = ({
       );
 
       if (found && found.hariH) {
-        return found;
+        let hDay = found.hariH;
+        const dCheck = new Date(year, currentMonthIndex, hDay);
+        if (dCheck.getDay() === 0 || dCheck.getDay() === 6) {
+          const closest = workingDays.reduce((prev, curr) => 
+            Math.abs(curr - hDay) < Math.abs(prev - hDay) ? curr : prev
+          , workingDays[0] || 1);
+          hDay = closest;
+        }
+        return {
+          ...found,
+          hariH: hDay
+        };
       }
 
-      // Fallback calculation for Sep-26 matching image
       let hariH = 7 + i;
-      // Skip Sundays
       if (currentMonthIndex === 8) {
-        // September 2026 specific exact mapping from image
+        // September 2026 exact mapping from image
         const exactHariH = [7, 8, 9, 10, 11, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25];
         hariH = exactHariH[i] || 7 + i;
+      } else {
+        // For other months: strictly schedule on Monday-Friday (working days)
+        const step = Math.max(1, Math.floor(workingDays.length / 16));
+        const index = Math.min(i * step, workingDays.length - 1);
+        hariH = workingDays[index] || (i + 1);
       }
 
-      const praBaca = Math.max(1, hariH - 2);
+      const praBaca = Math.max(1, hariH - 1);
       const verif = Math.min(daysInMonth, hariH + 1);
       const billing = Math.min(daysInMonth, hariH + 2);
 
@@ -78,10 +102,10 @@ export const CycleCalendarGridView: React.FC<CycleCalendarGridViewProps> = ({
         kategoriPetugas: found?.petugasUtama && found.petugasUtama !== 'Belum Ditugaskan'
           ? getReaderCategory(found.petugasUtama)
           : found?.kategoriPetugas,
-        catatan: found?.catatan || `Plotting Matriks Kalender ${currentMonthName}`
+        catatan: found?.catatan || `Plotting Matriks Kalender ${currentMonthName} (Hari Kerja Senin-Jumat)`
       };
     });
-  }, [cycleSchedules, currentMonthIndex, currentMonthName, currentMonthCode, daysInMonth]);
+  }, [cycleSchedules, currentMonthIndex, currentMonthName, currentMonthCode, daysInMonth, year]);
 
   const handlePrevMonth = () => {
     setCurrentMonthIndex((prev) => (prev > 0 ? prev - 1 : 11));
@@ -161,7 +185,7 @@ export const CycleCalendarGridView: React.FC<CycleCalendarGridViewProps> = ({
                 {currentMonthCode} - Kalender Pembacaan Meter Industri
               </th>
             </tr>
-            {/* Days Row: 1 to 31 */}
+              {/* Days Row: 1 to 31 */}
             <tr className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-extrabold text-[11px] border-b border-slate-300 dark:border-slate-700">
               <th className="p-2 border-r border-slate-300 dark:border-slate-700 w-20 text-left pl-3 text-[#0055A5] dark:text-blue-400">
                 Cycle
@@ -227,7 +251,7 @@ export const CycleCalendarGridView: React.FC<CycleCalendarGridViewProps> = ({
                       );
                     }
 
-                    // Sunday Column
+                    // Sunday Column (Hari Minggu / Libur)
                     if (isSunday && !isHariH) {
                       return (
                         <td

@@ -1021,18 +1021,32 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                         )}
                       </td>
                       <td className="p-3.5 font-mono text-right font-black text-[#0055A5] dark:text-blue-400 tabular-nums">
-                        Rp {tagihanAir.toLocaleString()}
+                        {isUnread || item.status === 'Pending Verification' || workflowFilter === 'Pending Verification' ? (
+                          <span className="text-slate-400 font-normal italic">—</span>
+                        ) : (
+                          `Rp ${tagihanAir.toLocaleString()}`
+                        )}
                       </td>
                       <td className="p-3.5 font-mono text-right tabular-nums text-slate-600 dark:text-slate-300">
-                        <div>Rp {materai.toLocaleString()}</div>
-                        {isMaterai && (
-                          <span className="inline-block text-[8px] font-black text-indigo-600 dark:text-indigo-400 font-sans uppercase bg-indigo-50 dark:bg-indigo-950/60 px-1 py-0.2 rounded mt-0.5">
-                            e-Materai (&gt;5Jt)
-                          </span>
+                        {isUnread || item.status === 'Pending Verification' || workflowFilter === 'Pending Verification' ? (
+                          <span className="text-slate-400 font-normal italic">—</span>
+                        ) : (
+                          <div>
+                            Rp {materai.toLocaleString()}
+                            {isMaterai && (
+                              <span className="inline-block text-[8px] font-black text-indigo-600 dark:text-indigo-400 font-sans uppercase bg-indigo-50 dark:bg-indigo-950/60 px-1 py-0.2 rounded mt-0.5">
+                                e-Materai (&gt;5Jt)
+                              </span>
+                            )}
+                          </div>
                         )}
                       </td>
                       <td className="p-3.5 font-mono text-right font-bold tabular-nums text-slate-900 dark:text-white">
-                        Rp {totalTagihan.toLocaleString()}
+                        {isUnread || item.status === 'Pending Verification' || workflowFilter === 'Pending Verification' ? (
+                          <span className="text-slate-400 font-normal italic font-sans text-[11px]">Dihitung saat Billing</span>
+                        ) : (
+                          `Rp ${totalTagihan.toLocaleString()}`
+                        )}
                       </td>
                       <td className="p-3.5">
                         <div className="flex items-center gap-1.5 flex-wrap">
