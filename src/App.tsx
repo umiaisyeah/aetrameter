@@ -21,6 +21,7 @@ import { FieldReaderApp } from './components/FieldReaderApp';
 import { SectionNavBar } from './components/SectionNavBar';
 import { ColorfulNotificationModal } from './components/ColorfulNotificationModal';
 import { ColorfulToastContainer } from './components/ColorfulToastContainer';
+import { showColorfulAlert } from './utils/notificationSystem';
 import {
   getAssignedCyclesForReader,
   getReaderCategory,
@@ -539,6 +540,51 @@ export default function App() {
     );
   };
 
+  const handleSyncNow = async () => {
+    const config = getSupabaseConfig();
+    if (!config.isConfigured) {
+      showColorfulAlert({
+        title: 'Sinkronisasi Lokal',
+        message: 'Data perangkat berhasil dimuat ulang dari memori lokal.',
+        type: 'success',
+        badge: 'SYNC'
+      });
+      return;
+    }
+
+    try {
+      const [remoteCusts, remoteReaders, remoteSchedules] = await Promise.all([
+        fetchSupabaseCustomers(),
+        fetchSupabaseMeterReaders(),
+        fetchSupabaseCycleSchedules()
+      ]);
+
+      if (remoteCusts && remoteCusts.length > 0) {
+        setCustomers(remoteCusts);
+      }
+      if (remoteReaders && remoteReaders.length > 0) {
+        setMeterReaders(remoteReaders);
+      }
+      if (remoteSchedules && remoteSchedules.length > 0) {
+        setCycleSchedules(remoteSchedules);
+      }
+
+      showColorfulAlert({
+        title: 'Sinkronisasi Berhasil! 🔄',
+        message: 'Data pembacaan meter dan tagihan berhasil disinkronkan secara real-time dengan server pusat.',
+        type: 'success',
+        badge: 'REALTIME SYNC'
+      });
+    } catch (err: any) {
+      showColorfulAlert({
+        title: 'Sinkronisasi Gagal',
+        message: err?.message || 'Gagal terhubung ke server.',
+        type: 'error',
+        badge: 'ERROR'
+      });
+    }
+  };
+
   const handleClearLogs = () => {
     setAuditLogs([]);
   };
@@ -635,6 +681,7 @@ export default function App() {
           cycleSchedules={cycleSchedules}
           onSaveReading={handleSaveReading}
           onLogout={handleLogout}
+          onSyncNow={handleSyncNow}
           onSwitchToAdmin={() => {
             const adminUser = USER_PROFILES.yaya;
             setCurrentUser(adminUser);

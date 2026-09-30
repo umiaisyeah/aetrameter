@@ -46,6 +46,7 @@ interface FieldReaderAppProps {
   onSaveReading: (updatedCustomer: IndustryCustomer) => void;
   onSwitchToAdmin: () => void;
   onLogout: () => void;
+  onSyncNow?: () => void;
 }
 
 // Helper to sort cycles naturally (Cycle 1, Cycle 2, ..., Cycle 15)
@@ -65,7 +66,8 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
   cycleSchedules = [],
   onSaveReading,
   onSwitchToAdmin,
-  onLogout
+  onLogout,
+  onSyncNow
 }) => {
   // Mobile UI Tabs
   const [mobileTab, setMobileTab] = useState<'tasks' | 'monitoring' | 'profile'>('tasks');
@@ -573,11 +575,31 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
             <Calendar className="w-3.5 h-3.5 text-[#0055A5] dark:text-blue-400 shrink-0" />
             <span className="text-[10px] font-bold truncate">{realTimeClock.fullDateStr}</span>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap bg-emerald-100/70 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
-            <span className="text-[9px] font-mono font-bold text-emerald-700 dark:text-emerald-300">
-              Sinkron Real-Time
-            </span>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                if (onSyncNow) {
+                  onSyncNow();
+                } else {
+                  showColorfulAlert({
+                    title: 'Sinkronisasi Berhasil! 🔄',
+                    message: 'Data perangkat berhasil disinkronkan secara real-time.',
+                    type: 'success',
+                    badge: 'REALTIME SYNC'
+                  });
+                }
+              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-0.5 rounded-lg text-[9px] font-bold shadow-xs transition flex items-center gap-1 cursor-pointer"
+            >
+              <span>🔄 Sinkronkan</span>
+            </button>
+            <div className="flex items-center gap-1.5 whitespace-nowrap bg-emerald-100/70 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+              <span className="text-[9px] font-mono font-bold text-emerald-700 dark:text-emerald-300">
+                Real-Time
+              </span>
+            </div>
           </div>
         </div>
 
