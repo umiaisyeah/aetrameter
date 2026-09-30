@@ -17,6 +17,7 @@ import {
   Globe
 } from 'lucide-react';
 import { getSupabaseConfig, saveSupabaseConfig, clearSupabaseConfig } from '../services/supabaseClient';
+import { showColorfulAlert } from '../utils/notificationSystem';
 import {
   testSupabaseConnection,
   pushAllDataToSupabase,
@@ -81,7 +82,12 @@ export const SupabaseConfigModal: React.FC<SupabaseConfigModalProps> = ({
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim() || !anonKey.trim()) {
-      alert('Mohon isi Supabase URL dan Anon Key terlebih dahulu.');
+      showColorfulAlert({
+        title: 'Konfigurasi Belum Lengkap',
+        message: 'Mohon isi Supabase URL dan Anon Key terlebih dahulu sebelum menyimpan.',
+        type: 'warning',
+        badge: 'INPUT WAJIB'
+      });
       return;
     }
 

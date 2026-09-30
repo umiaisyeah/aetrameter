@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import defaultLogoImg from '../assets/images/aetra_logo_1790675722882.jpg';
+import { showColorfulAlert } from '../utils/notificationSystem';
 
 interface AetraLogoProps {
   className?: string;
@@ -30,7 +31,12 @@ export const AetraLogo: React.FC<AetraLogoProps> = ({ className = 'h-8', variant
           localStorage.setItem('custom_aetra_logo', result);
           setLogoSrc(result);
           window.dispatchEvent(new Event('storage'));
-          alert('Logo resmi berhasil diperbarui dan diterapkan ke seluruh aplikasi!');
+          showColorfulAlert({
+            title: 'Logo Resmi Diperbarui! ✨',
+            message: 'Logo resmi PT Aetra Air Tangerang berhasil diperbarui dan diterapkan secara langsung ke seluruh dokumen, sidebar, cetak invoice, dan antarmuka aplikasi!',
+            type: 'success',
+            badge: 'BRANDING RESMI'
+          });
         }
       };
       reader.readAsDataURL(file);

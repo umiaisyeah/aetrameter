@@ -19,6 +19,13 @@ import { ImportCycleScheduleModal } from './components/ImportCycleScheduleModal'
 import { SupabaseConfigModal } from './components/SupabaseConfigModal';
 import { FieldReaderApp } from './components/FieldReaderApp';
 import { SectionNavBar } from './components/SectionNavBar';
+import { ColorfulNotificationModal } from './components/ColorfulNotificationModal';
+import { ColorfulToastContainer } from './components/ColorfulToastContainer';
+import {
+  getAssignedCyclesForReader,
+  getReaderCategory,
+  getReaderCompany
+} from './utils/readerAssignmentHelper';
 import { getSupabaseConfig } from './services/supabaseClient';
 import {
   testSupabaseConnection,
@@ -46,14 +53,21 @@ export default function App() {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((c: any) => ({
-            ...c,
-            catatan: c.catatan
+          return parsed.map((c: any) => {
+            const isUnread = c.status === 'Belum Dibaca';
+            const cleanCatatan = c.catatan
               ? c.catatan
+                  .replace(/Diimpor dari file Excel.*$/i, '')
                   .replace(/Ahmad Fauzi|Bambang Sutrisno|Rudi Hartono|Dani Permana|Budi Santoso|Dewi Lestari|PT Hideco|Kontraktor \(PT Hideco\)/gi, '')
                   .trim()
-              : ''
-          }));
+              : '';
+            return {
+              ...c,
+              // Stand kini tidak terisi jika berstatus Belum Dibaca
+              skrg: isUnread && c.skrg === c.lalu ? 0 : c.skrg,
+              catatan: cleanCatatan
+            };
+          });
         }
       } catch {}
     }
@@ -83,15 +97,14 @@ export default function App() {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length >= 7) {
-          // Normalize and verify categories
+          // Normalize and verify categories strictly: 1 person = 1 role
           return parsed.map((r: MeterReader) => {
-            const isKA = ['anjarini sukamto', 'febriadi', 'harsindi', 'yugo apriadi', 'wahyu hidayat'].includes(
-              r.nama.toLowerCase()
-            ) || r.kategori === 'Key Account' || r.id.startsWith('KA-');
+            const role = getReaderCategory(r.nama);
+            const company = getReaderCompany(r.nama);
             return {
               ...r,
-              kategori: isKA ? 'Key Account' : 'Kontraktor (PT Hideco)',
-              perusahaan: isKA ? 'PT Aetra Air Tangerang (Key Account)' : 'PT Hideco'
+              kategori: role,
+              perusahaan: company
             };
           });
         }
@@ -104,6 +117,35 @@ export default function App() {
     localStorage.setItem('aetra_meter_readers_official', JSON.stringify(meterReaders));
     localStorage.setItem('aetra_meter_readers', JSON.stringify(meterReaders));
   }, [meterReaders]);
+
+  // Automatically sync meter readers' assigned cycles and roles with inputted customer data (ZERO OVERLAP & 1 PERSON = 1 ROLE)
+  useEffect(() => {
+    setMeterReaders((prev) => {
+      let changed = false;
+      const updated = prev.map((r) => {
+        const freshCycles = getAssignedCyclesForReader(r, customers);
+        const role = getReaderCategory(r.nama);
+        const company = getReaderCompany(r.nama);
+        const isSame =
+          r.kategori === role &&
+          r.perusahaan === company &&
+          r.assignedCycles &&
+          r.assignedCycles.length === freshCycles.length &&
+          r.assignedCycles.every((c, i) => c === freshCycles[i]);
+        if (!isSame) {
+          changed = true;
+          return {
+            ...r,
+            kategori: role,
+            perusahaan: company,
+            assignedCycles: freshCycles
+          };
+        }
+        return r;
+      });
+      return changed ? updated : prev;
+    });
+  }, [customers]);
 
   const [cycleSchedules, setCycleSchedules] = useState<CycleSchedule[]>(() => {
     const saved = localStorage.getItem('aetra_cycle_schedules');
@@ -319,14 +361,15 @@ export default function App() {
   };
 
   const handleImportCustomers = (importedList: IndustryCustomer[]) => {
-    setCustomers((prev) => [...importedList, ...prev]);
+    const combinedCustomers = [...importedList, ...customers];
+    setCustomers(combinedCustomers);
     importedList.forEach((c) => upsertSupabaseCustomer(c).catch(() => {}));
 
-    // Auto-sync meter readers and cycle assignments from imported customers
+    // Auto-sync meter readers and cycle assignments strictly from combined customers (ZERO OVERLAP)
     setMeterReaders((prevReaders) => {
       const updatedReaders = [...prevReaders];
 
-      importedList.forEach((cust, idx) => {
+      importedList.forEach((cust) => {
         const readerName = cust.petugasBaca?.trim();
         if (!readerName) return;
 
@@ -334,23 +377,11 @@ export default function App() {
           (r) => r.nama.toLowerCase() === readerName.toLowerCase()
         );
 
-        const isKeyAccount =
-          cust.kategoriPetugas?.toLowerCase().includes('key') ||
-          cust.kelas === 'Platinum' ||
-          cust.kelas === 'Premium';
+        const category: ReaderCategory = getReaderCategory(readerName);
+        const company = getReaderCompany(readerName);
+        const isKeyAccount = category === 'Key Account';
 
-        const category: ReaderCategory = isKeyAccount ? 'Key Account' : 'Kontraktor (PT Hideco)';
-        const company = isKeyAccount ? 'PT Aetra Air Tangerang (Key Account)' : 'PT Hideco';
-
-        if (existingIdx >= 0) {
-          const existing = updatedReaders[existingIdx];
-          if (cust.cycle && !existing.assignedCycles.includes(cust.cycle)) {
-            updatedReaders[existingIdx] = {
-              ...existing,
-              assignedCycles: [...existing.assignedCycles, cust.cycle]
-            };
-          }
-        } else {
+        if (existingIdx === -1) {
           const newId = `RDR-${String(updatedReaders.length + 1).padStart(3, '0')}`;
           updatedReaders.push({
             id: newId,
@@ -360,18 +391,22 @@ export default function App() {
             email: `${readerName.toLowerCase().replace(/[^a-z0-9]/g, '')}@aetra-tangerang.co.id`,
             kategori: category,
             perusahaan: company,
-            assignedCycles: cust.cycle ? [cust.cycle] : [],
+            assignedCycles: [],
             status: 'Aktif',
             joinDate: '2026-01-15'
           });
         }
       });
 
-      return updatedReaders;
+      // Recalculate assignedCycles for EVERY reader strictly based on their assigned customers (ZERO OVERLAP)
+      return updatedReaders.map((reader) => ({
+        ...reader,
+        assignedCycles: getAssignedCyclesForReader(reader, combinedCustomers)
+      }));
     });
 
     logActivity(
-      `Mengimpor ${importedList.length} data industri via Excel & otomatis sinkronisasi penugasan pembaca meter lapangan.`,
+      `Mengimpor ${importedList.length} data industri via Excel & otomatis sinkronisasi penugasan pembaca meter lapangan tanpa overlap.`,
       'import'
     );
   };
@@ -601,12 +636,18 @@ export default function App() {
             meterReaders={meterReaders}
           />
         )}
+        <ColorfulNotificationModal />
+        <ColorfulToastContainer />
       </div>
     );
   }
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-sans antialiased transition-colors duration-200">
+      {/* Interactive Colorful Notification & Toast System */}
+      <ColorfulNotificationModal />
+      <ColorfulToastContainer />
+
       {/* Login Modal */}
       {isLoginModalOpen && (
         <ModalLogin

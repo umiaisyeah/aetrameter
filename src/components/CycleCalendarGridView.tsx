@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { CycleSchedule } from '../types';
 import { Calendar, ChevronLeft, ChevronRight, Info, UserCheck, Shield } from 'lucide-react';
 import { MONTH_NAMES_ID, MONTH_CODES } from '../utils/excelDateHelper';
+import { getReaderCategory } from '../utils/readerAssignmentHelper';
 
 interface CycleCalendarGridViewProps {
   cycleSchedules: CycleSchedule[];
@@ -74,7 +75,9 @@ export const CycleCalendarGridView: React.FC<CycleCalendarGridViewProps> = ({
         tanggalMulai: `${String(hariH).padStart(2, '0')} ${currentMonthName.slice(0, 3)} 2026`,
         tanggalSelesai: `${String(verif).padStart(2, '0')} ${currentMonthName.slice(0, 3)} 2026`,
         petugasUtama: found?.petugasUtama || 'Belum Ditugaskan',
-        kategoriPetugas: found?.kategoriPetugas || undefined,
+        kategoriPetugas: found?.petugasUtama && found.petugasUtama !== 'Belum Ditugaskan'
+          ? getReaderCategory(found.petugasUtama)
+          : found?.kategoriPetugas,
         catatan: found?.catatan || `Plotting Matriks Kalender ${currentMonthName}`
       };
     });

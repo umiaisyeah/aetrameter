@@ -17,6 +17,13 @@ import {
 } from 'lucide-react';
 import { downloadYearlyCycleScheduleTemplate } from '../utils/excelDateHelper';
 import { CycleCalendarGridView } from './CycleCalendarGridView';
+import {
+  getAssignedCustomersForReader,
+  getAssignedCyclesForReader,
+  sortCyclesNaturally,
+  getReaderCategory,
+  getReaderCompany
+} from '../utils/readerAssignmentHelper';
 
 interface MeterReaderProgressSectionProps {
   customers: IndustryCustomer[];
@@ -64,19 +71,32 @@ export const MeterReaderProgressSection: React.FC<MeterReaderProgressSectionProp
 
       const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-      // Determine field reader
-      let assignedReader = schedule?.petugasUtama;
-      let kategori: ReaderCategory = schedule?.kategoriPetugas || 'Belum Ditugaskan';
+      // Determine field reader and category strictly synced: 1 person = 1 role
+      const readersForCycle = meterReaders.filter((r) => {
+        const rCycles = getAssignedCyclesForReader(r, customers);
+        return rCycles.some((ac) => ac.toLowerCase() === cName.toLowerCase());
+      });
 
-      if (!assignedReader || assignedReader === 'Belum Ditugaskan') {
-        const found = meterReaders.find((r) =>
-          r.assignedCycles.some((ac) => ac.toLowerCase() === cName.toLowerCase())
+      let assignedReader = 'Belum Ditugaskan';
+      let kategori: ReaderCategory = 'Belum Ditugaskan';
+
+      if (readersForCycle.length > 0) {
+        assignedReader = readersForCycle.map((r) => r.nama).join(', ');
+        kategori = getReaderCategory(readersForCycle[0].nama);
+      } else {
+        const directCustReaders = Array.from(
+          new Set(
+            cycleCustomers
+              .map((c) => c.petugasBaca?.trim())
+              .filter((name): name is string => Boolean(name))
+          )
         );
-        if (found) {
-          assignedReader = found.nama;
-          kategori = found.kategori;
-        } else {
-          assignedReader = 'Belum Ditugaskan';
+        if (directCustReaders.length > 0) {
+          assignedReader = directCustReaders.join(', ');
+          kategori = getReaderCategory(directCustReaders[0]);
+        } else if (schedule?.petugasUtama && schedule.petugasUtama !== 'Belum Ditugaskan') {
+          assignedReader = schedule.petugasUtama;
+          kategori = getReaderCategory(schedule.petugasUtama);
         }
       }
 
@@ -109,38 +129,11 @@ export const MeterReaderProgressSection: React.FC<MeterReaderProgressSectionProp
     });
   }, [customers, scheduleMap, meterReaders]);
 
-  // Reader overall stats
+  // Reader overall stats strictly based on inputted/imported data (ZERO OVERLAP)
   const readerStats = useMemo(() => {
-    const sortCycles = (cycles: string[]): string[] => {
-      return [...cycles].sort((a, b) => {
-        const numA = parseInt(a.replace(/\D/g, '')) || 0;
-        const numB = parseInt(b.replace(/\D/g, '')) || 0;
-        return numA - numB;
-      });
-    };
-
     return meterReaders.map((reader) => {
-      // Sinkronisasi otomatis dari Database Industri yang diinput
-      const dbAssignedCycles = Array.from(
-        new Set(
-          customers
-            .filter((c) => c.petugasBaca && c.petugasBaca.toLowerCase() === reader.nama.toLowerCase())
-            .map((c) => c.cycle)
-            .filter(Boolean)
-        )
-      );
-
-      const validAssignedCycles = dbAssignedCycles.length > 0
-        ? dbAssignedCycles
-        : (reader.assignedCycles || []).filter((ac) =>
-            customers.some((c) => c.cycle.toLowerCase() === ac.toLowerCase())
-          );
-
-      const sortedCycles = sortCycles(validAssignedCycles);
-      const assignedCusts = customers.filter((c) =>
-        (c.petugasBaca && c.petugasBaca.toLowerCase() === reader.nama.toLowerCase()) ||
-        sortedCycles.some((ac) => ac.toLowerCase() === c.cycle.toLowerCase())
-      );
+      const sortedCycles = getAssignedCyclesForReader(reader, customers);
+      const assignedCusts = getAssignedCustomersForReader(reader, customers);
       const totalIndustri = assignedCusts.length;
       const totalCompleted = assignedCusts.filter(
         (c) => c.status === 'Verified' || c.status === 'Invoiced'
@@ -159,7 +152,7 @@ export const MeterReaderProgressSection: React.FC<MeterReaderProgressSectionProp
         overallPercent
       };
     });
-  }, [meterReaders, cycleProgressList, customers]);
+  }, [meterReaders, customers]);
 
   // Filtered cycle list
   const filteredCycles = useMemo(() => {

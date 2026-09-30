@@ -25,6 +25,14 @@ import {
   Calendar,
   Activity
 } from 'lucide-react';
+import { showColorfulAlert, showToast } from '../utils/notificationSystem';
+import {
+  getAssignedCustomersForReader,
+  getAssignedCyclesForReader,
+  sortCyclesNaturally,
+  getReaderCategory,
+  getReaderCompany
+} from '../utils/readerAssignmentHelper';
 
 interface MeterReaderManagementSectionProps {
   meterReaders: MeterReader[];
@@ -117,7 +125,12 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
         const rows = XLSX.utils.sheet_to_json<Record<string, any>>(workbook.Sheets[sheetName]);
 
         if (!rows || rows.length === 0) {
-          alert('File Excel kosong atau tidak memiliki data.');
+          showColorfulAlert({
+            title: 'File Excel Kosong',
+            message: 'File Excel yang dipilih tidak memiliki baris data petugas pembaca meter.',
+            type: 'warning',
+            badge: 'FILE KOSONG'
+          });
           return;
         }
 
@@ -189,10 +202,28 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
           }
         });
 
-        alert(`Sinkronisasi Excel Berhasil!\n- ${createdCount} petugas baru ditambahkan\n- ${updatedCount} petugas berhasil diperbarui & disinkronkan siklus penugasannya.`);
+        showColorfulAlert({
+          title: 'Sinkronisasi Petugas Selesai! 🎉',
+          subtitle: 'Impor & Pembaruan Data Petugas Pembaca Meter',
+          message: `Sinkronisasi Excel petugas pembaca meter berhasil dilakukan. Sebanyak ${createdCount} petugas baru berhasil didaftarkan dan ${updatedCount} petugas berhasil diperbarui data & siklus penugasannya.`,
+          type: 'success',
+          badge: 'PETUGAS TERSINKRON',
+          count: createdCount + updatedCount,
+          details: [
+            `${createdCount} petugas baru berhasil ditambahkan`,
+            `${updatedCount} data petugas berhasil diperbarui`,
+            'Otomatis terhubung ke jadwal rute catat meter'
+          ],
+          confirmText: 'Lihat Daftar Petugas'
+        });
       } catch (err) {
         console.error(err);
-        alert('Gagal mengimpor file Excel petugas. Pastikan format .xlsx atau .xls valid.');
+        showColorfulAlert({
+          title: 'Gagal Mengimpor File Excel',
+          message: 'Pastikan format file .xlsx atau .xls valid dan tidak terkunci/rusak.',
+          type: 'error',
+          badge: 'IMPORT GAGAL'
+        });
       }
       if (excelFileInputRef.current) excelFileInputRef.current.value = '';
     };
@@ -217,7 +248,12 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
   const handleSaveNewReader = (e: React.FormEvent) => {
     e.preventDefault();
     if (!nama.trim()) {
-      alert('Mohon isi Nama Petugas Pembaca Meter!');
+      showColorfulAlert({
+        title: 'Data Belum Lengkap',
+        message: 'Mohon isi Nama Petugas Pembaca Meter sebelum menyimpan!',
+        type: 'warning',
+        badge: 'INPUT WAJIB'
+      });
       return;
     }
 
@@ -250,7 +286,12 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
     setKategori('Kontraktor (PT Hideco)');
     setAssignedCycles([]);
     setShowAddForm(false);
-    alert(`Petugas lapangan ${newReader.nama} (${newReader.kategori}) berhasil ditambahkan!`);
+    showColorfulAlert({
+      title: 'Petugas Berhasil Didaftarkan! 👤',
+      message: `Petugas lapangan ${newReader.nama} (${newReader.kategori}) berhasil didaftarkan ke sistem SIMBA-IN dengan ID ${newReader.id}.`,
+      type: 'success',
+      badge: 'REGISTRASI BERHASIL'
+    });
   };
 
   const handleSaveEditReader = (e: React.FormEvent) => {
@@ -267,27 +308,29 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
       perusahaan: autoPerusahaan
     });
     setEditingReader(null);
-    alert(`Data petugas ${editingReader.nama} berhasil diperbarui!`);
+    showToast({
+      title: 'Data Petugas Diperbarui',
+      message: `Data petugas ${editingReader.nama} berhasil diperbarui!`,
+      type: 'success'
+    });
   };
 
   const filteredReaders = meterReaders.filter((r) => {
-    // 1. Category filter
+    // 1. Category filter strictly: 1 person = 1 role
     let matchCategory = true;
     if (filterCategory === 'Kontraktor') {
-      matchCategory = r.kategori === 'Kontraktor (PT Hideco)' || r.kategori === 'Kontraktor' || r.kategori.toLowerCase().includes('hideco');
+      matchCategory = getReaderCategory(r.nama) === 'Kontraktor (PT Hideco)';
     } else if (filterCategory === 'Key Account') {
-      matchCategory = r.kategori === 'Key Account';
+      matchCategory = getReaderCategory(r.nama) === 'Key Account';
     }
 
     if (!matchCategory) return false;
 
-    // 2. Cycle assignment filter
+    // 2. Cycle assignment filter (Strictly based on inputted data with zero overlap)
     if (filterCycle !== 'ALL') {
-      const hasCycle = r.assignedCycles?.some((c) => c.toLowerCase() === filterCycle.toLowerCase());
-      const hasCustomerInCycle = customers.some(
-        (c) => c.cycle.toLowerCase() === filterCycle.toLowerCase() && c.petugasBaca && c.petugasBaca.toLowerCase() === r.nama.toLowerCase()
-      );
-      if (!hasCycle && !hasCustomerInCycle) return false;
+      const assignedCyclesForR = getAssignedCyclesForReader(r, customers);
+      const hasCycle = assignedCyclesForR.some((c) => c.toLowerCase() === filterCycle.toLowerCase());
+      if (!hasCycle) return false;
     }
 
     return true;
@@ -415,9 +458,10 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
           </button>
           {allCycles.map((c) => {
             const isSelected = filterCycle === c;
-            const countPetugas = meterReaders.filter(
-              (r) => r.assignedCycles?.some((ac) => ac.toLowerCase() === c.toLowerCase())
-            ).length;
+            const countPetugas = meterReaders.filter((r) => {
+              const assignedCyclesForR = getAssignedCyclesForReader(r, customers);
+              return assignedCyclesForR.some((ac) => ac.toLowerCase() === c.toLowerCase());
+            }).length;
             return (
               <button
                 key={c}
@@ -614,29 +658,9 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
           </div>
         ) : (
           filteredReaders.map((reader) => {
-          // Sinkronisasi otomatis dari Database Industri yang diinput
-          const dbAssignedCycles = Array.from(
-            new Set(
-              customers
-                .filter((c) => c.petugasBaca && c.petugasBaca.toLowerCase() === reader.nama.toLowerCase())
-                .map((c) => c.cycle)
-                .filter(Boolean)
-            )
-          );
-
-          // Jika ada penugasan langsung di database industri, utamakan itu
-          // Atau jika reader memiliki assignedCycles yang memang ada industrinya di database
-          const validAssignedCycles = dbAssignedCycles.length > 0
-            ? dbAssignedCycles
-            : (reader.assignedCycles || []).filter((ac) =>
-                customers.some((c) => c.cycle.toLowerCase() === ac.toLowerCase())
-              );
-
-          const sortedAssignedCycles = sortCycles(validAssignedCycles);
-          const assignedCusts = customers.filter((c) => {
-            if (c.petugasBaca && c.petugasBaca.toLowerCase() === reader.nama.toLowerCase()) return true;
-            return sortedAssignedCycles.some((ac) => ac.toLowerCase() === c.cycle.toLowerCase());
-          });
+          // Penugasan cycle dan industri strictly berdasarkan data industri yang diinput (ZERO OVERLAP)
+          const sortedAssignedCycles = getAssignedCyclesForReader(reader, customers);
+          const assignedCusts = getAssignedCustomersForReader(reader, customers);
           const completedCount = assignedCusts.filter(
             (c) => c.status === 'Verified' || c.status === 'Invoiced'
           ).length;

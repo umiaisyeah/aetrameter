@@ -3,6 +3,7 @@ import { IndustryCustomer, UserProfile } from '../types';
 import { X, AlertTriangle, Info, Mail, Printer, CheckCircle, Camera, FileCheck } from 'lucide-react';
 import meterGaugeImg from '../assets/images/meter_industrial_gauge_1790243358407.jpg';
 import bpmDocImg from '../assets/images/meter_bpm_document_1790243369057.jpg';
+import { showColorfulAlert } from '../utils/notificationSystem';
 
 interface DetailModalProps {
   isOpen: boolean;
@@ -30,7 +31,8 @@ export const DetailModal: React.FC<DetailModalProps> = ({
 
   useEffect(() => {
     if (customer) {
-      setInputSkrg(customer.skrg);
+      const isUnread = customer.status === 'Belum Dibaca';
+      setInputSkrg(isUnread && customer.skrg === customer.lalu ? 0 : customer.skrg);
       setCatatan(customer.catatan || '');
       setShowOutlookBox(customer.status === 'Invoiced');
     }
@@ -83,7 +85,12 @@ export const DetailModal: React.FC<DetailModalProps> = ({
     } else {
       // Meter reading user saves reading
       if (currentStand < lalu) {
-        alert('Stand Meter saat ini tidak boleh lebih kecil dari Stand Bulan Lalu!');
+        showColorfulAlert({
+          title: 'Validasi Stand Meter',
+          message: `Stand Meter saat ini (${currentStand.toLocaleString()} m³) tidak boleh lebih kecil dari Stand Bulan Lalu (${lalu.toLocaleString()} m³)!`,
+          type: 'warning',
+          badge: 'VALIDASI NILAI'
+        });
         return;
       }
 
@@ -103,7 +110,12 @@ export const DetailModal: React.FC<DetailModalProps> = ({
       };
 
       onSaveReading(updated);
-      alert('Stand meter berhasil dibaca dan status workflow diatur ke Pending Verification!');
+      showColorfulAlert({
+        title: 'Stand Meter Berhasil Dicatat! 💧',
+        message: `Stand meter industri ${customer.nama} (${currentStand.toLocaleString()} m³) berhasil disimpan. Status alur kerja kini diatur ke Pending Verification (Menunggu Persetujuan Billing).`,
+        type: 'success',
+        badge: 'CATAT STAND BERHASIL'
+      });
       onClose();
     }
   };
@@ -366,7 +378,8 @@ export const DetailModal: React.FC<DetailModalProps> = ({
               </label>
               <input
                 type="number"
-                value={inputSkrg}
+                value={inputSkrg > 0 ? inputSkrg : ''}
+                placeholder="Belum Dicatat"
                 readOnly={isBillingUser}
                 onChange={(e) => setInputSkrg(Number(e.target.value))}
                 className={`w-full p-1.5 border border-blue-300 dark:border-slate-500 rounded-xl text-sm font-bold font-mono text-[#0055A5] dark:text-white focus:ring-2 focus:ring-[#0055A5] ${
@@ -380,7 +393,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
             <div>
               <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px]">Volume Konsumsi</p>
               <p className="text-sm font-black text-[#E86216] font-mono tabular-nums">
-                {vol.toLocaleString()} m³
+                {currentStand === 0 ? '—' : `${vol.toLocaleString()} m³`}
               </p>
             </div>
 

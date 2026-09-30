@@ -811,7 +811,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               ) : (
                 filteredCustomers.map((item) => {
                   const isSelected = selectedRowIds.includes(item.id);
-                  const vol = Math.max(0, item.skrg - item.lalu);
+                  const isUnread = item.status === 'Belum Dibaca';
+                  const vol = isUnread || !item.skrg || item.skrg === 0 ? 0 : Math.max(0, item.skrg - item.lalu);
                   const tagihanAir = vol * 17872;
                   // UU Bea Meterai: Dokumen tagihan > 5 Juta otomatis dikenakan Bea Materai Rp 10.000
                   const isMaterai = tagihanAir > 5000000;
@@ -878,10 +879,18 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                         {item.lalu.toLocaleString()}
                       </td>
                       <td className="p-3.5 font-mono text-right font-bold tabular-nums text-slate-900 dark:text-slate-100">
-                        {item.skrg.toLocaleString()}
+                        {isUnread || !item.skrg || item.skrg === 0 ? (
+                          <span className="text-slate-400 font-normal italic">—</span>
+                        ) : (
+                          item.skrg.toLocaleString()
+                        )}
                       </td>
                       <td className="p-3.5 font-mono text-right font-black text-[#E86216] tabular-nums">
-                        {vol.toLocaleString()}
+                        {isUnread || !item.skrg || item.skrg === 0 ? (
+                          <span className="text-slate-400 font-normal italic">—</span>
+                        ) : (
+                          vol.toLocaleString()
+                        )}
                       </td>
                       <td className="p-3.5 font-mono text-right font-black text-[#0055A5] dark:text-blue-400 tabular-nums">
                         Rp {tagihanAir.toLocaleString()}

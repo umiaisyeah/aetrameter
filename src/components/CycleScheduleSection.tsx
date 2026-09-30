@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { downloadYearlyCycleScheduleTemplate } from '../utils/excelDateHelper';
 import { CycleCalendarGridView } from './CycleCalendarGridView';
+import { showColorfulAlert, showToast } from '../utils/notificationSystem';
 
 interface CycleScheduleSectionProps {
   cycleSchedules: CycleSchedule[];
@@ -174,7 +175,12 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
 
     onUpdateSchedule(updated);
     setEditingShiftModal(null);
-    alert(`Pergeseran Hari Baca untuk ${shiftCycle} berhasil disimpan & disinkronkan ke akun petugas lapangan!`);
+    showColorfulAlert({
+      title: 'Pergeseran Hari Baca Disimpan! 📅',
+      message: `Pergeseran Hari Baca untuk ${shiftCycle} (Tgl ${shiftHariHOriginal} → Tgl ${shiftHariH}) berhasil disimpan & otomatis disinkronkan ke kalender matriks dan aplikasi petugas lapangan!`,
+      type: 'success',
+      badge: 'PERGESERAN CYCLE'
+    });
   };
 
   const handleRemoveShift = (cName: string) => {
@@ -196,7 +202,11 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
     };
 
     onUpdateSchedule(reverted);
-    alert(`Pergeseran untuk ${cName} telah dinormalisasi kembali ke Hari H Original (Tgl ${origHariH}).`);
+    showToast({
+      title: 'Jadwal Dinormalisasi',
+      message: `Pergeseran untuk ${cName} telah dinormalisasi kembali ke Hari H Original (Tgl ${origHariH}).`,
+      type: 'info'
+    });
   };
 
   const handleSaveEdit = (e: React.FormEvent) => {
@@ -205,7 +215,11 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
 
     onUpdateSchedule(editingSchedule);
     setEditingSchedule(null);
-    alert(`Jadwal untuk ${editingSchedule.cycle} berhasil diperbarui!`);
+    showToast({
+      title: 'Jadwal Diperbarui',
+      message: `Jadwal untuk ${editingSchedule.cycle} berhasil diperbarui!`,
+      type: 'success'
+    });
   };
 
   return (

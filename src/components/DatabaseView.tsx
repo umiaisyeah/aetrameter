@@ -19,6 +19,8 @@ import bpmDocImg from '../assets/images/meter_bpm_document_1790243369057.jpg';
 import { MeterReaderManagementSection } from './MeterReaderManagementSection';
 import { CycleScheduleSection } from './CycleScheduleSection';
 import { ImportCycleScheduleModal } from './ImportCycleScheduleModal';
+import { showColorfulAlert, showToast } from '../utils/notificationSystem';
+import { getReaderCategory } from '../utils/readerAssignmentHelper';
 
 interface DatabaseViewProps {
   customers: IndustryCustomer[];
@@ -158,7 +160,12 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
         const rows = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet);
 
         if (!rows || rows.length === 0) {
-          alert('File Excel kosong atau tidak memiliki data pada sheet pertama.');
+          showColorfulAlert({
+            title: 'File Excel Kosong',
+            message: 'File Excel yang dipilih tidak memiliki baris data pada sheet pertama.',
+            type: 'warning',
+            badge: 'FILE KOSONG'
+          });
           return;
         }
 
@@ -206,10 +213,21 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
               'pembacameter',
               'petugas_baca',
               'petugas baca',
+              'nama_petugas',
+              'nama petugas',
+              'nama_pembaca',
+              'nama pembaca',
               'petugas',
               'reader',
               'pic'
-            ]) || 'Pak Joko Widodo';
+            ]) || '';
+
+          const defaultReaderForCycle =
+            readerVal ||
+            (meterReaders.find((r) => r.assignedCycles?.some((ac) => ac.toLowerCase() === String(cyc).toLowerCase()))?.nama) ||
+            'Anjarini Sukamto';
+
+          const finalReader = readerVal || defaultReaderForCycle;
 
           const mail =
             getExcelValue(item, ['emailIndustri', 'email', 'surel', 'email perusahaan']) ||
@@ -219,10 +237,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
             Number(getExcelValue(item, ['standLalu', 'stand_lalu', 'lalu', 'meter lalu', 'stand bulan lalu'])) ||
             10000;
 
-          const isKA =
-            String(readerVal).toLowerCase().includes('dani') ||
-            String(readerVal).toLowerCase().includes('dewi') ||
-            kls === 'Premium';
+          const isKA = getReaderCategory(finalReader) === 'Key Account';
 
           return {
             id: String(idPel).trim().toUpperCase(),
@@ -230,13 +245,13 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
             email: String(mail).trim(),
             cycle: String(cyc).trim(),
             kelas: kls,
-            petugasBaca: String(readerVal).trim(),
+            petugasBaca: String(finalReader).trim(),
             kategoriPetugas: isKA ? 'Key Account' : 'Kontraktor',
             lalu: laluVal,
-            skrg: laluVal,
+            skrg: 0,
             status: 'Belum Dibaca' as const,
             bulan: 'September 2026',
-            catatan: `Diimpor dari file Excel. Petugas: ${readerVal} (Belum dibaca).`,
+            catatan: '',
             history: [Math.max(0, laluVal - 600), Math.max(0, laluVal - 300), laluVal],
             fotoMeter: '',
             fotoBPM: ''
@@ -244,10 +259,30 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
         });
 
         onImportCustomers(imported);
-        alert(`✓ Berhasil mengimpor ${imported.length} data industri gabungan (ID, Nama, Cycle, Kelas, Pembaca Meter) dengan status Belum Dibaca!`);
+        showColorfulAlert({
+          title: 'Import Data Industri Berhasil! 🎉',
+          subtitle: 'Sinkronisasi Database Industri & Penugasan Petugas Lapangan',
+          message: `Berhasil mengimpor ${imported.length} data industri gabungan (ID Pelanggan, Nama Perusahaan Industri, Cycle, Kelas, Pembaca Meter) ke dalam sistem SIMBA-IN. Status alur kerja diatur ke Belum Dibaca (siap dicatat petugas lapangan).`,
+          type: 'success',
+          badge: 'EXCEL IMPORT SUKSES',
+          count: imported.length,
+          tags: ['ID Pelanggan', 'Nama Perusahaan', 'Cycle 1 - 15', 'Kelas Pelanggan', 'Petugas Baca'],
+          details: [
+            `${imported.length} data industri berhasil diintegrasikan ke basis data`,
+            'Otomatis terhubung ke jadwal pergeseran cycle dan pembaca meter lapangan',
+            'Semua data siap diverifikasi dalam siklus pembacaan berjalan'
+          ],
+          confirmText: 'Lihat Daftar Industri',
+          autoCloseMs: 8000
+        });
       } catch (err) {
         console.error(err);
-        alert('Gagal membaca file Excel. Pastikan format file .xlsx atau .xls valid.');
+        showColorfulAlert({
+          title: 'Gagal Membaca File Excel',
+          message: 'Pastikan format file .xlsx atau .xls valid dan tidak dalam kondisi terproteksi / korup.',
+          type: 'error',
+          badge: 'IMPORT GAGAL'
+        });
       }
       if (fileInputRef.current) fileInputRef.current.value = '';
     };
@@ -258,11 +293,23 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   const handleManualAdd = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newId.trim() || !newName.trim()) {
-      alert('Mohon isi ID Pelanggan dan Nama Perusahaan terlebih dahulu!');
+      showColorfulAlert({
+        title: 'Data Belum Lengkap',
+        message: 'Mohon isi ID Pelanggan dan Nama Perusahaan terlebih dahulu sebelum menyimpan data industri baru.',
+        type: 'warning',
+        badge: 'INPUT WAJIB'
+      });
       return;
     }
 
     const standLaluNum = Number(newStandLalu) || 10000;
+
+    const assignedReaderForCycle =
+      meterReaders.find((r) =>
+        r.assignedCycles?.some((ac) => ac.toLowerCase() === newCycle.toLowerCase())
+      )?.nama || 'Anjarini Sukamto';
+
+    const isKA = getReaderCategory(assignedReaderForCycle) === 'Key Account';
 
     const newCustomer: IndustryCustomer = {
       id: newId.trim().toUpperCase(),
@@ -270,11 +317,13 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
       email: newEmail.trim() || 'finance@industri.co.id',
       cycle: newCycle,
       kelas: newKelas,
+      petugasBaca: assignedReaderForCycle,
+      kategoriPetugas: isKA ? 'Key Account' : 'Kontraktor',
       lalu: standLaluNum,
-      skrg: standLaluNum,
+      skrg: 0,
       status: 'Belum Dibaca',
       bulan: 'September 2026',
-      catatan: 'Didaftarkan manual ke siklus pembacaan (Belum dibaca).',
+      catatan: '',
       history: [Math.max(0, standLaluNum - 500), Math.max(0, standLaluNum - 200), standLaluNum],
       fotoMeter: '',
       fotoBPM: ''
@@ -285,7 +334,12 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
     setNewName('');
     setNewEmail('');
     setNewStandLalu('10000');
-    alert('Data industri berhasil ditambahkan dengan status Belum Dibaca!');
+    showColorfulAlert({
+      title: 'Industri Berhasil Didaftarkan! ✨',
+      message: `Akun industri ${newCustomer.nama} (${newCustomer.id}) telah berhasil disimpan ke database ${newCustomer.cycle} dengan status Belum Dibaca.`,
+      type: 'success',
+      badge: 'REGISTRASI BERHASIL'
+    });
   };
 
   // Filtered master data
@@ -720,10 +774,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                             </td>
                             <td className="p-3">
                               <span className="font-semibold text-slate-800 dark:text-slate-200">
-                                {item.petugasBaca || 'Pak Joko Widodo'}
-                              </span>
-                              <span className="block text-[9px] text-slate-400">
-                                {item.kategoriPetugas || 'Kontraktor'}
+                                {item.petugasBaca || 'Belum Ditugaskan'}
                               </span>
                             </td>
                             <td className="p-3">

@@ -30,6 +30,13 @@ import {
   User,
   Send
 } from 'lucide-react';
+import { showColorfulAlert } from '../utils/notificationSystem';
+import {
+  getAssignedCustomersForReader,
+  getAssignedCyclesForReader,
+  sortCyclesNaturally,
+  normalizeReaderName
+} from '../utils/readerAssignmentHelper';
 
 interface FieldReaderAppProps {
   currentUser: UserProfile;
@@ -90,7 +97,6 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCycleFilter, setSelectedCycleFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'Belum Dibaca' | 'Pending Verification' | 'Verified'>('ALL');
-  const [taskCategoryFilter, setTaskCategoryFilter] = useState<'ALL' | 'Kontraktor' | 'Key Account'>('ALL');
   const [isScheduleDetailsOpen, setIsScheduleDetailsOpen] = useState<boolean>(false);
 
   // Notification Toast
@@ -147,50 +153,23 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
 
   // Find reader details from master data
   const currentReader = meterReaders.find(
-    (r) => r.id === currentUser.readerId || r.nama.toLowerCase() === currentUser.name.toLowerCase()
+    (r) =>
+      (currentUser.readerId && r.id.toLowerCase() === currentUser.readerId.toLowerCase()) ||
+      normalizeReaderName(r.nama) === normalizeReaderName(currentUser.name)
   );
 
-  // Synchronize assigned cycles strictly with Database of Industrial Customers & Admin Schedules
+  const readerTargetObj = useMemo(() => {
+    if (currentReader) return currentReader;
+    return {
+      id: currentUser.readerId,
+      nama: currentUser.name
+    };
+  }, [currentReader, currentUser]);
+
+  // Synchronize assigned cycles strictly with inputted customer data (ZERO OVERLAP)
   const readerAssignedCycles = useMemo(() => {
-    const cycleSet = new Set<string>();
-    const rName = (currentReader?.nama || currentUser.name || '').trim().toLowerCase();
-
-    // 1. Dapatkan cycle langsung dari database industri yang telah diinputkan petugasnya
-    customers.forEach((c) => {
-      const pic = c.petugasBaca?.trim().toLowerCase();
-      if (pic && rName && (pic === rName || pic.includes(rName) || rName.includes(pic))) {
-        if (c.cycle && c.cycle.trim()) {
-          cycleSet.add(c.cycle.trim());
-        }
-      }
-    });
-
-    // 2. Jika database industri memiliki cycle yang diplot lewat jadwal cycle admin
-    if (cycleSchedules && Array.isArray(cycleSchedules)) {
-      cycleSchedules.forEach((sch) => {
-        const pic = sch.petugasUtama?.trim().toLowerCase();
-        if (pic && rName && (pic === rName || pic.includes(rName) || rName.includes(pic))) {
-          // Hanya masukkan jika cycle tersebut memang memiliki pelanggan yang diinput di database
-          const hasCustomers = customers.some((c) => c.cycle.toLowerCase() === sch.cycle.toLowerCase());
-          if (hasCustomers && sch.cycle && sch.cycle.trim()) {
-            cycleSet.add(sch.cycle.trim());
-          }
-        }
-      });
-    }
-
-    // 3. Sinkronkan dengan master data pembaca meter jika cycle tersebut ada industrinya di database
-    if (currentReader?.assignedCycles && Array.isArray(currentReader.assignedCycles)) {
-      currentReader.assignedCycles.forEach((c) => {
-        const hasCustomers = customers.some((cust) => cust.cycle.toLowerCase() === c.toLowerCase());
-        if (hasCustomers && c && c.trim()) {
-          cycleSet.add(c.trim());
-        }
-      });
-    }
-
-    return sortCycles(Array.from(cycleSet));
-  }, [currentReader, cycleSchedules, customers, currentUser.name]);
+    return getAssignedCyclesForReader(readerTargetObj, customers);
+  }, [readerTargetObj, customers]);
 
   // Automatically fetch GPS based on Google Maps decimal degrees standard
   const fetchCurrentGPS = () => {
@@ -222,42 +201,26 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
     fetchCurrentGPS();
   }, []);
 
-  // Filter customers assigned to this reader strictly based on Admin assignment
+  // Filter customers assigned strictly to this reader (cuma ditampilkan industri bagian si pencatat meter saja)
   const myAssignedCustomers = useMemo(() => {
-    return customers.filter((c) => {
-      // Ditugaskan langsung per akun industri
-      if (
-        c.petugasBaca &&
-        (c.petugasBaca.toLowerCase() === currentUser.name.toLowerCase() ||
-          (currentReader && c.petugasBaca.toLowerCase() === currentReader.nama.toLowerCase()))
-      ) {
-        return true;
-      }
+    return getAssignedCustomersForReader(readerTargetObj, customers);
+  }, [readerTargetObj, customers]);
 
-      // Berada di dalam cycle yang telah ditugaskan oleh admin ke akun ini
-      if (readerAssignedCycles.length > 0) {
-        return readerAssignedCycles.some((ac) => ac.toLowerCase() === c.cycle.toLowerCase());
-      }
-
-      return false;
-    });
-  }, [customers, readerAssignedCycles, currentUser.name, currentReader]);
-
-  // Detail jadwal penugasan dari admin untuk siklus-siklus pembaca meter ini (sorted)
+  // Detail jadwal penugasan dari admin untuk siklus-siklus pembaca meter ini (sorted & non-overlapping)
   const assignedCycleSchedules = useMemo(() => {
     if (!cycleSchedules || cycleSchedules.length === 0 || readerAssignedCycles.length === 0) return [];
     return readerAssignedCycles.map((cName) => {
       const sch = cycleSchedules.find((s) => s.cycle.toLowerCase() === cName.toLowerCase());
-      const count = customers.filter((c) => c.cycle.toLowerCase() === cName.toLowerCase()).length;
+      const count = myAssignedCustomers.filter((c) => c.cycle.toLowerCase() === cName.toLowerCase()).length;
       return {
         cycle: cName,
         totalPelanggan: count,
         schedule: sch || null
       };
     });
-  }, [cycleSchedules, readerAssignedCycles, customers]);
+  }, [cycleSchedules, readerAssignedCycles, myAssignedCustomers]);
 
-  // Filtered dataset for reader view with Key Account vs Kontraktor division
+  // Filtered dataset for reader view - ONLY industries assigned to this reader
   const displayedCustomers = useMemo(() => {
     return myAssignedCustomers.filter((c) => {
       const q = searchQuery.toLowerCase().trim();
@@ -269,25 +232,13 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
         c.cycle.toLowerCase().includes(q);
 
       const matchStatus = statusFilter === 'ALL' || c.status === statusFilter;
-      const matchCycle = selectedCycleFilter === 'ALL' || c.cycle.toLowerCase() === selectedCycleFilter.toLowerCase();
-
-      // Division: Key Account vs Kontraktor
-      if (taskCategoryFilter === 'Kontraktor') {
-        const isKont =
-          c.kategoriPetugas === 'Kontraktor (PT Hideco)' ||
-          c.kategoriPetugas === 'Kontraktor' ||
-          (!c.kategoriPetugas && c.kelas !== 'Premium');
-        if (!isKont) return false;
-      } else if (taskCategoryFilter === 'Key Account') {
-        const isKA =
-          c.kategoriPetugas === 'Key Account' ||
-          (!c.kategoriPetugas && c.kelas === 'Premium');
-        if (!isKA) return false;
-      }
+      const matchCycle =
+        selectedCycleFilter === 'ALL' ||
+        c.cycle.toLowerCase() === selectedCycleFilter.toLowerCase();
 
       return matchSearch && matchStatus && matchCycle;
     });
-  }, [myAssignedCustomers, searchQuery, statusFilter, selectedCycleFilter, taskCategoryFilter]);
+  }, [myAssignedCustomers, searchQuery, statusFilter, selectedCycleFilter]);
 
   // Statistics
   const totalMyCust = myAssignedCustomers.length;
@@ -310,13 +261,26 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
       const percent = total > 0 ? Math.round((readCount / total) * 100) : 0;
       const isMyCycle = readerAssignedCycles.some((ac) => ac.toLowerCase() === cName.toLowerCase());
 
-      let assignedPic = sch?.petugasUtama;
-      if (!assignedPic || assignedPic === 'Belum Ditugaskan') {
-        const found = meterReaders.find((r) =>
-          r.assignedCycles.some((ac) => ac.toLowerCase() === cName.toLowerCase())
+      // Sinkronisasi nama petugas pencatat meter sesuai akun dan pembagian data
+      const readersForThisCycle = meterReaders.filter((r) => {
+        const rCycles = getAssignedCyclesForReader(r, customers);
+        return rCycles.some((ac) => ac.toLowerCase() === cName.toLowerCase());
+      });
+
+      let assignedPic = '';
+      if (readersForThisCycle.length > 0) {
+        assignedPic = readersForThisCycle.map((r) => r.nama).join(', ');
+      } else {
+        const directCustReaders = Array.from(
+          new Set(cycleCusts.map((c) => c.petugasBaca?.trim()).filter(Boolean))
         );
-        if (found) assignedPic = found.nama;
-        else assignedPic = 'Belum Ditugaskan';
+        if (directCustReaders.length > 0) {
+          assignedPic = directCustReaders.join(', ');
+        } else if (sch?.petugasUtama && sch.petugasUtama !== 'Belum Ditugaskan') {
+          assignedPic = sch.petugasUtama;
+        } else {
+          assignedPic = 'Belum Ditugaskan';
+        }
       }
 
       return {
@@ -336,15 +300,11 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
     });
   }, [customers, readerAssignedCycles, cycleSchedules, meterReaders]);
 
-  // READER PROGRESS CALCULATION
+  // READER PROGRESS CALCULATION (ZERO OVERLAP)
   const readerProgressStats = useMemo(() => {
     return meterReaders.map((rdr) => {
-      const assignedCusts = customers.filter((c) => {
-        if (c.petugasBaca && c.petugasBaca.toLowerCase() === rdr.nama.toLowerCase()) {
-          return true;
-        }
-        return rdr.assignedCycles.some((ac) => ac.toLowerCase() === c.cycle.toLowerCase());
-      });
+      const assignedCusts = getAssignedCustomersForReader(rdr, customers);
+      const sortedCycles = getAssignedCyclesForReader(rdr, customers);
 
       const total = assignedCusts.length;
       const completed = assignedCusts.filter((c) => c.status === 'Verified' || c.status === 'Invoiced').length;
@@ -354,7 +314,7 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
 
       return {
         reader: rdr,
-        sortedCycles: sortCycles(rdr.assignedCycles),
+        sortedCycles,
         total,
         completed,
         pending,
@@ -367,10 +327,19 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
   // Open Reading Modal
   const handleOpenReadingForm = (cust: IndustryCustomer) => {
     setActiveCustId(cust.id);
-    setInputSkrg(cust.skrg > 0 ? String(cust.skrg) : '');
+    // Stand kini HANYA terisi jika meteran sudah pernah dicatat oleh pembaca meter (bukan 'Belum Dibaca')
+    const hasBeenRead = cust.status !== 'Belum Dibaca' && cust.skrg > 0 && cust.skrg !== cust.lalu;
+    setInputSkrg(hasBeenRead ? String(cust.skrg) : '');
     setFotoMeterPreview(cust.fotoMeter || null);
     setFotoBPMPreview(cust.fotoBPM || null);
-    setCatatan(cust.catatan || '');
+
+    // Catatan lapangan HANYA terisi apabila pencatat/pembaca meter melakukan pengisian
+    const isAutoNote =
+      !cust.catatan ||
+      cust.catatan.includes('Diimpor') ||
+      cust.catatan.includes('Belum dibaca') ||
+      cust.catatan.startsWith('Stand ');
+    setCatatan(isAutoNote ? '' : cust.catatan.trim());
     setOcrConfidence(null);
     setOcrSuccessNotice(null);
 
@@ -428,7 +397,12 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
   const handleSubmitReading = (cust: IndustryCustomer) => {
     const skrgNum = Number(inputSkrg);
     if (!skrgNum || skrgNum <= 0) {
-      alert('Silakan masukkan nilai Stand Sekarang yang valid.');
+      showColorfulAlert({
+        title: 'Stand Meter Belum Valid',
+        message: 'Silakan masukkan nilai Stand Sekarang yang valid (harus lebih besar dari 0) sebelum mengirim laporan.',
+        type: 'warning',
+        badge: 'VALIDASI NILAI'
+      });
       return;
     }
 
@@ -448,9 +422,7 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
       waktuBaca: waktuStr,
       petugasBaca: currentUser.name,
       kategoriPetugas: currentUser.kategori || 'Kontraktor (PT Hideco)',
-      catatan:
-        catatan.trim() ||
-        `Stand ${skrgNum.toLocaleString()} m³ (Pemakaian: ${calculatedUsage.toLocaleString()} m³) dicatat oleh ${currentUser.name} (${waktuStr})`
+      catatan: catatan.trim() // Terisi HANYA apabila pencatat/pembaca meter melakukan pengisian
     };
 
     onSaveReading(updatedCust);
@@ -623,34 +595,34 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
           {/* ======================= TAB 1: DAFTAR TUGAS CATAT METER ======================= */}
           {mobileTab === 'tasks' && (
             <div className="space-y-3 animate-in fade-in duration-150">
-              {/* Petugas Banner Card */}
-              <div className={`p-3.5 rounded-2xl border relative overflow-hidden ${
-                isFieldDarkMode ? 'bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950/40 border-slate-800' : 'bg-gradient-to-br from-[#0055A5]/5 via-white to-orange-50/30 border-slate-200'
+              {/* Petugas Banner Card - Colorful & Vibrant Gradient */}
+              <div className={`p-4 rounded-2xl border relative overflow-hidden shadow-lg transition-all duration-300 ${
+                isFieldDarkMode
+                  ? 'bg-gradient-to-br from-slate-900 via-indigo-950 to-blue-950 border-blue-500/30 text-white'
+                  : 'bg-gradient-to-br from-[#0055A5] via-[#0062B8] to-[#E86216] border-transparent text-white'
               }`}>
-                <div className="flex items-start justify-between gap-3">
+                {/* Ambient Decorative Glows */}
+                <div className="absolute -right-8 -top-8 w-36 h-36 bg-white/15 rounded-full blur-2xl pointer-events-none"></div>
+                <div className="absolute -left-8 -bottom-8 w-36 h-36 bg-orange-400/20 rounded-full blur-2xl pointer-events-none"></div>
+
+                <div className="flex items-start justify-between gap-3 relative z-10">
                   <div className="flex items-start gap-3 min-w-0 flex-1">
-                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#0055A5] to-[#E86216] text-white flex items-center justify-center font-black text-sm shadow-md shrink-0">
+                    <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md border border-white/40 text-white flex items-center justify-center font-black text-base shadow-md shrink-0">
                       {currentUser.name.slice(0, 2).toUpperCase()}
                     </div>
                     <div className="min-w-0 flex-1 space-y-1">
-                      <h2 className="font-extrabold text-sm text-slate-900 dark:text-white leading-snug break-words">
+                      <h2 className="font-black text-base text-white leading-tight break-words drop-shadow-xs">
                         {currentUser.name}
                       </h2>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug break-words">
+                      <p className="text-[11px] text-white/85 font-medium leading-snug break-words">
                         {currentReader?.nip ? `NIP: ${currentReader.nip} · ` : ''}{currentReader?.perusahaan || currentUser.perusahaan || 'PT Aetra Air Tangerang'}
                       </p>
                       <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase break-words shrink-0 ${
-                          currentUser.kategori?.includes('Key Account')
-                            ? 'bg-purple-100 text-purple-700 dark:bg-purple-950/80 dark:text-purple-300'
-                            : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300'
-                        }`}>
+                        <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-white/25 text-white backdrop-blur-md border border-white/30 shadow-2xs">
                           {currentUser.kategori || 'Kontraktor (PT Hideco)'}
                         </span>
-                        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 break-words leading-tight">
-                          {readerAssignedCycles.length > 0
-                            ? `Plotting: ${readerAssignedCycles.join(', ')}`
-                            : '⚠️ Belum Ada Plotting Cycle'}
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-black/20 text-white/90 backdrop-blur-sm border border-white/10">
+                          {readerAssignedCycles.length} Cycle Ditugaskan
                         </span>
                       </div>
                     </div>
@@ -658,41 +630,35 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                 </div>
 
                 {/* Progress summary bar */}
-                <div className="mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-800/80">
+                <div className="mt-3.5 pt-3 border-t border-white/20 relative z-10">
                   <div className="flex justify-between items-center gap-2 text-xs mb-1.5">
-                    <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 break-words">
-                      Progress Tugas Lapangan:
+                    <span className="text-[11px] font-bold text-white/90 break-words flex items-center gap-1">
+                      <span>Progress Tugas Lapangan:</span>
                     </span>
-                    <span className="font-mono font-extrabold text-xs text-[#0055A5] dark:text-blue-400 shrink-0 whitespace-nowrap">
+                    <span className="font-mono font-black text-xs text-white bg-black/25 backdrop-blur-sm px-2 py-0.5 rounded-lg border border-white/15 shrink-0 whitespace-nowrap">
                       {verifiedCount + pendingCount} / {totalMyCust} ({myPercentComplete}%)
                     </span>
                   </div>
-                  <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                  <div className="w-full h-2.5 bg-black/25 backdrop-blur-sm rounded-full overflow-hidden p-0.5 border border-white/15">
                     <div
-                      className="h-full bg-gradient-to-r from-[#0055A5] to-[#E86216] rounded-full transition-all duration-500"
+                      className="h-full bg-gradient-to-r from-amber-300 via-orange-300 to-emerald-300 rounded-full transition-all duration-500 shadow-xs"
                       style={{ width: `${myPercentComplete}%` }}
                     ></div>
                   </div>
 
                   {/* Summary Mini Cards */}
-                  <div className="grid grid-cols-3 gap-2 mt-2.5 text-center text-xs">
-                    <div className={`p-2 rounded-xl border min-w-0 ${
-                      isFieldDarkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
-                    }`}>
-                      <span className="text-[10px] font-bold text-slate-400 block truncate">Belum</span>
-                      <span className="font-mono font-extrabold text-amber-500 text-sm break-words">{unreadCount}</span>
+                  <div className="grid grid-cols-3 gap-2 mt-3 text-center text-xs">
+                    <div className="p-2 rounded-xl bg-white/15 backdrop-blur-md border border-white/20 min-w-0 transition hover:bg-white/20">
+                      <span className="text-[10px] font-bold text-white/80 block truncate">Belum</span>
+                      <span className="font-mono font-black text-amber-200 text-sm break-words drop-shadow-xs">{unreadCount}</span>
                     </div>
-                    <div className={`p-2 rounded-xl border min-w-0 ${
-                      isFieldDarkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
-                    }`}>
-                      <span className="text-[10px] font-bold text-slate-400 block truncate">Pending</span>
-                      <span className="font-mono font-extrabold text-blue-500 text-sm break-words">{pendingCount}</span>
+                    <div className="p-2 rounded-xl bg-white/15 backdrop-blur-md border border-white/20 min-w-0 transition hover:bg-white/20">
+                      <span className="text-[10px] font-bold text-white/80 block truncate">Pending</span>
+                      <span className="font-mono font-black text-sky-200 text-sm break-words drop-shadow-xs">{pendingCount}</span>
                     </div>
-                    <div className={`p-2 rounded-xl border min-w-0 ${
-                      isFieldDarkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
-                    }`}>
-                      <span className="text-[10px] font-bold text-slate-400 block truncate">Terverifikasi</span>
-                      <span className="font-mono font-extrabold text-emerald-500 text-sm break-words">{verifiedCount}</span>
+                    <div className="p-2 rounded-xl bg-white/15 backdrop-blur-md border border-white/20 min-w-0 transition hover:bg-white/20">
+                      <span className="text-[10px] font-bold text-white/80 block truncate">Terverifikasi</span>
+                      <span className="font-mono font-black text-emerald-200 text-sm break-words drop-shadow-xs">{verifiedCount}</span>
                     </div>
                   </div>
                 </div>
@@ -825,80 +791,38 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                       )}
                     </div>
 
-                    {/* PEMBAGIAN KATEGORI: SEMUA vs KONTRAKTOR vs KEY ACCOUNT */}
-                    <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs">
-                      <button
-                        type="button"
-                        onClick={() => setTaskCategoryFilter('ALL')}
-                        className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer break-words ${
-                          taskCategoryFilter === 'ALL'
-                            ? 'bg-[#0055A5] text-white shadow-xs'
-                            : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
-                        }`}
-                      >
-                        Semua ({myAssignedCustomers.length})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setTaskCategoryFilter('Kontraktor')}
-                        className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1 cursor-pointer break-words ${
-                          taskCategoryFilter === 'Kontraktor'
-                            ? 'bg-emerald-600 text-white shadow-xs'
-                            : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
-                        }`}
-                      >
-                        <span>Kontraktor</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setTaskCategoryFilter('Key Account')}
-                        className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1 cursor-pointer break-words ${
-                          taskCategoryFilter === 'Key Account'
-                            ? 'bg-purple-600 text-white shadow-xs'
-                            : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
-                        }`}
-                      >
-                        <span>Key Account</span>
-                      </button>
-                    </div>
-
-                    {/* Cycle Filter Pills (Terurut) */}
-                    {readerAssignedCycles.length > 1 && (
-                      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-                        <span className="text-[10px] font-bold text-slate-400 shrink-0">Filter Cycle:</span>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedCycleFilter('ALL')}
-                          className={`px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition cursor-pointer ${
-                            selectedCycleFilter === 'ALL'
-                              ? 'bg-[#E86216] text-white shadow-xs'
-                              : isFieldDarkMode
-                              ? 'bg-slate-800 text-slate-400 hover:text-slate-200'
-                              : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+                    {/* Cycle Filter Dropdown (Menggunakan Dropdown Praktis Tanpa Digeser) */}
+                    {readerAssignedCycles.length > 0 && (
+                      <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900/60 p-2 rounded-xl border border-slate-200 dark:border-slate-800">
+                        <label
+                          htmlFor="reader-cycle-dropdown"
+                          className="text-[11px] font-bold text-slate-500 dark:text-slate-400 shrink-0 flex items-center gap-1.5"
+                        >
+                          <Calendar className="w-3.5 h-3.5 text-[#0055A5] dark:text-blue-400" />
+                          <span>Pilih Cycle:</span>
+                        </label>
+                        <select
+                          id="reader-cycle-dropdown"
+                          value={selectedCycleFilter}
+                          onChange={(e) => setSelectedCycleFilter(e.target.value)}
+                          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold border transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#0055A5] ${
+                            isFieldDarkMode
+                              ? 'bg-slate-800 border-slate-700 text-white'
+                              : 'bg-white border-slate-200 text-slate-800 shadow-2xs'
                           }`}
                         >
-                          Semua Cycle ({totalMyCust})
-                        </button>
-                        {readerAssignedCycles.map((cyc) => {
-                          const count = myAssignedCustomers.filter((c) => c.cycle.toLowerCase() === cyc.toLowerCase()).length;
-                          const isSel = selectedCycleFilter.toLowerCase() === cyc.toLowerCase();
-                          return (
-                            <button
-                              key={cyc}
-                              type="button"
-                              onClick={() => setSelectedCycleFilter(cyc)}
-                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition cursor-pointer ${
-                                isSel
-                                  ? 'bg-[#E86216] text-white shadow-xs'
-                                  : isFieldDarkMode
-                                  ? 'bg-slate-800 text-slate-400 hover:text-slate-200'
-                                  : 'bg-slate-100 text-slate-600 hover:text-slate-900'
-                              }`}
-                            >
-                              {cyc} ({count})
-                            </button>
-                          );
-                        })}
+                          <option value="ALL">Semua Cycle ({totalMyCust} Industri)</option>
+                          {readerAssignedCycles.map((cyc) => {
+                            const count = myAssignedCustomers.filter(
+                              (c) => c.cycle.toLowerCase() === cyc.toLowerCase()
+                            ).length;
+                            return (
+                              <option key={cyc} value={cyc}>
+                                {cyc} ({count} Industri)
+                              </option>
+                            );
+                          })}
+                        </select>
                       </div>
                     )}
 
@@ -949,10 +873,7 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                         const isDone = cust.status === 'Verified' || cust.status === 'Invoiced';
                         const isPending = cust.status === 'Pending Verification';
                         const isUnread = cust.status === 'Belum Dibaca';
-                        const isKA =
-                          cust.kategoriPetugas === 'Key Account' ||
-                          (!cust.kategoriPetugas && cust.kelas === 'Premium');
-                        const waterUsage = cust.skrg > 0 ? Math.max(0, cust.skrg - cust.lalu) : 0;
+                        const waterUsage = !isUnread && cust.skrg > 0 ? Math.max(0, cust.skrg - cust.lalu) : 0;
 
                         return (
                           <div
@@ -977,16 +898,6 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                                   </span>
                                   <span className="font-bold text-[10px] px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-950 text-[#0055A5] dark:text-blue-300 shrink-0 border border-blue-200 dark:border-blue-800">
                                     {cust.cycle}
-                                  </span>
-                                  {/* Kategori Badge */}
-                                  <span
-                                    className={`font-black text-[9px] px-2 py-0.5 rounded-md uppercase shrink-0 ${
-                                      isKA
-                                        ? 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300 border border-purple-300 dark:border-purple-800'
-                                        : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
-                                    }`}
-                                  >
-                                    {isKA ? 'Key Account' : 'Kontraktor'}
                                   </span>
                                   <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-md shrink-0 ${
                                     cust.kelas === 'Premium'
@@ -1033,14 +944,14 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                               <div className="flex flex-col gap-1 min-w-0 p-2 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/70 dark:border-blue-800/60 [word-break:break-word]">
                                 <span className="text-[9px] text-[#0055A5] dark:text-blue-400 block font-bold uppercase truncate">Stand Kini</span>
                                 <span className="font-mono font-extrabold text-[#0055A5] dark:text-blue-300 text-xs sm:text-sm break-words [word-break:break-word] block leading-tight">
-                                  {cust.skrg > 0 ? `${cust.skrg.toLocaleString()} m³` : '—'}
+                                  {!isUnread && cust.skrg > 0 ? `${cust.skrg.toLocaleString()} m³` : '—'}
                                 </span>
                               </div>
 
                               <div className="flex flex-col gap-1 min-w-0 p-2 rounded-xl bg-orange-50/70 dark:bg-orange-950/30 border border-orange-200/70 dark:border-orange-800/60 [word-break:break-word]">
                                 <span className="text-[9px] text-[#E86216] dark:text-orange-400 block font-bold uppercase truncate">Pemakaian</span>
                                 <span className="font-mono font-black text-[#E86216] dark:text-orange-300 text-xs sm:text-sm break-words [word-break:break-word] block leading-tight">
-                                  {cust.skrg > 0 ? `${waterUsage.toLocaleString()} m³` : '—'}
+                                  {!isUnread && cust.skrg > 0 ? `${waterUsage.toLocaleString()} m³` : '—'}
                                 </span>
                               </div>
                             </div>
@@ -1172,9 +1083,6 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                             {rp.reader.kategori}
                           </span>
                         </div>
-                        <p className="text-[10px] text-slate-400 mt-0.5 break-words leading-tight">
-                          {rp.sortedCycles.length > 0 ? `Cycle: ${rp.sortedCycles.join(', ')}` : 'Belum Ada Plotting'}
-                        </p>
                       </div>
                       <span className="font-mono font-bold text-xs text-[#0055A5] dark:text-blue-400 shrink-0 whitespace-nowrap">
                         {rp.percent}%
@@ -1239,9 +1147,9 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                 </div>
 
                 <div className="flex justify-between items-center py-1 gap-2">
-                  <span className="text-slate-400 shrink-0">Plotting Cycle:</span>
+                  <span className="text-slate-400 shrink-0">Total Cycle Ditugaskan:</span>
                   <span className="font-bold text-[#0055A5] dark:text-blue-400 text-right break-words flex-1">
-                    {readerAssignedCycles.length > 0 ? readerAssignedCycles.join(', ') : 'Belum Ditugaskan'}
+                    {readerAssignedCycles.length > 0 ? `${readerAssignedCycles.length} Cycle Aktif` : 'Belum Ditugaskan'}
                   </span>
                 </div>
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserRole, UserProfile, MeterReader } from '../types';
 import { USER_PROFILES, INITIAL_METER_READERS } from '../data/initialData';
+import { getReaderCategory, getReaderCompany } from '../utils/readerAssignmentHelper';
 import { AetraLogo } from './AetraLogo';
 import { ShieldCheck, User, ArrowRight, Smartphone, Lock, Eye, EyeOff, KeyRound, AlertCircle, ChevronDown } from 'lucide-react';
 
@@ -58,9 +59,8 @@ export const ModalLogin: React.FC<ModalLoginProps> = ({ isOpen, onLogin, meterRe
         return;
       }
 
-      const isKeyAccount = selectedReader.kategori === 'Key Account' || selectedReader.id.startsWith('KA-');
-      const category = isKeyAccount ? 'Key Account' : 'Kontraktor (PT Hideco)';
-      const company = isKeyAccount ? 'PT Aetra Air Tangerang (Key Account)' : 'PT Hideco';
+      const category = getReaderCategory(selectedReader.nama);
+      const company = getReaderCompany(selectedReader.nama);
 
       const fieldUserProfile: UserProfile = {
         role: 'field_reader',
@@ -77,12 +77,12 @@ export const ModalLogin: React.FC<ModalLoginProps> = ({ isOpen, onLogin, meterRe
     }
   };
 
-  // Group readers by category for clean dropdown presentation
+  // Group readers by category strictly (1 person = 1 role)
   const keyAccountReaders = availableReaders.filter(
-    (r) => r.kategori === 'Key Account' || r.id.startsWith('KA-')
+    (r) => getReaderCategory(r.nama) === 'Key Account'
   );
   const kontraktorReaders = availableReaders.filter(
-    (r) => r.kategori !== 'Key Account' && !r.id.startsWith('KA-')
+    (r) => getReaderCategory(r.nama) !== 'Key Account'
   );
 
   return (
