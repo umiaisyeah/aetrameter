@@ -58,10 +58,25 @@ export const DetailModal: React.FC<DetailModalProps> = ({
       : Math.round(lalu * 0.08);
   const isAnomaly = prevUsage > 0 && vol > prevUsage * 1.5;
 
-  const isBillingUser = currentUser.role === 'yaya';
+  const canVerifyReading =
+    currentUser.adminType === 'meter_reading' ||
+    currentUser.role === 'solihin' ||
+    currentUser.role === 'kabul' ||
+    currentUser.role === 'tri_kartono';
+
+  const canManageBilling =
+    currentUser.adminType === 'billing' ||
+    currentUser.role === 'yaya' ||
+    currentUser.role === 'melva_sinaga';
+
+  const isKeyAccountAdmin =
+    currentUser.adminType === 'key_account' ||
+    currentUser.role === 'bayu_pramono';
+
+  const isBillingUser = canManageBilling;
 
   const handleSave = () => {
-    if (isBillingUser) {
+    if (canManageBilling) {
       // Billing user executes invoice process
       const updated: IndustryCustomer = {
         ...customer,
@@ -82,9 +97,9 @@ export const DetailModal: React.FC<DetailModalProps> = ({
 
       // Trigger default mail client
       window.location.href = mailto;
-    } else {
-      // Meter reading user saves reading
-      if (currentStand < lalu) {
+    } else if (canVerifyReading) {
+      // Meter reading user verifies or updates reading
+      if (currentStand < lalu && currentStand > 0) {
         showColorfulAlert({
           title: 'Validasi Stand Meter',
           message: `Stand Meter saat ini (${currentStand.toLocaleString()} m³) tidak boleh lebih kecil dari Stand Bulan Lalu (${lalu.toLocaleString()} m³)!`,
@@ -95,15 +110,15 @@ export const DetailModal: React.FC<DetailModalProps> = ({
       }
 
       const updatedHistory = [...historyData];
-      if (updatedHistory[updatedHistory.length - 1] !== currentStand) {
+      if (currentStand > 0 && updatedHistory[updatedHistory.length - 1] !== currentStand) {
         updatedHistory.push(currentStand);
       }
 
       const updated: IndustryCustomer = {
         ...customer,
-        skrg: currentStand,
-        status: 'Pending Verification',
-        catatan: catatan.trim() || `Diverifikasi di lapangan oleh ${currentUser.name}`,
+        skrg: currentStand > 0 ? currentStand : customer.skrg,
+        status: 'Verified',
+        catatan: catatan.trim() || `Diverifikasi resmi oleh ${currentUser.name} (Admin Meter Reading)`,
         history: updatedHistory,
         fotoMeter: customer.fotoMeter || meterGaugeImg,
         fotoBPM: customer.fotoBPM || bpmDocImg
@@ -111,11 +126,14 @@ export const DetailModal: React.FC<DetailModalProps> = ({
 
       onSaveReading(updated);
       showColorfulAlert({
-        title: 'Stand Meter Berhasil Dicatat! 💧',
-        message: `Stand meter industri ${customer.nama} (${currentStand.toLocaleString()} m³) berhasil disimpan. Status alur kerja kini diatur ke Pending Verification (Menunggu Persetujuan Billing).`,
+        title: 'Pembacaan Berhasil Diverifikasi! ✅',
+        message: `Stand meter industri ${customer.nama} (${currentStand.toLocaleString()} m³) berhasil diverifikasi oleh ${currentUser.name}. Status alur kerja kini diatur ke Verified (Siap untuk Penerbitan Invoice oleh Tim Billing).`,
         type: 'success',
-        badge: 'CATAT STAND BERHASIL'
+        badge: 'VERIFIKASI SELESAI'
       });
+      onClose();
+    } else {
+      // Key account admin or view only
       onClose();
     }
   };
@@ -177,12 +195,30 @@ export const DetailModal: React.FC<DetailModalProps> = ({
             </div>
           </div>
 
-          {/* Role limitation alert */}
-          {isBillingUser && (
+          {/* Role status banner */}
+          {canManageBilling && (
             <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 rounded-xl text-blue-800 dark:text-blue-300 font-semibold flex items-center gap-2">
               <Info className="w-4 h-4 text-[#0055A5] dark:text-blue-400 shrink-0" />
               <span>
-                Anda masuk sebagai Tim Billing (Pak Yaya). Stand meter dikunci dan hanya dapat diedit oleh Tim Meter Reading di lapangan.
+                Anda masuk sebagai Tim Billing ({currentUser.name}). Anda berwenang menerbitkan tagihan resmi, e-materai, dan mengirim invoice via surel.
+              </span>
+            </div>
+          )}
+
+          {canVerifyReading && (
+            <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 rounded-xl text-emerald-800 dark:text-emerald-300 font-semibold flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span>
+                Anda masuk sebagai Admin Meter Reading ({currentUser.name}). Anda berwenang memvalidasi dan memverifikasi hasil pembacaan stand meter lapangan.
+              </span>
+            </div>
+          )}
+
+          {isKeyAccountAdmin && (
+            <div className="p-3 bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-900 rounded-xl text-purple-800 dark:text-purple-300 font-semibold flex items-center gap-2">
+              <Info className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
+              <span>
+                Anda masuk sebagai Admin Key Account ({currentUser.name}). Mode peninjauan data pelanggan industri.
               </span>
             </div>
           )}
@@ -457,26 +493,34 @@ export const DetailModal: React.FC<DetailModalProps> = ({
             </button>
           </div>
 
-          <button
-            onClick={handleSave}
-            className={`px-5 py-2 text-white rounded-xl font-bold text-xs shadow-xs transition flex items-center gap-2 ${
-              isBillingUser
-                ? 'bg-[#0055A5] hover:bg-[#003E78]'
-                : 'bg-[#E86216] hover:bg-orange-700'
-            }`}
-          >
-            {isBillingUser ? (
-              <>
-                <Mail className="w-4 h-4" />
-                <span>Proses Verifikasi & Kirim Invoice Email</span>
-              </>
-            ) : (
-              <>
-                <CheckCircle className="w-4 h-4" />
-                <span>Simpan Perubahan Reading</span>
-              </>
-            )}
-          </button>
+          {canManageBilling && (
+            <button
+              onClick={handleSave}
+              className="px-5 py-2 bg-[#0055A5] hover:bg-[#003E78] text-white rounded-xl font-bold text-xs shadow-xs transition flex items-center gap-2 cursor-pointer"
+            >
+              <Mail className="w-4 h-4" />
+              <span>Terbitkan &amp; Kirim Invoice Email</span>
+            </button>
+          )}
+
+          {canVerifyReading && (
+            <button
+              onClick={handleSave}
+              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-xs transition flex items-center gap-2 cursor-pointer"
+            >
+              <CheckCircle className="w-4 h-4" />
+              <span>Verifikasi Pembacaan Stand (Verified)</span>
+            </button>
+          )}
+
+          {isKeyAccountAdmin && (
+            <button
+              onClick={onClose}
+              className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-xs shadow-xs transition flex items-center gap-2 cursor-pointer"
+            >
+              <span>Selesai Meninjau</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

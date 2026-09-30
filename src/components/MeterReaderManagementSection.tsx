@@ -1049,8 +1049,28 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
               <button
                 type="button"
                 onClick={() => {
+                  const targetName = deletingReader.nama;
+                  const targetCategory = deletingReader.kategori;
                   onDeleteMeterReader(deletingReader.id);
                   setDeletingReader(null);
+                  showColorfulAlert({
+                    title: 'Petugas Berhasil Dihapus! 🗑️',
+                    subtitle: 'Penghapusan Akun Petugas Pembaca Meter',
+                    message: `Akun petugas pembaca meter ${targetName} (${targetCategory}) telah berhasil dihapus dari sistem SIMBA-IN.`,
+                    type: 'success',
+                    badge: 'PETUGAS TERHAPUS',
+                    details: [
+                      `Nama: ${targetName}`,
+                      `Kategori: ${targetCategory}`,
+                      'Data petugas telah dihapus dari master data'
+                    ],
+                    confirmText: 'Selesai'
+                  });
+                  showToast({
+                    title: 'Petugas Dihapus',
+                    message: `✓ Akun petugas ${targetName} berhasil dihapus.`,
+                    type: 'success'
+                  });
                 }}
                 className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-extrabold shadow-md transition flex items-center gap-1.5 cursor-pointer"
               >

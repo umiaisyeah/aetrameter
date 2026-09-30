@@ -33,6 +33,7 @@ import { CycleProgressChart } from './CycleProgressChart';
 import { MeterReaderProgressSection } from './MeterReaderProgressSection';
 import { ImportCycleScheduleModal } from './ImportCycleScheduleModal';
 import { OfficialAetraInvoiceModal } from './OfficialAetraInvoiceModal';
+import { showColorfulAlert } from '../utils/notificationSystem';
 
 interface OverviewViewProps {
   customers: IndustryCustomer[];
@@ -229,8 +230,24 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     };
   }, [batchCycleSchedule, meterReaders]);
 
+  // Check if current user has meter reading verification authority
+  const canVerifyReading =
+    currentUser.adminType === 'meter_reading' ||
+    ['solihin', 'kabul', 'tri_kartono'].includes(currentUser.role);
+
   // Handle 1-Click Batch Update for the Target Cycle
   const triggerCycleBatchUpdate = (targetStatus: WorkflowStatus) => {
+    if (targetStatus === 'Verified' && !canVerifyReading) {
+      showColorfulAlert({
+        title: 'Akses Dibatasi ⚠️',
+        subtitle: 'Otoritas Khusus Admin Meter Reading',
+        message: `Akun Anda (${currentUser.name}) tidak memiliki hak untuk memverifikasi stand meter. Wewenang verifikasi stand meter lapangan hanya dimiliki oleh Admin Meter Reading (Akhmad Solihin, Kabul Nugroho, Tri Kartono).`,
+        type: 'warning',
+        badge: 'HAK AKSES KHUSUS'
+      });
+      return;
+    }
+
     let targetList: IndustryCustomer[] = [];
     if (targetStatus === 'Verified') {
       // Update those that are not yet invoiced or verified
@@ -301,6 +318,17 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
   const handleExecuteSelectedRowBatch = (targetStatus: WorkflowStatus) => {
     if (selectedRowIds.length === 0) return;
+
+    if (targetStatus === 'Verified' && !canVerifyReading) {
+      showColorfulAlert({
+        title: 'Akses Dibatasi ⚠️',
+        subtitle: 'Otoritas Khusus Admin Meter Reading',
+        message: `Akun Anda (${currentUser.name}) tidak memiliki hak untuk memverifikasi stand meter. Wewenang verifikasi stand meter lapangan hanya dimiliki oleh Admin Meter Reading (Akhmad Solihin, Kabul Nugroho, Tri Kartono).`,
+        type: 'warning',
+        badge: 'HAK AKSES KHUSUS'
+      });
+      return;
+    }
 
     const note =
       batchCustomNote.trim() ||

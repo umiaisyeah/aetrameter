@@ -772,6 +772,7 @@ export default function App() {
               onDeleteMeterReader={handleDeleteMeterReader}
               onImportCycleSchedules={handleImportCycleSchedules}
               onUpdateCycleSchedule={handleUpdateCycleSchedule}
+              currentUser={currentUser}
             />
           )}
 

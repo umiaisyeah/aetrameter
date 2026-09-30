@@ -1,4 +1,13 @@
-export type UserRole = 'yaya' | 'solihin' | 'kabul' | 'field_reader';
+export type AdminType = 'meter_reading' | 'key_account' | 'billing' | 'field_reader';
+
+export type UserRole =
+  | 'solihin'
+  | 'kabul'
+  | 'tri_kartono'
+  | 'bayu_pramono'
+  | 'yaya'
+  | 'melva_sinaga'
+  | 'field_reader';
 
 export interface UserProfile {
   role: UserRole;
@@ -6,6 +15,7 @@ export interface UserProfile {
   title: string;
   avatar: string;
   division: string;
+  adminType?: AdminType;
   readerId?: string;
   kategori?: string;
   perusahaan?: string;

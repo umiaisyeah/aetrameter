@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
-import { IndustryCustomer, CustomerClass, MeterReader, CycleSchedule } from '../types';
+import { IndustryCustomer, CustomerClass, MeterReader, CycleSchedule, UserProfile } from '../types';
 import {
   Upload,
   Plus,
@@ -12,7 +12,8 @@ import {
   Users,
   Calendar,
   Layers,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Lock
 } from 'lucide-react';
 import meterGaugeImg from '../assets/images/meter_industrial_gauge_1790243358407.jpg';
 import bpmDocImg from '../assets/images/meter_bpm_document_1790243369057.jpg';
@@ -35,6 +36,7 @@ interface DatabaseViewProps {
   onDeleteMeterReader: (id: string) => void;
   onImportCycleSchedules: (schedules: CycleSchedule[]) => void;
   onUpdateCycleSchedule: (schedule: CycleSchedule) => void;
+  currentUser?: UserProfile;
 }
 
 export const DatabaseView: React.FC<DatabaseViewProps> = ({
@@ -49,11 +51,33 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   onUpdateMeterReader,
   onDeleteMeterReader,
   onImportCycleSchedules,
-  onUpdateCycleSchedule
+  onUpdateCycleSchedule,
+  currentUser
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeSubTab, setActiveSubTab] = useState<'customers' | 'readers' | 'schedules'>('customers');
   const [isImportScheduleModalOpen, setIsImportScheduleModalOpen] = useState<boolean>(false);
+
+  // Check RBAC: Only Admin Meter Reading and Admin Key Account can import database & cycle schedules
+  const canImportDatabase =
+    !currentUser ||
+    currentUser.adminType === 'meter_reading' ||
+    currentUser.adminType === 'key_account' ||
+    ['solihin', 'kabul', 'tri_kartono', 'bayu_pramono'].includes(currentUser.role);
+
+  const handleTriggerExcelImport = () => {
+    if (!canImportDatabase) {
+      showColorfulAlert({
+        title: 'Akses Dibatasi ⚠️',
+        subtitle: 'Otoritas Khusus Admin Meter Reading & Key Account',
+        message: `Akun Anda (${currentUser?.name || 'Tim Billing'}) hanya berwenang untuk mengelola Billing & Invoicing. Hak impor database industri dan jadwal cycle hanya dimiliki oleh Admin Meter Reading dan Admin Key Account.`,
+        type: 'warning',
+        badge: 'HAK AKSES KHUSUS'
+      });
+      return;
+    }
+    fileInputRef.current?.click();
+  };
 
   // Form states
   const [newId, setNewId] = useState('');
@@ -415,11 +439,49 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
         type: 'success',
         message: `✓ Berhasil menghapus ${count} data industri terpilih dari database.`
       });
+      showColorfulAlert({
+        title: 'Data Industri Berhasil Dihapus! 🗑️',
+        subtitle: 'Penghapusan Data dari Database SIMBA-IN',
+        message: `Sebanyak ${count} data industri yang dipilih telah berhasil dihapus dari database sistem secara permanen.`,
+        type: 'success',
+        badge: 'DATA TERHAPUS',
+        count: count,
+        details: [
+          `${count} akun industri telah dihapus`,
+          'Daftar database telah diperbarui otomatis',
+          'Siklus catat meter telah disesuaikan'
+        ],
+        confirmText: 'Selesai'
+      });
+      showToast({
+        title: 'Data Dihapus',
+        message: `✓ ${count} data industri berhasil dihapus dari database.`,
+        type: 'success'
+      });
     } else if (deleteConfirmModal.type === 'single' && deleteConfirmModal.id) {
+      const targetName = deleteConfirmModal.name || deleteConfirmModal.id;
       onDeleteCustomer(deleteConfirmModal.id);
       setActionFeedback({
         type: 'success',
-        message: `✓ Berhasil menghapus industri ${deleteConfirmModal.name || deleteConfirmModal.id} dari database.`
+        message: `✓ Berhasil menghapus industri ${targetName} dari database.`
+      });
+      showColorfulAlert({
+        title: 'Data Industri Berhasil Dihapus! 🗑️',
+        subtitle: 'Penghapusan Akun Industri',
+        message: `Data industri ${targetName} (ID: ${deleteConfirmModal.id}) telah berhasil dihapus dari database sistem SIMBA-IN.`,
+        type: 'success',
+        badge: 'DATA TERHAPUS',
+        details: [
+          `Nama: ${targetName}`,
+          `ID: ${deleteConfirmModal.id}`,
+          'Data berhasil dibersihkan dari daftar'
+        ],
+        confirmText: 'Selesai'
+      });
+      showToast({
+        title: 'Industri Dihapus',
+        message: `✓ Akun industri ${targetName} berhasil dihapus.`,
+        type: 'success'
       });
     }
 
@@ -502,7 +564,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                 />
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={handleTriggerExcelImport}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer"
                 >
                   <Upload className="w-4 h-4" />
@@ -820,7 +882,19 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
           cycleSchedules={cycleSchedules}
           customers={customers}
           meterReaders={meterReaders}
-          onOpenImportModal={() => setIsImportScheduleModalOpen(true)}
+          onOpenImportModal={() => {
+            if (!canImportDatabase) {
+              showColorfulAlert({
+                title: 'Akses Dibatasi ⚠️',
+                subtitle: 'Otoritas Khusus Admin Meter Reading & Key Account',
+                message: `Akun Anda (${currentUser?.name || 'Tim Billing'}) hanya berwenang untuk mengelola Billing & Invoicing. Hak impor jadwal 15 cycle hanya dimiliki oleh Admin Meter Reading dan Admin Key Account.`,
+                type: 'warning',
+                badge: 'HAK AKSES KHUSUS'
+              });
+              return;
+            }
+            setIsImportScheduleModalOpen(true);
+          }}
           onUpdateSchedule={onUpdateCycleSchedule}
         />
       )}

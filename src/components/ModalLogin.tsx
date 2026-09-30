@@ -3,7 +3,17 @@ import { UserRole, UserProfile, MeterReader } from '../types';
 import { USER_PROFILES, INITIAL_METER_READERS } from '../data/initialData';
 import { getReaderCategory, getReaderCompany } from '../utils/readerAssignmentHelper';
 import { AetraLogo } from './AetraLogo';
-import { ShieldCheck, User, ArrowRight, Smartphone, Lock, Eye, EyeOff, KeyRound, AlertCircle, ChevronDown } from 'lucide-react';
+import {
+  ShieldCheck,
+  User,
+  ArrowRight,
+  Smartphone,
+  Lock,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  ChevronDown
+} from 'lucide-react';
 
 interface ModalLoginProps {
   isOpen: boolean;
@@ -12,9 +22,21 @@ interface ModalLoginProps {
 }
 
 export const ModalLogin: React.FC<ModalLoginProps> = ({ isOpen, onLogin, meterReaders = [] }) => {
-  const [loginType, setLoginType] = useState<'admin' | 'field_reader'>('admin');
-  const [selectedAdminRole, setSelectedAdminRole] = useState<UserRole>('yaya');
-  
+  // Check URL query param or hash to separate entrance link
+  const getInitialPortal = (): 'admin' | 'field_reader' => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const portal = params.get('portal') || params.get('mode');
+      if (portal === 'reader' || portal === 'field' || window.location.hash === '#reader') {
+        return 'field_reader';
+      }
+    }
+    return 'admin';
+  };
+
+  const [loginType, setLoginType] = useState<'admin' | 'field_reader'>(getInitialPortal);
+  const [selectedAdminRole, setSelectedAdminRole] = useState<UserRole>('solihin');
+
   // Available list of readers (fallback to INITIAL_METER_READERS if empty)
   const availableReaders = meterReaders.length > 0 ? meterReaders : INITIAL_METER_READERS;
 
@@ -30,6 +52,20 @@ export const ModalLogin: React.FC<ModalLoginProps> = ({ isOpen, onLogin, meterRe
     }
   }, [availableReaders, selectedReaderId]);
 
+  // Update URL params when portal switcher is clicked
+  const handleSwitchPortal = (type: 'admin' | 'field_reader') => {
+    setLoginType(type);
+    setAuthError(null);
+    if (type === 'field_reader') {
+      setPasswordInput('');
+    }
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('portal', type === 'field_reader' ? 'reader' : 'admin');
+      window.history.replaceState({}, '', url.toString());
+    }
+  };
+
   if (!isOpen) return null;
 
   const selectedReader = availableReaders.find((r) => r.id === selectedReaderId) || availableReaders[0];
@@ -39,7 +75,7 @@ export const ModalLogin: React.FC<ModalLoginProps> = ({ isOpen, onLogin, meterRe
     setAuthError(null);
 
     if (loginType === 'admin') {
-      const user = USER_PROFILES[selectedAdminRole] || USER_PROFILES.yaya;
+      const user = USER_PROFILES[selectedAdminRole] || USER_PROFILES.solihin;
       onLogin(user);
     } else {
       // Field Reader login with password validation
@@ -87,28 +123,37 @@ export const ModalLogin: React.FC<ModalLoginProps> = ({ isOpen, onLogin, meterRe
 
   return (
     <div className="fixed inset-0 bg-slate-900/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white dark:bg-slate-800 rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in-95 max-h-[92vh] overflow-y-auto">
         <div className="text-center mb-5">
           <div className="flex justify-center mb-3">
             <div className="bg-slate-50 dark:bg-slate-700/50 p-2.5 rounded-2xl border border-slate-100 dark:border-slate-600 inline-flex shadow-sm">
               <AetraLogo className="h-8" />
             </div>
           </div>
-          <h2 className="text-xl font-black text-[#0055A5] dark:text-blue-400">Masuk SIMBA-IN</h2>
+          <h2 className="text-xl font-black text-[#0055A5] dark:text-blue-400">
+            {loginType === 'field_reader' ? 'Laman Masuk Pencatat Meter' : 'Laman Masuk Dashboard Admin'}
+          </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
-            Sistem Informasi Monitoring Billing Air Industri
+            {loginType === 'field_reader'
+              ? 'Portal Khusus Petugas Pembacaan Meter Lapangan'
+              : 'Sistem Informasi Monitoring Billing Air Industri (SIMBA-IN)'}
           </p>
-          <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500">PT Aetra Air Tangerang</p>
+          <div className="mt-1.5 flex items-center justify-center gap-1.5">
+            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+              loginType === 'field_reader'
+                ? 'bg-orange-100 text-[#E86216] dark:bg-orange-950/80 dark:text-orange-300'
+                : 'bg-blue-100 text-[#0055A5] dark:bg-blue-950/80 dark:text-blue-300'
+            }`}>
+              {loginType === 'field_reader' ? '📱 PORTAL PETUGAS LAPANGAN' : '🛡️ PORTAL ADMIN KANTOR'}
+            </span>
+          </div>
         </div>
 
-        {/* Tab switcher: Admin Kantor vs Pembaca Meter Lapangan */}
+        {/* Distinct Portal Entrance Switcher */}
         <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-100 dark:bg-slate-700/60 rounded-2xl mb-4 text-xs font-bold">
           <button
             type="button"
-            onClick={() => {
-              setLoginType('admin');
-              setAuthError(null);
-            }}
+            onClick={() => handleSwitchPortal('admin')}
             className={`py-2 px-3 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
               loginType === 'admin'
                 ? 'bg-[#0055A5] text-white shadow-sm'
@@ -120,11 +165,7 @@ export const ModalLogin: React.FC<ModalLoginProps> = ({ isOpen, onLogin, meterRe
           </button>
           <button
             type="button"
-            onClick={() => {
-              setLoginType('field_reader');
-              setAuthError(null);
-              setPasswordInput('');
-            }}
+            onClick={() => handleSwitchPortal('field_reader')}
             className={`py-2 px-3 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
               loginType === 'field_reader'
                 ? 'bg-[#E86216] text-white shadow-sm'
@@ -153,11 +194,20 @@ export const ModalLogin: React.FC<ModalLoginProps> = ({ isOpen, onLogin, meterRe
                 <select
                   value={selectedAdminRole}
                   onChange={(e) => setSelectedAdminRole(e.target.value as UserRole)}
-                  className="w-full pl-3.5 pr-9 py-3 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold focus:ring-2 focus:ring-[#0055A5] bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white transition"
+                  className="w-full pl-3.5 pr-9 py-3 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold focus:ring-2 focus:ring-[#0055A5] bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white transition cursor-pointer"
                 >
-                  <option value="yaya">Pak Yaya (Tim Billing & Invoicing)</option>
-                  <option value="solihin">Pak Solihin (Admin Meter Reading)</option>
-                  <option value="kabul">Pak Kabul (Admin Meter Reading)</option>
+                  <optgroup label="📋 Admin Meter Reading (Akses Impor Database &amp; Verifikasi)">
+                    <option value="solihin">Akhmad Solihin (Meter Reading)</option>
+                    <option value="kabul">Kabul Nugroho (Meter Reading)</option>
+                    <option value="tri_kartono">Tri Kartono (Meter Reading)</option>
+                  </optgroup>
+                  <optgroup label="🌟 Admin Key Account (Akses Impor Database)">
+                    <option value="bayu_pramono">Bayu Pramono (Key Account)</option>
+                  </optgroup>
+                  <optgroup label="💳 Admin Billing (Akses Billing &amp; Invoicing)">
+                    <option value="yaya">Yaya Sunarya (Billing)</option>
+                    <option value="melva_sinaga">Melva Sinaga (Billing)</option>
+                  </optgroup>
                 </select>
                 <User className="w-4 h-4 text-slate-400 absolute right-3 top-3.5 pointer-events-none" />
               </div>
@@ -238,37 +288,6 @@ export const ModalLogin: React.FC<ModalLoginProps> = ({ isOpen, onLogin, meterRe
               </div>
             </div>
           )}
-
-          {/* Role Info Box */}
-          <div
-            className={`p-3 rounded-xl border text-[11px] flex items-start gap-2.5 ${
-              loginType === 'admin'
-                ? 'bg-blue-50/80 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900/50 text-slate-700 dark:text-slate-300'
-                : 'bg-orange-50/80 dark:bg-orange-950/40 border-orange-200 dark:border-orange-900/50 text-slate-700 dark:text-slate-300'
-            }`}
-          >
-            {loginType === 'admin' ? (
-              <ShieldCheck className="w-4 h-4 text-[#0055A5] dark:text-blue-400 shrink-0 mt-0.5" />
-            ) : (
-              <Smartphone className="w-4 h-4 text-[#E86216] shrink-0 mt-0.5" />
-            )}
-            <div>
-              <p className="font-extrabold text-[#0055A5] dark:text-blue-300">
-                {loginType === 'admin'
-                  ? selectedAdminRole === 'yaya'
-                    ? 'Otoritas Pak Yaya (Billing & Invoicing):'
-                    : 'Otoritas Admin Meter Reading (Pak Solihin / Pak Kabul):'
-                  : `Petugas: ${selectedReader?.nama || 'Petugas'} (${selectedReader?.kategori || 'Key Account'})`}
-              </p>
-              <p className="mt-0.5 leading-relaxed text-[10px]">
-                {loginType === 'admin'
-                  ? selectedAdminRole === 'yaya'
-                    ? 'Monitoring status Verified, approval invoice resmi, otomasi E-Materai (> 5 Juta), dan ekspor CSV.'
-                    : 'Pengelolaan master data industri, plotting matriks jadwal 15 cycle, rekap verifikasi lapangan, dan audit log.'
-                  : `Siklus penugasan: ${selectedReader?.assignedCycles.join(', ') || 'Cycle 1-3'}. Form input stand meter, foto meteran fisik, lembar BPM & GPS satelit.`}
-              </p>
-            </div>
-          </div>
 
           <button
             type="submit"

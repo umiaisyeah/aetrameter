@@ -3,26 +3,53 @@ import meterGaugeImg from '../assets/images/meter_industrial_gauge_1790243358407
 import bpmDocImg from '../assets/images/meter_bpm_document_1790243369057.jpg';
 
 export const USER_PROFILES: Record<string, UserProfile> = {
-  yaya: {
-    role: 'yaya',
-    name: 'Pak Yaya',
-    title: 'Tim Billing & Invoicing',
-    avatar: 'PY',
-    division: 'Commercial & Billing Dept'
-  },
   solihin: {
     role: 'solihin',
-    name: 'Pak Solihin',
+    name: 'Akhmad Solihin',
     title: 'Admin Meter Reading',
-    avatar: 'PS',
-    division: 'Commercial & Meter Reading Admin'
+    avatar: 'AS',
+    division: 'Commercial & Meter Reading Admin',
+    adminType: 'meter_reading'
   },
   kabul: {
     role: 'kabul',
-    name: 'Pak Kabul',
+    name: 'Kabul Nugroho',
     title: 'Admin Meter Reading',
-    avatar: 'PK',
-    division: 'Commercial & Meter Reading Admin'
+    avatar: 'KN',
+    division: 'Commercial & Meter Reading Admin',
+    adminType: 'meter_reading'
+  },
+  tri_kartono: {
+    role: 'tri_kartono',
+    name: 'Tri Kartono',
+    title: 'Admin Meter Reading',
+    avatar: 'TK',
+    division: 'Commercial & Meter Reading Admin',
+    adminType: 'meter_reading'
+  },
+  bayu_pramono: {
+    role: 'bayu_pramono',
+    name: 'Bayu Pramono',
+    title: 'Admin Key Account',
+    avatar: 'BP',
+    division: 'Key Account Industrial Division',
+    adminType: 'key_account'
+  },
+  yaya: {
+    role: 'yaya',
+    name: 'Yaya Sunarya',
+    title: 'Tim Billing & Invoicing',
+    avatar: 'YS',
+    division: 'Commercial & Billing Dept',
+    adminType: 'billing'
+  },
+  melva_sinaga: {
+    role: 'melva_sinaga',
+    name: 'Melva Sinaga',
+    title: 'Tim Billing & Invoicing',
+    avatar: 'MS',
+    division: 'Commercial & Billing Dept',
+    adminType: 'billing'
   }
 };
 

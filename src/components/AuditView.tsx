@@ -43,9 +43,16 @@ export const AuditView: React.FC<AuditViewProps> = ({ logs, onClearLogs }) => {
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<string>(''); // YYYY-MM-DD
   const [selectedMonth, setSelectedMonth] = useState<string>('ALL');
 
-  // List of all distinct users, ensuring Pak Kabul, Pak Solihin, and Pak Yaya are always listed
+  // List of all distinct users, ensuring all 6 Admins and Billing are always listed
   const allKnownUsers = useMemo(() => {
-    const defaultUsers = ['Pak Kabul', 'Pak Solihin', 'Pak Yaya'];
+    const defaultUsers = [
+      'Akhmad Solihin',
+      'Kabul Nugroho',
+      'Tri Kartono',
+      'Bayu Pramono',
+      'Yaya Sunarya',
+      'Melva Sinaga'
+    ];
     const logUsers = logs.map((l) => l.user);
     return Array.from(new Set([...defaultUsers, ...logUsers]));
   }, [logs]);
@@ -377,8 +384,14 @@ export const AuditView: React.FC<AuditViewProps> = ({ logs, onClearLogs }) => {
                     badgeRoleClass = 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border-emerald-300';
                   } else if (log.user.toLowerCase().includes('solihin')) {
                     badgeRoleClass = 'bg-amber-50 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border-amber-300';
+                  } else if (log.user.toLowerCase().includes('tri')) {
+                    badgeRoleClass = 'bg-cyan-50 text-cyan-800 dark:bg-cyan-950/70 dark:text-cyan-300 border-cyan-300';
+                  } else if (log.user.toLowerCase().includes('bayu')) {
+                    badgeRoleClass = 'bg-purple-50 text-purple-800 dark:bg-purple-950/70 dark:text-purple-300 border-purple-300';
                   } else if (log.user.toLowerCase().includes('yaya')) {
                     badgeRoleClass = 'bg-orange-50 text-[#E86216] dark:bg-orange-950/70 dark:text-orange-300 border-orange-300';
+                  } else if (log.user.toLowerCase().includes('melva')) {
+                    badgeRoleClass = 'bg-pink-50 text-pink-800 dark:bg-pink-950/70 dark:text-pink-300 border-pink-300';
                   }
 
                   return (
@@ -393,6 +406,12 @@ export const AuditView: React.FC<AuditViewProps> = ({ logs, onClearLogs }) => {
                               ? 'bg-emerald-600'
                               : log.user.toLowerCase().includes('solihin')
                               ? 'bg-amber-600'
+                              : log.user.toLowerCase().includes('tri')
+                              ? 'bg-cyan-600'
+                              : log.user.toLowerCase().includes('bayu')
+                              ? 'bg-purple-600'
+                              : log.user.toLowerCase().includes('melva')
+                              ? 'bg-pink-600'
                               : 'bg-[#E86216]'
                           }`}>
                             {log.user.split(' ').map(n => n[0]).join('')}
