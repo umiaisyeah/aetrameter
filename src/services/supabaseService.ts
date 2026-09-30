@@ -148,22 +148,23 @@ export const testSupabaseConnection = async (): Promise<{
 // CRUD Services
 // ==============================================================================
 
-// Fetch all customers from Supabase
+// Fetch all customers from Supabase with table fallback ('industry_customers' -> 'industri')
 export const fetchSupabaseCustomers = async (): Promise<IndustryCustomer[] | null> => {
   const client = getSupabaseClient();
   if (!client) return null;
 
   try {
-    const { data, error } = await client
-      .from('industry_customers')
-      .select('*')
-      .order('id', { ascending: true });
-
-    if (error) throw error;
-    if (!data) return [];
-    return data.map(mapRowToCustomer);
-  } catch (err) {
-    console.error('Error fetching customers from Supabase:', err);
+    let res = await client.from('industry_customers').select('*').order('id', { ascending: true });
+    if (res.error && res.error.code === 'PGRST205') {
+      res = await client.from('industri').select('*').order('id', { ascending: true });
+    }
+    if (res.error) throw res.error;
+    if (!res.data) return [];
+    return res.data.map(mapRowToCustomer);
+  } catch (err: any) {
+    if (err?.code !== 'PGRST205') {
+      console.warn('Supabase fetch customers notice:', err?.message || err);
+    }
     return null;
   }
 };
@@ -175,16 +176,21 @@ export const upsertSupabaseCustomer = async (customer: IndustryCustomer): Promis
 
   try {
     const row = mapCustomerToRow(customer);
-    const { error } = await client.from('industry_customers').upsert(row, { onConflict: 'id' });
-    if (error) throw error;
+    let res = await client.from('industry_customers').upsert(row, { onConflict: 'id' });
+    if (res.error && res.error.code === 'PGRST205') {
+      res = await client.from('industri').upsert(row, { onConflict: 'id' });
+    }
+    if (res.error) throw res.error;
     return true;
-  } catch (err) {
-    console.error('Error saving customer to Supabase:', err);
+  } catch (err: any) {
+    if (err?.code !== 'PGRST205') {
+      console.warn('Supabase upsert customer notice:', err?.message || err);
+    }
     return false;
   }
 };
 
-// Batch update customer status (e.g. from 1-Click Cycle Batch)
+// Batch update customer status
 export const batchUpdateSupabaseStatus = async (
   ids: string[],
   status: WorkflowStatus,
@@ -197,15 +203,16 @@ export const batchUpdateSupabaseStatus = async (
     const payload: any = { status };
     if (note) payload.catatan = note;
 
-    const { error } = await client
-      .from('industry_customers')
-      .update(payload)
-      .in('id', ids);
-
-    if (error) throw error;
+    let res = await client.from('industry_customers').update(payload).in('id', ids);
+    if (res.error && res.error.code === 'PGRST205') {
+      res = await client.from('industri').update(payload).in('id', ids);
+    }
+    if (res.error) throw res.error;
     return true;
-  } catch (err) {
-    console.error('Error batch updating Supabase status:', err);
+  } catch (err: any) {
+    if (err?.code !== 'PGRST205') {
+      console.warn('Supabase batch update notice:', err?.message || err);
+    }
     return false;
   }
 };
@@ -216,31 +223,37 @@ export const deleteSupabaseCustomer = async (id: string): Promise<boolean> => {
   if (!client) return false;
 
   try {
-    const { error } = await client.from('industry_customers').delete().eq('id', id);
-    if (error) throw error;
+    let res = await client.from('industry_customers').delete().eq('id', id);
+    if (res.error && res.error.code === 'PGRST205') {
+      res = await client.from('industri').delete().eq('id', id);
+    }
+    if (res.error) throw res.error;
     return true;
-  } catch (err) {
-    console.error('Error deleting customer from Supabase:', err);
+  } catch (err: any) {
+    if (err?.code !== 'PGRST205') {
+      console.warn('Supabase delete customer notice:', err?.message || err);
+    }
     return false;
   }
 };
 
-// Fetch meter readers
+// Fetch meter readers with fallback
 export const fetchSupabaseMeterReaders = async (): Promise<MeterReader[] | null> => {
   const client = getSupabaseClient();
   if (!client) return null;
 
   try {
-    const { data, error } = await client
-      .from('meter_readers')
-      .select('*')
-      .order('id', { ascending: true });
-
-    if (error) throw error;
-    if (!data) return [];
-    return data.map(mapRowToMeterReader);
-  } catch (err) {
-    console.error('Error fetching meter readers from Supabase:', err);
+    let res = await client.from('meter_readers').select('*').order('id', { ascending: true });
+    if (res.error && res.error.code === 'PGRST205') {
+      res = await client.from('petugas').select('*').order('id', { ascending: true });
+    }
+    if (res.error) throw res.error;
+    if (!res.data) return [];
+    return res.data.map(mapRowToMeterReader);
+  } catch (err: any) {
+    if (err?.code !== 'PGRST205') {
+      console.warn('Supabase fetch readers notice:', err?.message || err);
+    }
     return null;
   }
 };
@@ -252,11 +265,16 @@ export const upsertSupabaseMeterReader = async (reader: MeterReader): Promise<bo
 
   try {
     const row = mapMeterReaderToRow(reader);
-    const { error } = await client.from('meter_readers').upsert(row, { onConflict: 'id' });
-    if (error) throw error;
+    let res = await client.from('meter_readers').upsert(row, { onConflict: 'id' });
+    if (res.error && res.error.code === 'PGRST205') {
+      res = await client.from('petugas').upsert(row, { onConflict: 'id' });
+    }
+    if (res.error) throw res.error;
     return true;
-  } catch (err) {
-    console.error('Error saving meter reader to Supabase:', err);
+  } catch (err: any) {
+    if (err?.code !== 'PGRST205') {
+      console.warn('Supabase upsert reader notice:', err?.message || err);
+    }
     return false;
   }
 };
@@ -267,31 +285,37 @@ export const deleteSupabaseMeterReader = async (id: string): Promise<boolean> =>
   if (!client) return false;
 
   try {
-    const { error } = await client.from('meter_readers').delete().eq('id', id);
-    if (error) throw error;
+    let res = await client.from('meter_readers').delete().eq('id', id);
+    if (res.error && res.error.code === 'PGRST205') {
+      res = await client.from('petugas').delete().eq('id', id);
+    }
+    if (res.error) throw res.error;
     return true;
-  } catch (err) {
-    console.error('Error deleting meter reader from Supabase:', err);
+  } catch (err: any) {
+    if (err?.code !== 'PGRST205') {
+      console.warn('Supabase delete reader notice:', err?.message || err);
+    }
     return false;
   }
 };
 
-// Fetch cycle schedules
+// Fetch cycle schedules with fallback
 export const fetchSupabaseCycleSchedules = async (): Promise<CycleSchedule[] | null> => {
   const client = getSupabaseClient();
   if (!client) return null;
 
   try {
-    const { data, error } = await client
-      .from('cycle_schedules')
-      .select('*')
-      .order('hari_h', { ascending: true });
-
-    if (error) throw error;
-    if (!data) return [];
-    return data.map(mapRowToCycleSchedule);
-  } catch (err) {
-    console.error('Error fetching cycle schedules from Supabase:', err);
+    let res = await client.from('cycle_schedules').select('*').order('hari_h', { ascending: true });
+    if (res.error && res.error.code === 'PGRST205') {
+      res = await client.from('jadwal_cycle').select('*').order('hari_h', { ascending: true });
+    }
+    if (res.error) throw res.error;
+    if (!res.data) return [];
+    return res.data.map(mapRowToCycleSchedule);
+  } catch (err: any) {
+    if (err?.code !== 'PGRST205') {
+      console.warn('Supabase fetch cycle schedules notice:', err?.message || err);
+    }
     return null;
   }
 };
@@ -303,33 +327,33 @@ export const upsertSupabaseCycleSchedules = async (schedules: CycleSchedule[]): 
 
   try {
     const rows = schedules.map(mapCycleScheduleToRow);
-    const { error } = await client
-      .from('cycle_schedules')
-      .upsert(rows, { onConflict: 'cycle,bulan' });
-
-    if (error) throw error;
+    let res = await client.from('cycle_schedules').upsert(rows, { onConflict: 'cycle,bulan' });
+    if (res.error && res.error.code === 'PGRST205') {
+      res = await client.from('jadwal_cycle').upsert(rows, { onConflict: 'cycle,bulan' });
+    }
+    if (res.error) throw res.error;
     return true;
-  } catch (err) {
-    console.error('Error saving cycle schedules to Supabase:', err);
+  } catch (err: any) {
+    if (err?.code !== 'PGRST205') {
+      console.warn('Supabase upsert cycle schedules notice:', err?.message || err);
+    }
     return false;
   }
 };
 
-// Fetch audit logs
+// Fetch audit logs with fallback
 export const fetchSupabaseAuditLogs = async (): Promise<AuditLog[] | null> => {
   const client = getSupabaseClient();
   if (!client) return null;
 
   try {
-    const { data, error } = await client
-      .from('audit_logs')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(150);
-
-    if (error) throw error;
-    if (!data) return [];
-    return data.map((row) => ({
+    let res = await client.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(150);
+    if (res.error && res.error.code === 'PGRST205') {
+      res = await client.from('audit').select('*').order('created_at', { ascending: false }).limit(150);
+    }
+    if (res.error) throw res.error;
+    if (!res.data) return [];
+    return res.data.map((row: any) => ({
       id: row.id,
       time: row.time,
       user: row.user,
@@ -337,8 +361,10 @@ export const fetchSupabaseAuditLogs = async (): Promise<AuditLog[] | null> => {
       desc: row.desc,
       type: row.type as any
     }));
-  } catch (err) {
-    console.error('Error fetching audit logs from Supabase:', err);
+  } catch (err: any) {
+    if (err?.code !== 'PGRST205') {
+      console.warn('Supabase fetch audit logs notice:', err?.message || err);
+    }
     return null;
   }
 };
@@ -349,18 +375,24 @@ export const insertSupabaseAuditLog = async (log: AuditLog): Promise<boolean> =>
   if (!client) return false;
 
   try {
-    const { error } = await client.from('audit_logs').insert({
+    const payload = {
       id: log.id,
       time: log.time,
       user: log.user,
       role: log.role,
       desc: log.desc,
       type: log.type || 'info'
-    });
-    if (error) throw error;
+    };
+    let res = await client.from('audit_logs').insert(payload);
+    if (res.error && res.error.code === 'PGRST205') {
+      res = await client.from('audit').insert(payload);
+    }
+    if (res.error) throw res.error;
     return true;
-  } catch (err) {
-    console.error('Error inserting audit log to Supabase:', err);
+  } catch (err: any) {
+    if (err?.code !== 'PGRST205') {
+      console.warn('Supabase insert audit log notice:', err?.message || err);
+    }
     return false;
   }
 };
@@ -429,39 +461,45 @@ export const subscribeToFieldReaderUpdates = (
   const client = getSupabaseClient();
   if (!client) return () => {};
 
-  const channel = client
-    .channel('simba-in-realtime-field')
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'industry_customers' },
-      (payload) => {
-        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-          const mapped = mapRowToCustomer(payload.new);
-          onCustomerUpsert(mapped);
-        } else if (payload.eventType === 'DELETE') {
-          onCustomerDelete(payload.old.id);
+  try {
+    const channel = client
+      .channel('simba-in-realtime-field')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'industry_customers' },
+        (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const mapped = mapRowToCustomer(payload.new);
+            onCustomerUpsert(mapped);
+          } else if (payload.eventType === 'DELETE') {
+            onCustomerDelete(payload.old.id);
+          }
         }
-      }
-    )
-    .on(
-      'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'audit_logs' },
-      (payload) => {
-        if (onNewAuditLog && payload.new) {
-          onNewAuditLog({
-            id: payload.new.id,
-            time: payload.new.time,
-            user: payload.new.user,
-            role: payload.new.role,
-            desc: payload.new.desc,
-            type: payload.new.type
-          });
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'audit_logs' },
+        (payload) => {
+          if (onNewAuditLog && payload.new) {
+            onNewAuditLog({
+              id: payload.new.id,
+              time: payload.new.time,
+              user: payload.new.user,
+              role: payload.new.role,
+              desc: payload.new.desc,
+              type: payload.new.type
+            });
+          }
         }
-      }
-    )
-    .subscribe();
+      )
+      .subscribe();
 
-  return () => {
-    client.removeChannel(channel);
-  };
+    return () => {
+      try {
+        client.removeChannel(channel);
+      } catch {}
+    };
+  } catch (err) {
+    return () => {};
+  }
 };
