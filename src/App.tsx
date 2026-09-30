@@ -297,25 +297,37 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [customers, meterReaders, cycleSchedules, auditLogs]);
 
-  // Persist customers & audit logs
+  // Persist customers & audit logs safely with try/catch quota protection
   useEffect(() => {
-    localStorage.setItem('aetra_industri_data', JSON.stringify(customers));
+    try {
+      localStorage.setItem('aetra_industri_data', JSON.stringify(customers));
+    } catch (err) {
+      console.warn('LocalStorage quota exceeded for customers:', err);
+    }
   }, [customers]);
 
   useEffect(() => {
-    localStorage.setItem('aetra_audit_logs', JSON.stringify(auditLogs));
+    try {
+      localStorage.setItem('aetra_audit_logs', JSON.stringify(auditLogs));
+    } catch {}
   }, [auditLogs]);
 
   useEffect(() => {
-    localStorage.setItem('aetra_current_user', JSON.stringify(currentUser));
+    try {
+      localStorage.setItem('aetra_current_user', JSON.stringify(currentUser));
+    } catch {}
   }, [currentUser]);
 
   useEffect(() => {
-    localStorage.setItem('aetra_meter_readers', JSON.stringify(meterReaders));
+    try {
+      localStorage.setItem('aetra_meter_readers', JSON.stringify(meterReaders));
+    } catch {}
   }, [meterReaders]);
 
   useEffect(() => {
-    localStorage.setItem('aetra_cycle_schedules', JSON.stringify(cycleSchedules));
+    try {
+      localStorage.setItem('aetra_cycle_schedules', JSON.stringify(cycleSchedules));
+    } catch {}
   }, [cycleSchedules]);
 
   // Logging function
