@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { IndustryCustomer, UserProfile } from '../types';
-import { X, AlertTriangle, Info, Mail, Printer, CheckCircle, Camera, FileCheck } from 'lucide-react';
+import { X, AlertTriangle, Info, Mail, Printer, CheckCircle, Camera, FileCheck, MapPin, Radio } from 'lucide-react';
 import meterGaugeImg from '../assets/images/meter_industrial_gauge_1790243358407.jpg';
 import bpmDocImg from '../assets/images/meter_bpm_document_1790243369057.jpg';
 import { showColorfulAlert } from '../utils/notificationSystem';
+import { RealtimeLocationMap } from './RealtimeLocationMap';
+import { PhotoGeotagStamp } from './PhotoGeotagStamp';
+import { calculateAetraInvoice, formatRupiah } from '../utils/aetraInvoiceCalculator';
 
 interface DetailModalProps {
   isOpen: boolean;
@@ -40,15 +43,14 @@ export const DetailModal: React.FC<DetailModalProps> = ({
 
   if (!isOpen || !customer) return null;
 
-  // Calculations
+  // Calculations following exact Aetra official rules
   const lalu = customer.lalu;
   const currentStand = Number(inputSkrg) || 0;
   const vol = Math.max(0, currentStand - lalu);
-  const estTagihan = vol * 12500;
-  // UU Bea Meterai: Dokumen tagihan / invoice di atas Rp 5.000.000 dikenakan Bea Meterai Rp 10.000
-  const isMateraiRequired = estTagihan > 5000000;
-  const materai = isMateraiRequired ? 10000 : 0;
-  const totalTagihan = estTagihan + materai;
+  const invCalc = calculateAetraInvoice({ ...customer, skrg: currentStand });
+  const isMateraiRequired = invCalc.isMateraiApplied;
+  const materai = invCalc.meterai;
+  const totalTagihan = invCalc.totalKeseluruhan;
 
   // Anomaly calculation
   const historyData = customer.history || [Math.max(0, lalu - 500), lalu];
@@ -88,7 +90,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
       const mailto = `mailto:${encodeURIComponent(customer.email)}?subject=${encodeURIComponent(
         `Tagihan Air Industri PT Aetra Air Tangerang - ${customer.id} (${customer.nama})`
       )}&body=${encodeURIComponent(
-        `Kepada Yth. Bagian Keuangan / Finance\n${customer.nama}\nID Pelanggan: ${customer.id}\n\nBerikut kami sampaikan rincian tagihan pemakaian air bersih PT Aetra Air Tangerang periode ${customer.bulan}:\n\n- Stand Meter Lalu: ${lalu.toLocaleString()} m³\n- Stand Meter Sekarang: ${currentStand.toLocaleString()} m³\n- Total Pemakaian: ${vol.toLocaleString()} m³\n- Tarif Air Industri: Rp 12.500 / m³\n- Biaya Pemakaian Air: Rp ${estTagihan.toLocaleString()}\n- Bea Materai: Rp ${materai.toLocaleString()}\n- TOTAL TAGIHAN: Rp ${totalTagihan.toLocaleString()}\n\nFaktur resmi PDF dapat diunduh dan dicetak melalui lampiran invoice.\n\nAtas kerja sama yang baik, kami ucapkan terima kasih.\n\nSalam hormat,\nTim Billing & Invoicing\nPT Aetra Air Tangerang`
+        `Kepada Yth. Bagian Keuangan / Finance\n${customer.nama}\nID Pelanggan: ${customer.id}\n\nBerikut kami sampaikan rincian tagihan pemakaian air bersih PT Aetra Air Tangerang periode ${customer.bulan}:\n\n- Stand Meter Lalu: ${lalu.toLocaleString('id-ID')} m³\n- Stand Meter Sekarang: ${currentStand.toLocaleString('id-ID')} m³\n- Total Pemakaian: ${vol.toLocaleString('id-ID')} m³\n- Biaya Pemakaian Air: Rp ${formatRupiah(invCalc.biayaPakaiAir)}\n- Abonemen: Rp ${formatRupiah(invCalc.abonemen)}\n- DPP: Rp ${formatRupiah(invCalc.dpp)}\n- PPN (12% Dibebaskan): Rp ${formatRupiah(invCalc.ppn)}\n- Bea Materai: Rp ${formatRupiah(materai)}\n- TOTAL TAGIHAN KESELURUHAN: Rp ${formatRupiah(totalTagihan)}\n- Terbilang: ${invCalc.terbilangStr}\n- Tanggal Jatuh Tempo: ${invCalc.tanggalJatuhTempo}\n\nFaktur resmi PDF dapat diunduh dan dicetak melalui aplikasi SIMBA.\n\nAtas kerja sama yang baik, kami ucapkan terima kasih.\n\nSalam hormat,\nTim Billing & Invoicing\nPT Aetra Air Tangerang`
       )}`;
 
       setOutlookLink(mailto);
@@ -118,7 +120,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
         ...customer,
         skrg: currentStand > 0 ? currentStand : customer.skrg,
         status: 'Verified',
-        catatan: catatan.trim() || `Diverifikasi resmi oleh ${currentUser.name} (Admin Meter Reading)`,
+        catatan: catatan.trim() || `Diverifikasi resmi oleh ${currentUser.name} (Tim Meter Reading)`,
         history: updatedHistory,
         fotoMeter: customer.fotoMeter || meterGaugeImg,
         fotoBPM: customer.fotoBPM || bpmDocImg
@@ -209,7 +211,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
             <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 rounded-xl text-emerald-800 dark:text-emerald-300 font-semibold flex items-center gap-2">
               <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <span>
-                Anda masuk sebagai Admin Meter Reading ({currentUser.name}). Anda berwenang memvalidasi dan memverifikasi hasil pembacaan stand meter lapangan.
+                Anda masuk sebagai Tim Meter Reading ({currentUser.name}). Anda berwenang memvalidasi dan memverifikasi hasil pembacaan stand meter lapangan.
               </span>
             </div>
           )}
@@ -298,16 +300,18 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                   </p>
                 </div>
               ) : (
-                <div className="h-40 w-full overflow-hidden rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-900 relative">
+                <div className="h-48 w-full overflow-hidden rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-900 relative group">
                   <img
                     src={customer.fotoMeter}
                     alt={`Meteran ${customer.nama}`}
                     referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
-                  <span className="absolute bottom-2 left-2 bg-slate-900/80 text-white text-[9px] font-mono px-1.5 py-0.5 rounded">
+                  <span className="absolute top-2 left-2 bg-slate-900/85 text-white text-[9px] font-mono px-2 py-0.5 rounded shadow-xs z-10 border border-white/10">
                     SN: MTR-{customer.id.replace('IND-', '')}-2026
                   </span>
+                  {/* Realtime GPS Geotag Stamp Overlay */}
+                  <PhotoGeotagStamp customer={customer} photoType="meter" />
                 </div>
               )}
             </div>
@@ -337,19 +341,26 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                   </p>
                 </div>
               ) : (
-                <div className="h-40 w-full overflow-hidden rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-900 relative">
+                <div className="h-48 w-full overflow-hidden rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-900 relative group">
                   <img
                     src={customer.fotoBPM}
                     alt={`BPM ${customer.nama}`}
                     referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
-                  <span className="absolute bottom-2 left-2 bg-slate-900/80 text-white text-[9px] font-mono px-1.5 py-0.5 rounded">
+                  <span className="absolute top-2 left-2 bg-slate-900/85 text-white text-[9px] font-mono px-2 py-0.5 rounded shadow-xs z-10 border border-white/10">
                     BPM Validated &amp; Stamped
                   </span>
+                  {/* Realtime GPS Geotag Stamp Overlay */}
+                  <PhotoGeotagStamp customer={customer} photoType="bpm" />
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Integrated Realtime Location Map */}
+          <div className="space-y-1.5">
+            <RealtimeLocationMap customer={customer} height="h-64 sm:h-72" />
           </div>
 
           {/* Historical Usage Graph (Sesuai Permintaan: Jangan ditampilkan pada tampilan Billing & Invoicing) */}

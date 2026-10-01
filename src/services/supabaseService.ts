@@ -19,7 +19,11 @@ export const mapRowToCustomer = (row: any): IndustryCustomer => ({
   lokasi: row.lokasi || undefined,
   diameterPipa: row.diameter_pipa || undefined,
   petugasBaca: row.petugas_baca || undefined,
-  kategoriPetugas: row.kategori_petugas || undefined
+  kategoriPetugas: row.kategori_petugas || undefined,
+  lokasiGps: row.lokasi_gps || undefined,
+  latitude: row.latitude ? Number(row.latitude) : undefined,
+  longitude: row.longitude ? Number(row.longitude) : undefined,
+  waktuBaca: row.waktu_baca || undefined
 });
 
 // Convert IndustryCustomer to database snake_case row
@@ -40,7 +44,11 @@ export const mapCustomerToRow = (c: IndustryCustomer) => ({
   lokasi: c.lokasi || null,
   diameter_pipa: c.diameterPipa || null,
   petugas_baca: c.petugasBaca || null,
-  kategori_petugas: c.kategoriPetugas || null
+  kategori_petugas: c.kategoriPetugas || null,
+  lokasi_gps: c.lokasiGps || null,
+  latitude: c.latitude || null,
+  longitude: c.longitude || null,
+  waktu_baca: c.waktuBaca || null
 });
 
 // Convert database row to MeterReader

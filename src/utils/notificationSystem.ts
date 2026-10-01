@@ -1,4 +1,4 @@
-// Interactive Colorful Notification & Alert System for SIMBA-IN PT Aetra Air Tangerang
+// Interactive Colorful Notification & Alert System for SIMBA PT Aetra Air Tangerang
 
 export type NotificationType = 'success' | 'warning' | 'error' | 'info';
 

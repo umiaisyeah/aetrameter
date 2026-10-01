@@ -12,9 +12,11 @@ import {
   ChevronRight,
   Check,
   CalendarDays,
-  Menu
+  Menu,
+  Sparkles
 } from 'lucide-react';
 import { UserProfile, CycleSchedule } from '../types';
+import { SimbaLogo } from './SimbaLogo';
 
 interface HeaderProps {
   searchQuery: string;
@@ -126,18 +128,42 @@ export const Header: React.FC<HeaderProps> = ({
   const cycles = Array.from({ length: 15 }, (_, i) => `Cycle ${i + 1}`);
 
   return (
-    <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-3.5 md:p-4 flex flex-col md:flex-row items-center justify-between gap-3 sticky top-0 z-20 shadow-xs transition-colors duration-200">
-      {/* Search Input & Sidebar Toggle */}
-      <div className="flex items-center gap-2 w-full md:w-80">
+    <div className="sticky top-0 z-30 shadow-md">
+      {/* Top Colorful System Text Marquee Ticker */}
+      <div className="bg-gradient-to-r from-[#001738] via-[#004b93] via-[#0284c7] via-[#059669] via-[#d97706] to-[#E86216] text-white py-1 px-3 text-[11px] font-extrabold flex items-center gap-2 overflow-hidden border-b border-white/15 shadow-sm">
+        <span className="bg-gradient-to-r from-amber-300 to-orange-400 text-slate-950 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 flex items-center gap-1 shadow-md">
+          <Sparkles className="w-3 h-3 text-slate-950 animate-spin" />
+          <span>SISTEM AKTIF</span>
+        </span>
+        <div className="flex-1 overflow-hidden whitespace-nowrap">
+          <div className="inline-block animate-marquee font-black tracking-wide text-white drop-shadow-xs">
+            🌊 SIMBA (Sistem Integrasi Metering &amp; Billing Aetra Air Tangerang) &nbsp;—&nbsp; ⚡ STATUS SISTEM: Real-Time Live Sync Admin &amp; Field Reader App &nbsp;—&nbsp; 👥 SINKRONISASI PENUGASAN PETUGAS: Key Account &amp; Kontraktor &nbsp;—&nbsp; 📅 PERIODE AKTIF: September 2026 &nbsp;—&nbsp; 🏢 PT AETRA AIR TANGERANG
+          </div>
+        </div>
+        <span className="hidden sm:flex items-center gap-1 text-[10px] font-mono font-bold bg-white/20 backdrop-blur-xs px-2 py-0.5 rounded-full border border-white/20 text-white shrink-0">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span>ONLINE</span>
+        </span>
+      </div>
+
+      {/* Micro Rainbow Accent Stripe */}
+      <div className="h-0.5 bg-gradient-to-r from-cyan-400 via-blue-500 via-emerald-400 via-amber-400 to-[#E86216]" />
+
+      <header className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 p-3 md:p-3.5 flex flex-col md:flex-row items-center justify-between gap-3 transition-colors duration-200">
+      {/* Search Input, Sidebar Toggle & SIMBA Brand Logo */}
+      <div className="flex items-center gap-2.5 w-full md:w-auto flex-1 max-w-md">
         {onToggleSidebar && (
           <button
             onClick={onToggleSidebar}
-            className="p-2 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 shrink-0 transition"
+            className="p-2 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 shrink-0 transition cursor-pointer"
             title="Sembunyikan / Tampilkan Sidebar"
           >
             <Menu className="w-5 h-5" />
           </button>
         )}
+        <div className="hidden sm:flex items-center shrink-0">
+          <SimbaLogo variant="compact" className="h-8" />
+        </div>
         <div className="relative flex-1">
           <input
             type="text"
@@ -388,6 +414,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
     </header>
+    </div>
   );
 };
 

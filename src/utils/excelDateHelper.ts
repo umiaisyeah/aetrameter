@@ -291,7 +291,7 @@ export function downloadYearlyCycleScheduleTemplate() {
     XLSX.utils.book_append_sheet(workbook, ws, code);
   });
 
-  XLSX.writeFile(workbook, 'Jadwal_Cycle_1_Tahun_SIMBA_IN_2026.xlsx');
+  XLSX.writeFile(workbook, 'Jadwal_Cycle_1_Tahun_SIMBA_2026.xlsx');
 }
 
 /**

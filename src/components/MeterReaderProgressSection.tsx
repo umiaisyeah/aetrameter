@@ -215,7 +215,7 @@ export const MeterReaderProgressSection: React.FC<MeterReaderProgressSectionProp
         <div className="flex items-center gap-2">
           <Briefcase className="w-4 h-4 text-[#0055A5] dark:text-blue-400 shrink-0" />
           <span className="text-slate-700 dark:text-slate-200">
-            <strong>Struktur Operasional:</strong> <em>Pak Solihin</em> &amp; <em>Pak Kabul</em> bertindak sebagai <strong>Admin Meter Reading</strong> (Input Cycle &amp; Data Industri). Pembaca meter fisik di lapangan dilakukan oleh <strong>Petugas Lapangan / Kontraktor</strong> yang ditugaskan.
+            <strong>Struktur Operasional:</strong> <em>Pak Solihin</em> &amp; <em>Pak Kabul</em> bertindak sebagai <strong>Tim Meter Reading</strong> (Input Cycle &amp; Data Industri). Pembaca meter fisik di lapangan dilakukan oleh <strong>Petugas Lapangan / Kontraktor</strong> yang ditugaskan.
           </span>
         </div>
       </div>

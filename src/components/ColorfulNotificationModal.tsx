@@ -166,7 +166,7 @@ export const ColorfulNotificationModal: React.FC = () => {
                   {type === 'success' && (
                     <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
                       <Sparkles className="w-3 h-3 text-amber-500 animate-spin" />
-                      <span>SIMBA-IN Live</span>
+                      <span>SIMBA Live</span>
                     </span>
                   )}
                 </div>
@@ -218,13 +218,9 @@ export const ColorfulNotificationModal: React.FC = () => {
             <p className="whitespace-pre-line">{modal.message}</p>
 
             {/* Recognized metadata tags / chips */}
-            {defaultTags.length > 0 && (
+            {modal.tags && modal.tags.length > 0 && (
               <div className="mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-700 flex flex-wrap items-center gap-1.5">
-                <span className="text-[10px] font-bold uppercase text-slate-400 dark:text-slate-400 flex items-center gap-1">
-                  <Layers className="w-3 h-3 text-[#0055A5]" />
-                  <span>Kolom Terintegrasi:</span>
-                </span>
-                {defaultTags.map((tag) => (
+                {modal.tags.map((tag) => (
                   <span
                     key={tag}
                     className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-white dark:bg-slate-700 text-[#0055A5] dark:text-blue-300 border border-slate-200 dark:border-slate-600 shadow-2xs"

@@ -58,7 +58,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   const [activeSubTab, setActiveSubTab] = useState<'customers' | 'readers' | 'schedules'>('customers');
   const [isImportScheduleModalOpen, setIsImportScheduleModalOpen] = useState<boolean>(false);
 
-  // Check RBAC: Only Admin Meter Reading and Admin Key Account can import database & cycle schedules
+  // Check RBAC: Only Tim Meter Reading and Admin Key Account can import database & cycle schedules
   const canImportDatabase =
     !currentUser ||
     currentUser.adminType === 'meter_reading' ||
@@ -69,8 +69,8 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
     if (!canImportDatabase) {
       showColorfulAlert({
         title: 'Akses Dibatasi ⚠️',
-        subtitle: 'Otoritas Khusus Admin Meter Reading & Key Account',
-        message: `Akun Anda (${currentUser?.name || 'Tim Billing'}) hanya berwenang untuk mengelola Billing & Invoicing. Hak impor database industri dan jadwal cycle hanya dimiliki oleh Admin Meter Reading dan Admin Key Account.`,
+        subtitle: 'Otoritas Khusus Tim Meter Reading & Key Account',
+        message: `Akun Anda (${currentUser?.name || 'Tim Billing'}) hanya berwenang untuk mengelola Billing & Invoicing. Hak impor database industri dan jadwal cycle hanya dimiliki oleh Tim Meter Reading dan Admin Key Account.`,
         type: 'warning',
         badge: 'HAK AKSES KHUSUS'
       });
@@ -167,7 +167,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
     const ws = XLSX.utils.json_to_sheet(templateData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Database Industri & Cycle');
-    XLSX.writeFile(wb, 'Format_Import_Industri_Cycle_SIMBA_IN.xlsx');
+    XLSX.writeFile(wb, 'Format_Import_Industri_Cycle_SIMBA.xlsx');
   };
 
   const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -286,7 +286,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
         showColorfulAlert({
           title: 'Import Data Industri Berhasil! 🎉',
           subtitle: 'Sinkronisasi Database Industri & Penugasan Petugas Lapangan',
-          message: `Berhasil mengimpor ${imported.length} data industri gabungan (ID Pelanggan, Nama Perusahaan Industri, Cycle, Kelas, Pembaca Meter) ke dalam sistem SIMBA-IN. Status alur kerja diatur ke Belum Dibaca (siap dicatat petugas lapangan).`,
+          message: `Berhasil mengimpor ${imported.length} data industri gabungan (ID Pelanggan, Nama Perusahaan Industri, Cycle, Kelas, Pembaca Meter) ke dalam sistem SIMBA. Status alur kerja diatur ke Belum Dibaca (siap dicatat petugas lapangan).`,
           type: 'success',
           badge: 'EXCEL IMPORT SUKSES',
           count: imported.length,
@@ -441,7 +441,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
       });
       showColorfulAlert({
         title: 'Data Industri Berhasil Dihapus! 🗑️',
-        subtitle: 'Penghapusan Data dari Database SIMBA-IN',
+        subtitle: 'Penghapusan Data dari Database SIMBA',
         message: `Sebanyak ${count} data industri yang dipilih telah berhasil dihapus dari database sistem secara permanen.`,
         type: 'success',
         badge: 'DATA TERHAPUS',
@@ -468,7 +468,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
       showColorfulAlert({
         title: 'Data Industri Berhasil Dihapus! 🗑️',
         subtitle: 'Penghapusan Akun Industri',
-        message: `Data industri ${targetName} (ID: ${deleteConfirmModal.id}) telah berhasil dihapus dari database sistem SIMBA-IN.`,
+        message: `Data industri ${targetName} (ID: ${deleteConfirmModal.id}) telah berhasil dihapus dari database sistem SIMBA.`,
         type: 'success',
         badge: 'DATA TERHAPUS',
         details: [
@@ -886,8 +886,8 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
             if (!canImportDatabase) {
               showColorfulAlert({
                 title: 'Akses Dibatasi ⚠️',
-                subtitle: 'Otoritas Khusus Admin Meter Reading & Key Account',
-                message: `Akun Anda (${currentUser?.name || 'Tim Billing'}) hanya berwenang untuk mengelola Billing & Invoicing. Hak impor jadwal 15 cycle hanya dimiliki oleh Admin Meter Reading dan Admin Key Account.`,
+                subtitle: 'Otoritas Khusus Tim Meter Reading & Key Account',
+                message: `Akun Anda (${currentUser?.name || 'Tim Billing'}) hanya berwenang untuk mengelola Billing & Invoicing. Hak impor jadwal 15 cycle hanya dimiliki oleh Tim Meter Reading dan Admin Key Account.`,
                 type: 'warning',
                 badge: 'HAK AKSES KHUSUS'
               });
@@ -896,6 +896,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
             setIsImportScheduleModalOpen(true);
           }}
           onUpdateSchedule={onUpdateCycleSchedule}
+          onUpdateCustomersBatch={onImportCustomers}
         />
       )}
 
@@ -906,34 +907,8 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
           onClose={() => setIsImportScheduleModalOpen(false)}
           onImport={(schedules) => {
             onImportCycleSchedules(schedules);
-            setActionFeedback({
-              type: 'success',
-              message: `✓ Berhasil mengimpor tanggal pembacaan untuk ${schedules.length} cycle via Excel!`
-            });
-            setTimeout(() => setActionFeedback(null), 5000);
           }}
         />
-      )}
-
-      {/* Action Feedback Floating Banner */}
-      {actionFeedback && (
-        <div
-          className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-2xl shadow-2xl border text-xs font-bold flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-5 duration-200 ${
-            actionFeedback.type === 'success'
-              ? 'bg-emerald-900/95 text-emerald-100 border-emerald-500'
-              : actionFeedback.type === 'warning'
-              ? 'bg-amber-900/95 text-amber-100 border-amber-500'
-              : 'bg-blue-900/95 text-blue-100 border-blue-500'
-          }`}
-        >
-          <span>{actionFeedback.message}</span>
-          <button
-            onClick={() => setActionFeedback(null)}
-            className="ml-2 text-white/80 hover:text-white font-mono"
-          >
-            ✕
-          </button>
-        </div>
       )}
 
       {/* IN-APP CONFIRMATION MODAL DIALOG (Non-blocking in iframes) */}

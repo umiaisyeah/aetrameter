@@ -288,7 +288,7 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
     setShowAddForm(false);
     showColorfulAlert({
       title: 'Petugas Berhasil Didaftarkan! 👤',
-      message: `Petugas lapangan ${newReader.nama} (${newReader.kategori}) berhasil didaftarkan ke sistem SIMBA-IN dengan ID ${newReader.id}.`,
+      message: `Petugas lapangan ${newReader.nama} (${newReader.kategori}) berhasil didaftarkan ke sistem SIMBA dengan ID ${newReader.id}.`,
       type: 'success',
       badge: 'REGISTRASI BERHASIL'
     });
@@ -394,7 +394,7 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
       <div className="bg-blue-50/70 dark:bg-blue-950/30 p-3.5 rounded-xl border border-blue-200 dark:border-blue-800 flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300">
         <Briefcase className="w-4 h-4 text-[#0055A5] dark:text-blue-400 shrink-0 mt-0.5" />
         <p>
-          <strong>Catatan Pembagian Tugas:</strong> <em>Pak Solihin</em> &amp; <em>Pak Kabul</em> bertindak sebagai <strong>Admin Meter Reading</strong> di kantor yang bertugas menginput cycle dan mengelola list industri. Pembaca meter fisik di lapangan dilakukan oleh petugas lapangan yang didaftarkan pada halaman ini.
+          <strong>Catatan Pembagian Tugas:</strong> <em>Pak Solihin</em> &amp; <em>Pak Kabul</em> bertindak sebagai <strong>Tim Meter Reading</strong> di kantor yang bertugas menginput cycle dan mengelola list industri. Pembaca meter fisik di lapangan dilakukan oleh petugas lapangan yang didaftarkan pada halaman ini.
         </p>
       </div>
 
@@ -1056,7 +1056,7 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
                   showColorfulAlert({
                     title: 'Petugas Berhasil Dihapus! 🗑️',
                     subtitle: 'Penghapusan Akun Petugas Pembaca Meter',
-                    message: `Akun petugas pembaca meter ${targetName} (${targetCategory}) telah berhasil dihapus dari sistem SIMBA-IN.`,
+                    message: `Akun petugas pembaca meter ${targetName} (${targetCategory}) telah berhasil dihapus dari sistem SIMBA.`,
                     type: 'success',
                     badge: 'PETUGAS TERHAPUS',
                     details: [

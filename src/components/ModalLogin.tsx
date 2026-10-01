@@ -91,7 +91,7 @@ export const ModalLogin: React.FC<ModalLoginProps> = ({ isOpen, onLogin, meterRe
 
       const expectedPassword = selectedReader.password || 'ANJAR123';
       if (passwordInput.trim().toUpperCase() !== expectedPassword.toUpperCase()) {
-        setAuthError('Password tidak sesuai. Silakan periksa kembali password Anda atau hubungi Admin Meter Reading.');
+        setAuthError('Password tidak sesuai. Silakan periksa kembali password Anda atau hubungi Tim Meter Reading.');
         return;
       }
 
@@ -125,9 +125,9 @@ export const ModalLogin: React.FC<ModalLoginProps> = ({ isOpen, onLogin, meterRe
     <div className="fixed inset-0 bg-slate-900/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
       <div className="bg-white dark:bg-slate-800 rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in-95 max-h-[92vh] overflow-y-auto">
         <div className="text-center mb-5">
-          <div className="flex justify-center mb-3">
-            <div className="bg-slate-50 dark:bg-slate-700/50 p-2.5 rounded-2xl border border-slate-100 dark:border-slate-600 inline-flex shadow-sm">
-              <AetraLogo className="h-8" />
+          <div className="flex justify-center mb-3.5">
+            <div className="bg-slate-50 dark:bg-slate-700/50 py-3 px-5 rounded-2xl border border-slate-100 dark:border-slate-600 inline-flex shadow-sm items-center justify-center">
+              <AetraLogo />
             </div>
           </div>
           <h2 className="text-xl font-black text-[#0055A5] dark:text-blue-400">
@@ -136,7 +136,7 @@ export const ModalLogin: React.FC<ModalLoginProps> = ({ isOpen, onLogin, meterRe
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
             {loginType === 'field_reader'
               ? 'Portal Khusus Petugas Pembacaan Meter Lapangan'
-              : 'Sistem Informasi Monitoring Billing Air Industri (SIMBA-IN)'}
+              : 'SIMBA — Sistem Integrasi Metering & Billing Aetra Air Tangerang'}
           </p>
           <div className="mt-1.5 flex items-center justify-center gap-1.5">
             <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
@@ -196,7 +196,7 @@ export const ModalLogin: React.FC<ModalLoginProps> = ({ isOpen, onLogin, meterRe
                   onChange={(e) => setSelectedAdminRole(e.target.value as UserRole)}
                   className="w-full pl-3.5 pr-9 py-3 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold focus:ring-2 focus:ring-[#0055A5] bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white transition cursor-pointer"
                 >
-                  <optgroup label="📋 Admin Meter Reading (Akses Impor Database &amp; Verifikasi)">
+                  <optgroup label="📋 Tim Meter Reading (Akses Impor Database &amp; Verifikasi)">
                     <option value="solihin">Akhmad Solihin (Meter Reading)</option>
                     <option value="kabul">Kabul Nugroho (Meter Reading)</option>
                     <option value="tri_kartono">Tri Kartono (Meter Reading)</option>

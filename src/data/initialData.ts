@@ -6,25 +6,25 @@ export const USER_PROFILES: Record<string, UserProfile> = {
   solihin: {
     role: 'solihin',
     name: 'Akhmad Solihin',
-    title: 'Admin Meter Reading',
+    title: 'Tim Meter Reading',
     avatar: 'AS',
-    division: 'Commercial & Meter Reading Admin',
+    division: 'Commercial & Meter Reading Division',
     adminType: 'meter_reading'
   },
   kabul: {
     role: 'kabul',
     name: 'Kabul Nugroho',
-    title: 'Admin Meter Reading',
+    title: 'Tim Meter Reading',
     avatar: 'KN',
-    division: 'Commercial & Meter Reading Admin',
+    division: 'Commercial & Meter Reading Division',
     adminType: 'meter_reading'
   },
   tri_kartono: {
     role: 'tri_kartono',
     name: 'Tri Kartono',
-    title: 'Admin Meter Reading',
+    title: 'Tim Meter Reading',
     avatar: 'TK',
-    division: 'Commercial & Meter Reading Admin',
+    division: 'Commercial & Meter Reading Division',
     adminType: 'meter_reading'
   },
   bayu_pramono: {
@@ -61,7 +61,7 @@ export const INITIAL_AUDIT_LOGS: AuditLog[] = [
     time: '24 Sep 2026 08:30:12',
     user: 'Pak Yaya',
     role: 'Tim Billing & Invoicing',
-    desc: 'Sistem SIMBA-IN diinisialisasi untuk periode Cycle September 2026.',
+    desc: 'Sistem SIMBA (Sistem Integrasi Metering & Billing) diinisialisasi untuk periode Cycle September 2026.',
     type: 'info'
   },
   {
@@ -84,7 +84,7 @@ export const INITIAL_AUDIT_LOGS: AuditLog[] = [
     id: 'log-4',
     time: '24 Sep 2026 11:15:20',
     user: 'Pak Kabul',
-    role: 'Admin Meter Reading',
+    role: 'Tim Meter Reading',
     desc: 'Memvalidasi plotting jadwal cycle 1–15 dan rute pembacaan meter industri.',
     type: 'info'
   },
@@ -92,7 +92,7 @@ export const INITIAL_AUDIT_LOGS: AuditLog[] = [
     id: 'log-5',
     time: '24 Sep 2026 14:30:10',
     user: 'Pak Kabul',
-    role: 'Admin Meter Reading',
+    role: 'Tim Meter Reading',
     desc: 'Rekapitulasi stand meter industri kawasan Cikupa dan koordinasi pembacaan lapangan.',
     type: 'update'
   },
@@ -100,7 +100,7 @@ export const INITIAL_AUDIT_LOGS: AuditLog[] = [
     id: 'log-6',
     time: '25 Sep 2026 08:20:45',
     user: 'Pak Kabul',
-    role: 'Admin Meter Reading',
+    role: 'Tim Meter Reading',
     desc: 'Sinkronisasi hasil pembacaan lapangan Cycle 1 dan Cycle 2 bersama Pak Solihin.',
     type: 'update'
   },
@@ -108,7 +108,7 @@ export const INITIAL_AUDIT_LOGS: AuditLog[] = [
     id: 'log-7',
     time: '25 Sep 2026 09:45:00',
     user: 'Pak Kabul',
-    role: 'Admin Meter Reading',
+    role: 'Tim Meter Reading',
     desc: 'Audit investigasi anomali volume industri pada akun PT Multi Bintang.',
     type: 'info'
   }

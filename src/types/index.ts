@@ -55,14 +55,15 @@ export interface CycleSchedule {
   tglBilling?: number; // Invoicing day
   targetPelanggan?: number;
   catatan?: string;
-  // Pergeseran Hari Baca untuk Pemenuhan Target Volume
+  // Pergeseran Hari Baca per Industri
   adaPergeseran?: boolean;
   hariHOriginal?: number;
   selisihHariPergeseran?: number; // e.g. +1, +2, -1
-  keteranganPergeseran?: string; // Penjelasan pergeseran untuk pemenuhan target volume
+  keteranganPergeseran?: string; // Penjelasan pergeseran
   targetVolumeTambahanM3?: number;
   tanggalPergeseranBaru?: string;
-  alasanPergeseran?: 'Target Volume Industri' | 'Penyesuaian Hari Kerja/Libur' | 'Maintenance Jaringan Pipa' | 'Permintaan Khusus Pelanggan' | 'Lainnya';
+  alasanPergeseran?: 'Target Volume Industri' | 'Penyesuaian Hari Kerja/Libur' | 'Maintenance Jaringan Pipa' | 'Permintaan Khusus Pelanggan' | 'Lainnya' | string;
+  shiftedCustomerIds?: string[]; // Daftar ID industri yang mengalami pergeseran
 }
 
 export interface IndustryCustomer {
@@ -85,6 +86,23 @@ export interface IndustryCustomer {
   kategoriPetugas?: ReaderCategory;
   lokasiGps?: string;
   waktuBaca?: string;
+  latitude?: number;
+  longitude?: number;
+  gpsAkurasiMeter?: number;
+  altitudeMeter?: number;
+  meterLatitude?: number;
+  meterLongitude?: number;
+  meterWaktuFoto?: string;
+  bpmLatitude?: number;
+  bpmLongitude?: number;
+  bpmWaktuFoto?: string;
+  // Pergeseran Hari Baca Industri
+  adaPergeseran?: boolean;
+  tanggalPergeseranBaru?: string;
+  alasanPergeseran?: string;
+  keteranganPergeseran?: string;
+  hariHOriginal?: number;
+  hariHPergeseran?: number;
 }
 
 export interface AuditLog {

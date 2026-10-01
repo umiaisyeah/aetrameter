@@ -16,7 +16,7 @@ import {
   Zap,
   Globe
 } from 'lucide-react';
-import { getSupabaseConfig, saveSupabaseConfig, clearSupabaseConfig } from '../services/supabaseClient';
+import { getSupabaseConfig, saveSupabaseConfig, clearSupabaseConfig, isValidHttpUrl } from '../services/supabaseClient';
 import { showColorfulAlert } from '../utils/notificationSystem';
 import {
   testSupabaseConnection,
@@ -87,6 +87,16 @@ export const SupabaseConfigModal: React.FC<SupabaseConfigModalProps> = ({
         message: 'Mohon isi Supabase URL dan Anon Key terlebih dahulu sebelum menyimpan.',
         type: 'warning',
         badge: 'INPUT WAJIB'
+      });
+      return;
+    }
+
+    if (!isValidHttpUrl(url.trim())) {
+      showColorfulAlert({
+        title: 'Supabase URL Tidak Valid',
+        message: 'Supabase URL harus merupakan URL HTTP/HTTPS yang valid (contoh: https://xyzcompany.supabase.co).',
+        type: 'error',
+        badge: 'URL TIDAK VALID'
       });
       return;
     }
@@ -414,7 +424,7 @@ export async function submitMeterReading(customerId, standSkrg, fotoUrl, fotoBpm
                         <span>Sinkronisasi Data Dua Arah</span>
                       </h4>
                       <p className="text-[11px] text-slate-400 mt-0.5">
-                        Unggah data awal SIMBA-IN ke Supabase atau tarik data terbaru yang diinput petugas.
+                        Unggah data awal SIMBA ke Supabase atau tarik data terbaru yang diinput petugas.
                       </p>
                     </div>
                   </div>
@@ -465,7 +475,7 @@ export async function submitMeterReading(customerId, standSkrg, fotoUrl, fotoBpm
               <div className="bg-blue-50/70 dark:bg-blue-950/40 p-3.5 rounded-xl border border-blue-200 dark:border-blue-900 text-slate-700 dark:text-slate-300">
                 <p className="font-bold text-[#0055A5] dark:text-blue-300 flex items-center gap-1.5">
                   <ShieldCheck className="w-4 h-4" />
-                  <span>Petugas Lapangan &rarr; Supabase &rarr; Admin SIMBA-IN Realtime</span>
+                  <span>Petugas Lapangan &rarr; Supabase &rarr; Dashboard SIMBA Realtime</span>
                 </p>
                 <p className="text-[11px] mt-1 leading-relaxed">
                   Petugas pembaca meter lapangan (Kontraktor Mitra &amp; Key Account) dapat menggunakan aplikasi mobile, Android, PWA, atau form web untuk mengirimkan stand meter langsung ke Supabase. Dashboard Admin ini akan menerima perubahannya secara instan melalui <strong>Supabase Realtime Channel</strong> tanpa perlu refresh halaman.
@@ -580,7 +590,7 @@ function SaveIcon({ className }: { className?: string }) {
 }
 
 const SQL_SCHEMA_STRING = `-- ==============================================================================
--- SIMBA-IN: Supabase PostgreSQL DDL
+-- SIMBA: Supabase PostgreSQL DDL (Sistem Integrasi Metering & Billing)
 -- Jalankan di: Supabase Console -> SQL Editor -> New Query -> Run
 -- ==============================================================================
 

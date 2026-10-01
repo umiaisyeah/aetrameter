@@ -33,6 +33,7 @@ import { CycleProgressChart } from './CycleProgressChart';
 import { MeterReaderProgressSection } from './MeterReaderProgressSection';
 import { ImportCycleScheduleModal } from './ImportCycleScheduleModal';
 import { OfficialAetraInvoiceModal } from './OfficialAetraInvoiceModal';
+import { SectionProgressHub } from './SectionProgressHub';
 import { showColorfulAlert } from '../utils/notificationSystem';
 import {
   ResponsiveContainer,
@@ -88,19 +89,18 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   // Full dataset access for cycle-wide operations
   const fullDataset = allCustomers || customers;
 
-  // Batch cycle selection state
-  const [batchTargetCycle, setBatchTargetCycle] = useState<string>(
+  // Analytics cycle selection state for anomaly chart
+  const [analyticsCycle, setAnalyticsCycle] = useState<string>(
     selectedCycle !== 'ALL' ? selectedCycle : 'Cycle 1'
   );
-  const [batchReaderScope, setBatchReaderScope] = useState<'ALL' | 'Kontraktor' | 'Key Account'>('ALL');
-  const [batchCustomNote, setBatchCustomNote] = useState<string>('');
   const [batchFeedback, setBatchFeedback] = useState<{
     type: 'success' | 'info';
     message: string;
   } | null>(null);
 
-  // Row selection state for table batch actions
+  // Row selection state for table checklist actions
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [batchCustomNote, setBatchCustomNote] = useState<string>('');
   const [deleteConfirmModal, setDeleteConfirmModal] = useState<{
     isOpen: boolean;
     type: 'batch' | 'single';
@@ -109,26 +109,18 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     count?: number;
   } | null>(null);
 
-  // Confirmation modal state for 1-click cycle batch
-  const [confirmBatchModal, setConfirmBatchModal] = useState<{
-    isOpen: boolean;
-    cycle: string;
-    targetStatus: WorkflowStatus;
-    customerIds: string[];
-    affectedNames: string[];
-    scopeLabel?: string;
-  } | null>(null);
-
   const [selectedInvoiceCustomer, setSelectedInvoiceCustomer] = useState<IndustryCustomer | null>(null);
 
-  // Synchronize batchTargetCycle when selectedCycle changes from props
+  // Synchronize analyticsCycle when selectedCycle changes from props
   React.useEffect(() => {
-    setBatchTargetCycle(selectedCycle);
+    if (selectedCycle !== 'ALL') {
+      setAnalyticsCycle(selectedCycle);
+    }
   }, [selectedCycle]);
 
-  // Handler to synchronously update both batchTargetCycle and table cycle filter
-  const handleSelectBatchCycle = (newCycle: string) => {
-    setBatchTargetCycle(newCycle);
+  // Handler to synchronously update analyticsCycle and table cycle filter
+  const handleSelectAnalyticsCycle = (newCycle: string) => {
+    setAnalyticsCycle(newCycle);
     onSelectCycle(newCycle);
   };
 
@@ -137,22 +129,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     return customers.filter((c) => {
       // 1. Workflow filter
       if (workflowFilter !== 'ALL' && c.status !== workflowFilter) return false;
-      
-      // 2. Automatically sync with batchReaderScope if selected
-      if (batchReaderScope === 'Kontraktor') {
-        const isContractor =
-          c.kategoriPetugas === 'Kontraktor' ||
-          c.kategoriPetugas?.toLowerCase().includes('kontraktor') ||
-          (!c.kategoriPetugas && c.kelas !== 'Premium');
-        if (!isContractor) return false;
-      } else if (batchReaderScope === 'Key Account') {
-        const isKA =
-          c.kategoriPetugas === 'Key Account' ||
-          (!c.kategoriPetugas && c.kelas === 'Premium');
-        if (!isKA) return false;
-      }
 
-      // 3. Search query filter for industry progress
+      // 2. Search query filter for industry progress
       if (industrySearchQuery.trim()) {
         const q = industrySearchQuery.toLowerCase().trim();
         const matchQ =
@@ -167,70 +145,11 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
       return true;
     });
-  }, [customers, workflowFilter, batchReaderScope, industrySearchQuery]);
-
-  // Raw customers in the target cycle (all readers)
-  const batchCycleAllCustomers = useMemo(() => {
-    return fullDataset.filter((c) => c.cycle.toLowerCase() === batchTargetCycle.toLowerCase());
-  }, [fullDataset, batchTargetCycle]);
-
-  // Reader info for target cycle
-  const batchCycleDualReaders = useMemo(() => {
-    const contractorReader = meterReaders.find(
-      (m) => m.kategori !== 'Key Account' && m.assignedCycles.includes(batchTargetCycle)
-    ) || meterReaders.find((m) => m.kategori !== 'Key Account');
-
-    const keyAccountReader = meterReaders.find(
-      (m) => m.kategori === 'Key Account' && m.assignedCycles.includes(batchTargetCycle)
-    ) || meterReaders.find((m) => m.kategori === 'Key Account');
-
-    return {
-      contractor: contractorReader?.nama || 'Belum Ditugaskan',
-      contractorCompany: contractorReader?.perusahaan || 'Kontraktor',
-      keyAccount: keyAccountReader?.nama || 'Belum Ditugaskan',
-      keyAccountCompany: keyAccountReader?.perusahaan || 'Key Account'
-    };
-  }, [meterReaders, batchTargetCycle]);
-
-  // Filtered target customers depending on scope
-  const batchCycleCustomers = useMemo(() => {
-    if (batchReaderScope === 'Kontraktor') {
-      return batchCycleAllCustomers.filter(
-        (c) => (c.kategoriPetugas && c.kategoriPetugas !== 'Key Account') || (!c.kategoriPetugas && c.kelas !== 'Premium')
-      );
-    } else if (batchReaderScope === 'Key Account') {
-      return batchCycleAllCustomers.filter(
-        (c) => c.kategoriPetugas === 'Key Account' || (!c.kategoriPetugas && c.kelas === 'Premium')
-      );
-    }
-    return batchCycleAllCustomers;
-  }, [batchCycleAllCustomers, batchReaderScope]);
-
-  const batchCycleSchedule = useMemo(() => {
-    return cycleSchedules.find(
-      (s) => s.cycle.toLowerCase() === batchTargetCycle.toLowerCase()
-    );
-  }, [cycleSchedules, batchTargetCycle]);
-
-  const batchCycleCounts = useMemo(() => {
-    const belumDibaca = batchCycleCustomers.filter((c) => c.status === 'Belum Dibaca').length;
-    const pending = batchCycleCustomers.filter((c) => c.status === 'Pending Verification').length;
-    const verified = batchCycleCustomers.filter((c) => c.status === 'Verified').length;
-    const invoiced = batchCycleCustomers.filter((c) => c.status === 'Invoiced').length;
-    return {
-      total: batchCycleCustomers.length,
-      belumDibaca,
-      pending,
-      verified,
-      invoiced,
-      actionableForVerified: belumDibaca + pending,
-      actionableForPending: belumDibaca + verified
-    };
-  }, [batchCycleCustomers]);
+  }, [customers, workflowFilter, industrySearchQuery]);
 
   // Data for Recharts consumption comparison (Bulan Ini vs Bulan Lalu)
   const consumptionChartData = useMemo(() => {
-    const targetCyc = selectedCycle !== 'ALL' ? selectedCycle : batchTargetCycle;
+    const targetCyc = selectedCycle !== 'ALL' ? selectedCycle : analyticsCycle;
     const list = fullDataset.filter((c) => c.cycle.toLowerCase() === targetCyc.toLowerCase());
     return list.map((c) => {
       const currentVol = Math.max(0, c.skrg - c.lalu);
@@ -245,90 +164,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         'Bulan Lalu (m³)': prevVol
       };
     });
-  }, [fullDataset, selectedCycle, batchTargetCycle]);
-
-  // Info for batch cycle
-  const batchCyclePicInfo = useMemo(() => {
-    const schedule = batchCycleSchedule;
-    const picName = schedule?.petugasUtama || 'Belum Ditugaskan';
-    const reader = meterReaders.find((m) => m.nama.toLowerCase() === picName.toLowerCase());
-    return {
-      name: picName,
-      company: reader?.perusahaan || schedule?.kategoriPetugas || 'Petugas Lapangan',
-      isAssigned: picName !== 'Belum Ditugaskan'
-    };
-  }, [batchCycleSchedule, meterReaders]);
+  }, [fullDataset, selectedCycle, analyticsCycle]);
 
   // Check if current user has meter reading verification authority
   const canVerifyReading =
     currentUser.adminType === 'meter_reading' ||
     ['solihin', 'kabul', 'tri_kartono'].includes(currentUser.role);
-
-  // Handle 1-Click Batch Update for the Target Cycle
-  const triggerCycleBatchUpdate = (targetStatus: WorkflowStatus) => {
-    if (targetStatus === 'Verified' && !canVerifyReading) {
-      showColorfulAlert({
-        title: 'Akses Dibatasi ⚠️',
-        subtitle: 'Otoritas Khusus Admin Meter Reading',
-        message: `Akun Anda (${currentUser.name}) tidak memiliki hak untuk memverifikasi stand meter. Wewenang verifikasi stand meter lapangan hanya dimiliki oleh Admin Meter Reading (Akhmad Solihin, Kabul Nugroho, Tri Kartono).`,
-        type: 'warning',
-        badge: 'HAK AKSES KHUSUS'
-      });
-      return;
-    }
-
-    let targetList: IndustryCustomer[] = [];
-    if (targetStatus === 'Verified') {
-      // Update those that are not yet invoiced or verified
-      targetList = batchCycleCustomers.filter(
-        (c) => c.status === 'Belum Dibaca' || c.status === 'Pending Verification'
-      );
-    } else if (targetStatus === 'Pending Verification') {
-      // Update those that are Belum Dibaca or Verified
-      targetList = batchCycleCustomers.filter(
-        (c) => c.status === 'Belum Dibaca' || c.status === 'Verified'
-      );
-    }
-
-    if (targetList.length === 0) {
-      setBatchFeedback({
-        type: 'info',
-        message: `Tidak ada pelanggan di ${batchTargetCycle} yang perlu diperbarui ke status '${targetStatus}'.`
-      });
-      setTimeout(() => setBatchFeedback(null), 4000);
-      return;
-    }
-
-    setConfirmBatchModal({
-      isOpen: true,
-      cycle: batchTargetCycle,
-      targetStatus,
-      customerIds: targetList.map((c) => c.id),
-      affectedNames: targetList.map((c) => c.nama)
-    });
-  };
-
-  const executeConfirmBatchUpdate = () => {
-    if (!confirmBatchModal) return;
-
-    const defaultNote =
-      batchCustomNote.trim() ||
-      (confirmBatchModal.targetStatus === 'Verified'
-        ? `Verifikasi massal ${confirmBatchModal.cycle} selesai`
-        : `Pending verifikasi massal ${confirmBatchModal.cycle}`);
-
-    onBatchUpdateStatus(confirmBatchModal.customerIds, confirmBatchModal.targetStatus, defaultNote);
-
-    setBatchFeedback({
-      type: 'success',
-      message: `✓ Berhasil memperbarui ${confirmBatchModal.customerIds.length} industri di ${confirmBatchModal.cycle} menjadi '${confirmBatchModal.targetStatus}'.`
-    });
-
-    setConfirmBatchModal(null);
-    setBatchCustomNote('');
-    setSelectedRowIds([]);
-    setTimeout(() => setBatchFeedback(null), 5000);
-  };
 
   // Table selection handlers
   const handleSelectAllRows = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -351,8 +192,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     if (targetStatus === 'Verified' && !canVerifyReading) {
       showColorfulAlert({
         title: 'Akses Dibatasi ⚠️',
-        subtitle: 'Otoritas Khusus Admin Meter Reading',
-        message: `Akun Anda (${currentUser.name}) tidak memiliki hak untuk memverifikasi stand meter. Wewenang verifikasi stand meter lapangan hanya dimiliki oleh Admin Meter Reading (Akhmad Solihin, Kabul Nugroho, Tri Kartono).`,
+        subtitle: 'Otoritas Khusus Tim Meter Reading',
+        message: `Akun Anda (${currentUser.name}) tidak memiliki hak untuk memverifikasi stand meter. Wewenang verifikasi stand meter lapangan hanya dimiliki oleh Tim Meter Reading (Akhmad Solihin, Kabul Nugroho, Tri Kartono).`,
         type: 'warning',
         badge: 'HAK AKSES KHUSUS'
       });
@@ -468,7 +309,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     <Zap className="w-5 h-5" />
                   </span>
                   <h3 className="font-black text-sm text-slate-900 dark:text-white">
-                    Analisis Komparasi Konsumsi Air Industri ({batchTargetCycle}) — Deteksi Anomali
+                    Analisis Komparasi Konsumsi Air Industri ({analyticsCycle}) — Deteksi Anomali
                   </h3>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -478,8 +319,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Pilih Cycle:</span>
                 <select
-                  value={batchTargetCycle}
-                  onChange={(e) => handleSelectBatchCycle(e.target.value)}
+                  value={analyticsCycle}
+                  onChange={(e) => handleSelectAnalyticsCycle(e.target.value)}
                   className="py-1.5 px-3 rounded-xl text-xs font-bold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0055A5]"
                 >
                   {allCycleNames.map((cyc) => (
@@ -495,7 +336,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             <div className="h-80 w-full pt-2">
               {consumptionChartData.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-xs text-slate-400 font-medium">
-                  Belum ada data industri untuk {batchTargetCycle}.
+                  Belum ada data industri untuk {analyticsCycle}.
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
@@ -585,205 +426,22 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         </div>
       )}
 
-      {/* REQUESTED FEATURE: BATCH STATUS UPDATE UNTUK KONTRAKTOR & KEY ACCOUNT BERDASARKAN CYCLE */}
-      <div className="bg-gradient-to-r from-blue-900 via-[#0055A5] to-[#003E78] text-white rounded-2xl p-5 shadow-md border border-blue-800">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-blue-700/60 pb-4">
-          <div className="flex items-start gap-3">
-            <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm border border-white/20">
-              <Zap className="w-5 h-5 text-[#E86216]" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-black text-base text-white tracking-wide">
-                  Pembaruan Status Massal per Cycle
-                </h3>
-                <span className="bg-[#E86216] text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase">
-                  Batch Update
-                </span>
-              </div>
-              <p className="text-xs text-blue-100 mt-1 max-w-3xl leading-relaxed">
-                Tandai seluruh pelanggan industri di siklus terpilih menjadi{' '}
-                <span className="font-bold text-emerald-300">'Verified' (Siap Billing)</span> atau{' '}
-                <span className="font-bold text-amber-300">'Pending'</span> sekaligus dalam 1 kali klik.
-              </p>
-            </div>
-          </div>
+      {/* SECTION PROGRESS: TAMPIL KHUSUS DI MASING-MASING SECTION */}
+      {workflowFilter === 'Pending Verification' && (
+        <SectionProgressHub
+          customers={fullDataset}
+          onFilterStatus={onWorkflowFilterChange}
+          variant="verification_only"
+        />
+      )}
 
-          {/* Controls: Target Cycle & Target Scope */}
-          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-            {/* Target Reader Scope Selector */}
-            <div className="bg-white/10 p-1 rounded-xl border border-white/20 flex items-center text-xs">
-              <button
-                onClick={() => setBatchReaderScope('ALL')}
-                className={`px-2.5 py-1 rounded-lg font-bold transition text-[11px] ${
-                  batchReaderScope === 'ALL'
-                    ? 'bg-white text-slate-800 shadow-xs'
-                    : 'text-blue-100 hover:text-white'
-                }`}
-              >
-                Semua Industri
-              </button>
-              <button
-                onClick={() => setBatchReaderScope('Kontraktor')}
-                className={`px-2.5 py-1 rounded-lg font-bold transition text-[11px] ${
-                  batchReaderScope === 'Kontraktor'
-                    ? 'bg-amber-400 text-amber-950 shadow-xs'
-                    : 'text-blue-100 hover:text-white'
-                }`}
-              >
-                Reguler / Kontraktor
-              </button>
-              <button
-                onClick={() => setBatchReaderScope('Key Account')}
-                className={`px-2.5 py-1 rounded-lg font-bold transition text-[11px] ${
-                  batchReaderScope === 'Key Account'
-                    ? 'bg-indigo-300 text-indigo-950 shadow-xs'
-                    : 'text-blue-100 hover:text-white'
-                }`}
-              >
-                Key Account
-              </button>
-            </div>
-
-            {/* Target Cycle Selector */}
-            <div className="flex items-center gap-2 bg-white/10 p-1.5 rounded-xl border border-white/20">
-              <span className="text-xs font-bold text-blue-200 uppercase tracking-wider pl-1">
-                Cycle:
-              </span>
-              <select
-                value={batchTargetCycle}
-                onChange={(e) => handleSelectBatchCycle(e.target.value)}
-                className="bg-white text-slate-800 font-bold text-xs px-3 py-1 rounded-lg border-0 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#E86216]"
-              >
-                {allCycleNames.map((cName) => (
-                  <option key={cName} value={cName}>
-                    {cName}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Cycle Metrics & Action Panel */}
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-          {/* Cycle Info Box with Reader Assignment */}
-          <div className="md:col-span-4 bg-white/10 backdrop-blur-xs rounded-xl p-3.5 border border-white/15">
-            <div className="flex items-center justify-between">
-              <span className="font-black text-sm text-white">{batchTargetCycle}</span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/20 text-white">
-                {batchReaderScope === 'ALL'
-                  ? 'Semua Industri'
-                  : batchReaderScope === 'Key Account'
-                  ? 'Khusus Key Account'
-                  : 'Reguler / Kontraktor'}
-              </span>
-            </div>
-            <div className="mt-2 text-xs text-blue-100 space-y-1.5">
-              <div className="flex justify-between items-center text-[11px] bg-white/5 p-1 rounded-md">
-                <span className="text-amber-200 flex items-center gap-1 font-semibold">
-                  <Users className="w-3 h-3" /> Petugas Kontraktor:
-                </span>
-                <span className="font-bold text-white">{batchCycleDualReaders.contractor}</span>
-              </div>
-              <div className="flex justify-between items-center text-[11px] bg-white/5 p-1 rounded-md">
-                <span className="text-indigo-200 flex items-center gap-1 font-semibold">
-                  <ShieldCheck className="w-3 h-3" /> Key Account:
-                </span>
-                <span className="font-bold text-white">{batchCycleDualReaders.keyAccount}</span>
-              </div>
-              <p className="flex justify-between text-[11px]">
-                <span className="text-blue-200">Plotting Jadwal:</span>
-                <span className="font-mono text-white font-bold">
-                  Hari H: Tanggal {batchCycleSchedule?.hariH || 7} (Siklus Bulanan)
-                </span>
-              </p>
-              <div className="pt-2 border-t border-white/15 grid grid-cols-4 gap-1 text-center font-mono text-[10px]">
-                <div className="bg-white/10 rounded p-1">
-                  <div className="text-white font-bold">{batchCycleCounts.total}</div>
-                  <div className="text-blue-200 text-[9px]">Target</div>
-                </div>
-                <div className="bg-amber-500/20 rounded p-1 border border-amber-400/30">
-                  <div className="text-amber-300 font-bold">{batchCycleCounts.pending + batchCycleCounts.belumDibaca}</div>
-                  <div className="text-amber-200 text-[9px]">Pending</div>
-                </div>
-                <div className="bg-emerald-500/20 rounded p-1 border border-emerald-400/30">
-                  <div className="text-emerald-300 font-bold">{batchCycleCounts.verified}</div>
-                  <div className="text-emerald-200 text-[9px]">Verified</div>
-                </div>
-                <div className="bg-blue-500/20 rounded p-1">
-                  <div className="text-blue-200 font-bold">{batchCycleCounts.invoiced}</div>
-                  <div className="text-blue-300 text-[9px]">Invoiced</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="md:col-span-8 flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={() => triggerCycleBatchUpdate('Verified')}
-              className="flex-1 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-black text-xs py-3 px-4 rounded-xl shadow-md transition flex items-center justify-center gap-2 group cursor-pointer"
-            >
-              <CheckCircle2 className="w-4 h-4 text-emerald-100 group-hover:scale-110 transition" />
-              <div className="text-left">
-                <div className="leading-tight">
-                  1-Klik Tandai {batchReaderScope === 'ALL' ? 'Semua' : batchReaderScope === 'Key Account' ? 'Key Account' : 'Kontraktor'} sbg 'Verified'
-                </div>
-                <div className="text-[10px] font-normal text-emerald-100">
-                  {batchCycleCounts.actionableForVerified} pelanggan di {batchTargetCycle} siap billing
-                </div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => triggerCycleBatchUpdate('Pending Verification')}
-              className="flex-1 bg-[#E86216] hover:bg-orange-600 active:scale-95 text-white font-black text-xs py-3 px-4 rounded-xl shadow-md transition flex items-center justify-center gap-2 group cursor-pointer"
-            >
-              <Clock className="w-4 h-4 text-orange-100 group-hover:scale-110 transition" />
-              <div className="text-left">
-                <div className="leading-tight">
-                  1-Klik Tandai {batchReaderScope === 'ALL' ? 'Semua' : batchReaderScope === 'Key Account' ? 'Key Account' : 'Kontraktor'} sbg 'Pending'
-                </div>
-                <div className="text-[10px] font-normal text-orange-100">
-                  Menunggu verifikasi lapangan {batchTargetCycle}
-                </div>
-              </div>
-            </button>
-
-            <div
-              className="bg-white/10 text-white font-bold text-xs py-3 px-3.5 rounded-xl border border-white/20 flex items-center justify-center gap-2 whitespace-nowrap shadow-xs"
-              title="Filter tabel otomatis tersinkronisasi langsung saat Anda memilih cycle atau pembaca di panel ini"
-            >
-              <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-              <div className="text-left">
-                <div className="leading-tight text-[11px] text-white">Tersinkronisasi</div>
-                <div className="text-[9px] text-blue-200 font-normal">Tabel Terhubung Otomatis</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Cycle Chips for Fast Switching across all 15 cycles */}
-        <div className="mt-4 pt-3 border-t border-blue-700/60 flex flex-wrap items-center gap-1.5 text-xs">
-          <span className="text-[11px] font-semibold text-blue-200 mr-1 flex items-center gap-1">
-            <Calendar className="w-3.5 h-3.5 text-amber-300" /> Pilih Siklus (Cycle 1 - 15):
-          </span>
-          {allCycleNames.map((cName) => (
-            <button
-              key={cName}
-              onClick={() => handleSelectBatchCycle(cName)}
-              className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition ${
-                batchTargetCycle === cName
-                  ? 'bg-amber-400 text-amber-950 ring-2 ring-white shadow-xs'
-                  : 'bg-white/10 hover:bg-white/20 text-white'
-              }`}
-            >
-              {cName.replace('Cycle ', 'C')}
-            </button>
-          ))}
-        </div>
-      </div>
+      {workflowFilter === 'Verified' && (
+        <SectionProgressHub
+          customers={fullDataset}
+          onFilterStatus={onWorkflowFilterChange}
+          variant="billing_only"
+        />
+      )}
 
       {/* Main Table Section with Batch Multi-Select Capability */}
       <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs overflow-hidden transition-colors duration-200">
@@ -800,7 +458,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               )}
             </div>
             <p className="text-[11px] text-slate-400 font-medium">
-              Centang checkbox di bawah untuk update status massal atau gunakan tombol cepat per cycle di atas
+              Daftar seluruh pelanggan industri beserta rincian stand meter, status pembacaan, dan verifikasi
             </p>
           </div>
 
@@ -922,9 +580,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 <th className="p-3.5 text-right">Stand Lalu (m³)</th>
                 <th className="p-3.5 text-right">Stand Skrg (m³)</th>
                 <th className="p-3.5 text-right">Volume (m³)</th>
-                <th className="p-3.5 text-right">Tagihan Air (Rp)</th>
-                <th className="p-3.5 text-right">Bea Materai (Rp)</th>
-                <th className="p-3.5 text-right">Total Tagihan (Rp)</th>
+                {workflowFilter !== 'Pending Verification' && (
+                  <>
+                    <th className="p-3.5 text-right">Tagihan Air (Rp)</th>
+                    <th className="p-3.5 text-right">Bea Materai (Rp)</th>
+                    <th className="p-3.5 text-right">Total Tagihan (Rp)</th>
+                  </>
+                )}
                 <th className="p-3.5">Status Alur Kerja &amp; Catatan</th>
                 <th className="p-3.5 text-center">Aksi Operasional</th>
               </tr>
@@ -932,7 +594,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700 font-medium">
               {filteredCustomers.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="p-8 text-center text-slate-400">
+                  <td colSpan={workflowFilter === 'Pending Verification' ? 8 : 11} className="p-8 text-center text-slate-400">
                     Tidak ada data industri yang sesuai dengan kriteria filter atau pencarian.
                   </td>
                 </tr>
@@ -1020,34 +682,38 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                           vol.toLocaleString()
                         )}
                       </td>
-                      <td className="p-3.5 font-mono text-right font-black text-[#0055A5] dark:text-blue-400 tabular-nums">
-                        {isUnread || item.status === 'Pending Verification' || workflowFilter === 'Pending Verification' ? (
-                          <span className="text-slate-400 font-normal italic">—</span>
-                        ) : (
-                          `Rp ${tagihanAir.toLocaleString()}`
-                        )}
-                      </td>
-                      <td className="p-3.5 font-mono text-right tabular-nums text-slate-600 dark:text-slate-300">
-                        {isUnread || item.status === 'Pending Verification' || workflowFilter === 'Pending Verification' ? (
-                          <span className="text-slate-400 font-normal italic">—</span>
-                        ) : (
-                          <div>
-                            Rp {materai.toLocaleString()}
-                            {isMaterai && (
-                              <span className="inline-block text-[8px] font-black text-indigo-600 dark:text-indigo-400 font-sans uppercase bg-indigo-50 dark:bg-indigo-950/60 px-1 py-0.2 rounded mt-0.5">
-                                e-Materai (&gt;5Jt)
-                              </span>
+                      {workflowFilter !== 'Pending Verification' && (
+                        <>
+                          <td className="p-3.5 font-mono text-right font-black text-[#0055A5] dark:text-blue-400 tabular-nums">
+                            {isUnread || item.status === 'Pending Verification' ? (
+                              <span className="text-slate-400 font-normal italic">—</span>
+                            ) : (
+                              `Rp ${tagihanAir.toLocaleString()}`
                             )}
-                          </div>
-                        )}
-                      </td>
-                      <td className="p-3.5 font-mono text-right font-bold tabular-nums text-slate-900 dark:text-white">
-                        {isUnread || item.status === 'Pending Verification' || workflowFilter === 'Pending Verification' ? (
-                          <span className="text-slate-400 font-normal italic font-sans text-[11px]">Dihitung saat Billing</span>
-                        ) : (
-                          `Rp ${totalTagihan.toLocaleString()}`
-                        )}
-                      </td>
+                          </td>
+                          <td className="p-3.5 font-mono text-right tabular-nums text-slate-600 dark:text-slate-300">
+                            {isUnread || item.status === 'Pending Verification' ? (
+                              <span className="text-slate-400 font-normal italic">—</span>
+                            ) : (
+                              <div>
+                                Rp {materai.toLocaleString()}
+                                {isMaterai && (
+                                  <span className="inline-block text-[8px] font-black text-indigo-600 dark:text-indigo-400 font-sans uppercase bg-indigo-50 dark:bg-indigo-950/60 px-1 py-0.2 rounded mt-0.5">
+                                    e-Materai (&gt;5Jt)
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          <td className="p-3.5 font-mono text-right font-bold tabular-nums text-slate-900 dark:text-white">
+                            {isUnread || item.status === 'Pending Verification' ? (
+                              <span className="text-slate-400 font-normal italic font-sans text-[11px]">Dihitung saat Billing</span>
+                            ) : (
+                              `Rp ${totalTagihan.toLocaleString()}`
+                            )}
+                          </td>
+                        </>
+                      )}
                       <td className="p-3.5">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span
@@ -1127,119 +793,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           </table>
         </div>
       </div>
-
-      {/* Confirmation Modal for 1-Click Cycle Batch Update */}
-      {confirmBatchModal && confirmBatchModal.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-700">
-              <div className="flex items-center gap-2.5">
-                <div
-                  className={`p-2 rounded-xl ${
-                    confirmBatchModal.targetStatus === 'Verified'
-                      ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-300'
-                      : 'bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-300'
-                  }`}
-                >
-                  <Zap className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-sm text-slate-800 dark:text-white">
-                    Konfirmasi Pembaruan Massal Cycle
-                  </h3>
-                  <p className="text-[11px] text-slate-400">
-                    {confirmBatchModal.cycle} · {batchCyclePicInfo.name} ({batchCyclePicInfo.company})
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setConfirmBatchModal(null)}
-                className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="py-4 space-y-3">
-              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                Anda akan mengubah status{' '}
-                <strong className="text-slate-900 dark:text-white">
-                  {confirmBatchModal.customerIds.length} pelanggan industri
-                </strong>{' '}
-                di <strong className="text-[#0055A5] dark:text-blue-400">{confirmBatchModal.cycle}</strong>{' '}
-                menjadi:
-              </p>
-
-              <div
-                className={`p-3 rounded-xl border text-center font-bold text-sm ${
-                  confirmBatchModal.targetStatus === 'Verified'
-                    ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300'
-                    : 'bg-amber-50 dark:bg-amber-950/60 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300'
-                }`}
-              >
-                {confirmBatchModal.targetStatus === 'Verified' ? (
-                  <span className="flex items-center justify-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4" /> Status: Verified (Siap Masuk Billing Pak Yaya)
-                  </span>
-                ) : (
-                  <span className="flex items-center justify-center gap-1.5">
-                    <Clock className="w-4 h-4" /> Status: Pending Verification (Perlu Pengecekan Lapangan)
-                  </span>
-                )}
-              </div>
-
-              {/* List of Affected Customers */}
-              <div className="bg-slate-50 dark:bg-slate-900/60 p-3 rounded-xl border border-slate-200 dark:border-slate-700 max-h-36 overflow-y-auto">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-                  Daftar Industri yang Diperbarui:
-                </p>
-                <ul className="text-xs space-y-1 text-slate-700 dark:text-slate-300">
-                  {confirmBatchModal.affectedNames.map((nama, idx) => (
-                    <li key={idx} className="flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#0055A5] shrink-0" />
-                      <span className="truncate">{nama}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Optional Custom Note */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                  Catatan Operasional (Opsional):
-                </label>
-                <input
-                  type="text"
-                  placeholder={`Contoh: Verifikasi fisik meter oleh ${batchCyclePicInfo.name} (${batchCyclePicInfo.company})`}
-                  value={batchCustomNote}
-                  onChange={(e) => setBatchCustomNote(e.target.value)}
-                  className="w-full text-xs px-3 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0055A5]"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-700">
-              <button
-                onClick={() => setConfirmBatchModal(null)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition"
-              >
-                Batal
-              </button>
-              <button
-                onClick={executeConfirmBatchUpdate}
-                className={`px-4 py-2 text-xs font-bold text-white rounded-xl shadow-md transition flex items-center gap-1.5 ${
-                  confirmBatchModal.targetStatus === 'Verified'
-                    ? 'bg-emerald-600 hover:bg-emerald-700'
-                    : 'bg-[#E86216] hover:bg-orange-600'
-                }`}
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Konfirmasi &amp; Terapkan ({confirmBatchModal.customerIds.length} Industri)</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Modal for importing cycle schedule */}
       {isImportScheduleOpen && (

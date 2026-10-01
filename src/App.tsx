@@ -19,9 +19,10 @@ import { ImportCycleScheduleModal } from './components/ImportCycleScheduleModal'
 import { SupabaseConfigModal } from './components/SupabaseConfigModal';
 import { FieldReaderApp } from './components/FieldReaderApp';
 import { SectionNavBar } from './components/SectionNavBar';
+import { MobileBottomNavigation } from './components/MobileBottomNavigation';
 import { ColorfulNotificationModal } from './components/ColorfulNotificationModal';
 import { ColorfulToastContainer } from './components/ColorfulToastContainer';
-import { showColorfulAlert } from './utils/notificationSystem';
+import { showColorfulAlert, showToast } from './utils/notificationSystem';
 import {
   getAssignedCyclesForReader,
   getReaderCategory,
@@ -225,58 +226,79 @@ export default function App() {
         }
       } catch {}
 
-      // 2. Supabase if configured
-      const config = getSupabaseConfig();
-      if (config.isConfigured) {
-        const test = await testSupabaseConnection();
-        if (test.success) {
-          setIsSupabaseConnected(true);
-          const remoteCusts = await fetchSupabaseCustomers();
-          if (remoteCusts && remoteCusts.length > 0) setCustomers(remoteCusts);
-          const remoteReaders = await fetchSupabaseMeterReaders();
-          if (remoteReaders && remoteReaders.length > 0) setMeterReaders(remoteReaders);
-          const remoteSchedules = await fetchSupabaseCycleSchedules();
-          if (remoteSchedules && remoteSchedules.length > 0) setCycleSchedules(remoteSchedules);
+      // 2. Supabase if configured with valid HTTP/HTTPS URL
+      try {
+        const config = getSupabaseConfig();
+        if (config.isConfigured) {
+          const test = await testSupabaseConnection();
+          if (test.success) {
+            setIsSupabaseConnected(true);
+            const remoteCusts = await fetchSupabaseCustomers();
+            if (remoteCusts && remoteCusts.length > 0) setCustomers(remoteCusts);
+            const remoteReaders = await fetchSupabaseMeterReaders();
+            if (remoteReaders && remoteReaders.length > 0) setMeterReaders(remoteReaders);
+            const remoteSchedules = await fetchSupabaseCycleSchedules();
+            if (remoteSchedules && remoteSchedules.length > 0) setCycleSchedules(remoteSchedules);
 
-          unsubscribe = subscribeToFieldReaderUpdates(
-            (updatedCust) => {
-              setCustomers((prev) => {
-                const exists = prev.some((c) => c.id === updatedCust.id);
-                if (exists) {
-                  return prev.map((c) => (c.id === updatedCust.id ? updatedCust : c));
-                }
-                return [updatedCust, ...prev];
-              });
-            },
-            (deletedId) => {
-              setCustomers((prev) => prev.filter((c) => c.id !== deletedId));
-            },
-            (newLog) => {
-              setAuditLogs((prev) => [newLog, ...prev]);
-            }
-          );
+            unsubscribe = subscribeToFieldReaderUpdates(
+              (updatedCust) => {
+                setCustomers((prev) => {
+                  const exists = prev.some((c) => c.id === updatedCust.id);
+                  if (exists) {
+                    return prev.map((c) => (c.id === updatedCust.id ? updatedCust : c));
+                  }
+                  return [updatedCust, ...prev];
+                });
+              },
+              (deletedId) => {
+                setCustomers((prev) => prev.filter((c) => c.id !== deletedId));
+              },
+              (newLog) => {
+                setAuditLogs((prev) => [newLog, ...prev]);
+              }
+            );
+          } else {
+            setIsSupabaseConnected(false);
+          }
         } else {
           setIsSupabaseConnected(false);
         }
-      } else {
+      } catch (e) {
+        console.warn('Supabase initialization bypassed:', e);
         setIsSupabaseConnected(false);
       }
 
-      // 3. Periodic background polling for cross-device sync (every 5 seconds)
+      // 3. Fast background polling for cross-device realtime sync (every 2.5 seconds)
       pollInterval = setInterval(async () => {
         try {
           const cloud = await fetchCloudState();
           if (cloud && cloud.customers && cloud.customers.length > 0) {
-            setCustomers(cloud.customers);
+            setCustomers((prev) => {
+              // Deep compare length and timestamps to avoid unnecessary re-renders
+              if (JSON.stringify(prev) !== JSON.stringify(cloud.customers)) {
+                return cloud.customers;
+              }
+              return prev;
+            });
           }
           if (cloud && cloud.meterReaders && cloud.meterReaders.length > 0) {
-            setMeterReaders(cloud.meterReaders);
+            setMeterReaders((prev) => {
+              if (JSON.stringify(prev) !== JSON.stringify(cloud.meterReaders)) {
+                return cloud.meterReaders;
+              }
+              return prev;
+            });
           }
           if (cloud && cloud.cycleSchedules && cloud.cycleSchedules.length > 0) {
-            setCycleSchedules(cloud.cycleSchedules);
+            setCycleSchedules((prev) => {
+              if (JSON.stringify(prev) !== JSON.stringify(cloud.cycleSchedules)) {
+                return cloud.cycleSchedules;
+              }
+              return prev;
+            });
           }
         } catch {}
-      }, 5000);
+      }, 2500);
     };
 
     initCloudSync();
@@ -296,7 +318,7 @@ export default function App() {
         cycleSchedules,
         auditLogs
       }).catch(() => {});
-    }, 800);
+    }, 400);
     return () => clearTimeout(timer);
   }, [customers, meterReaders, cycleSchedules, auditLogs]);
 
@@ -378,23 +400,70 @@ export default function App() {
 
   // Customer modifications
   const handleSaveReading = (updated: IndustryCustomer) => {
-    setCustomers((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+    let nextCusts: IndustryCustomer[] = [];
+    setCustomers((prev) => {
+      nextCusts = prev.map((c) => (c.id === updated.id ? updated : c));
+      try {
+        localStorage.setItem('aetra_industri_data', JSON.stringify(nextCusts));
+        localStorage.setItem('aetra_customers_official', JSON.stringify(nextCusts));
+      } catch {}
+      return nextCusts;
+    });
+
+    // Instant cloud push
+    pushCloudState({ customers: nextCusts, updatedAt: new Date().toISOString() }).catch(() => {});
     upsertSupabaseCustomer(updated).catch(() => {});
+
+    // Instant multi-tab broadcast
+    try {
+      const bc = new BroadcastChannel('aetra_simba_online_sync');
+      bc.postMessage({
+        type: 'STATE_UPDATE',
+        action: 'READING_SAVED',
+        customer: updated,
+        customers: nextCusts
+      });
+      bc.close();
+    } catch {}
+
     logActivity(
-      `Memperbarui stand meter ${updated.nama} (${updated.id}) ke angka ${updated.skrg.toLocaleString()} m³`,
+      `Pencatat meter ${updated.petugasBaca || currentUser?.name || 'Petugas'} mengirim hasil pembacaan stand ${updated.nama} (${updated.id}) ke angka ${updated.skrg.toLocaleString()} m³`,
       'update'
     );
     setSelectedCustomerForDetail(null);
   };
 
   const handleProcessInvoice = (updated: IndustryCustomer) => {
-    setCustomers((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
-    upsertSupabaseCustomer({ ...updated, status: 'Invoiced' }).catch(() => {});
+    const invoicedCust = { ...updated, status: 'Invoiced' as WorkflowStatus };
+    let nextCusts: IndustryCustomer[] = [];
+    setCustomers((prev) => {
+      nextCusts = prev.map((c) => (c.id === updated.id ? invoicedCust : c));
+      try {
+        localStorage.setItem('aetra_industri_data', JSON.stringify(nextCusts));
+        localStorage.setItem('aetra_customers_official', JSON.stringify(nextCusts));
+      } catch {}
+      return nextCusts;
+    });
+
+    pushCloudState({ customers: nextCusts, updatedAt: new Date().toISOString() }).catch(() => {});
+    upsertSupabaseCustomer(invoicedCust).catch(() => {});
+
+    try {
+      const bc = new BroadcastChannel('aetra_simba_online_sync');
+      bc.postMessage({
+        type: 'STATE_UPDATE',
+        action: 'INVOICED',
+        customer: invoicedCust,
+        customers: nextCusts
+      });
+      bc.close();
+    } catch {}
+
     logActivity(
       `Menerbitkan faktur tagihan & email untuk ${updated.nama} (${updated.id})`,
       'invoice'
     );
-    setSelectedCustomerForDetail(updated);
+    setSelectedCustomerForDetail(invoicedCust);
   };
 
   const handleAddCustomer = (newCustomer: IndustryCustomer) => {
@@ -596,12 +665,26 @@ export default function App() {
           if (event.data.customers) setCustomers(event.data.customers);
           if (event.data.meterReaders) setMeterReaders(event.data.meterReaders);
           if (event.data.cycleSchedules) setCycleSchedules(event.data.cycleSchedules);
+
+          if (event.data.action === 'READING_SAVED' && event.data.customer) {
+            showToast({
+              title: '📥 Data Stand Masuk dari Lapangan! 🛰️',
+              message: `${event.data.customer.petugasBaca || 'Petugas'} telah mencatat ${event.data.customer.nama} (Stand: ${event.data.customer.skrg.toLocaleString()} m³).`,
+              type: 'info'
+            });
+          } else if (event.data.action === 'INVOICED' && event.data.customer) {
+            showToast({
+              title: '🧾 Faktur Tagihan Diterbitkan!',
+              message: `Tagihan untuk ${event.data.customer.nama} berhasil diterbitkan.`,
+              type: 'success'
+            });
+          }
         }
       };
     } catch {}
 
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'aetra_customers_official' && e.newValue) {
+      if ((e.key === 'aetra_industri_data' || e.key === 'aetra_customers_official') && e.newValue) {
         try {
           setCustomers(JSON.parse(e.newValue));
         } catch {}
@@ -872,7 +955,7 @@ export default function App() {
         />
 
         {/* Tab View Contents */}
-        <main className="p-3.5 sm:p-6 space-y-6 flex-1">
+        <main className="p-3.5 sm:p-6 space-y-6 flex-1 pb-28 md:pb-6">
           {(activeTab === 'monitoring' || activeTab === 'overview') && (
             <OverviewView
               customers={filteredCustomers}
@@ -913,9 +996,33 @@ export default function App() {
           )}
 
           {activeTab === 'audit' && (
-            <AuditView logs={auditLogs} onClearLogs={handleClearLogs} />
+            <AuditView logs={auditLogs} onClearLogs={handleClearLogs} customers={customers} />
           )}
         </main>
+
+        {/* Ergonomic 1-Hand Mobile Bottom Navigation */}
+        <MobileBottomNavigation
+          activeTab={activeTab}
+          workflowFilter={workflowFilter}
+          onSelectTab={handleSelectTab}
+          customers={customers}
+          currentUser={currentUser}
+          onSwitchToFieldReader={() => {
+            const firstReader = meterReaders[0];
+            const fieldUser: UserProfile = {
+              role: 'field_reader',
+              name: firstReader?.nama || 'Anjarini Sukamto',
+              title: `Pembaca Meter (${firstReader?.kategori || 'Kontraktor (PT Hideco)'})`,
+              avatar: (firstReader?.nama || 'AS').substring(0, 2).toUpperCase(),
+              division: firstReader?.perusahaan || 'PT Hideco',
+              readerId: firstReader?.id || 'RDR-001',
+              kategori: firstReader?.kategori || 'Kontraktor (PT Hideco)',
+              perusahaan: firstReader?.perusahaan || 'PT Hideco'
+            };
+            setCurrentUser(fieldUser);
+            logActivity(`Beralih ke Aplikasi Pembaca Meter Lapangan (${fieldUser.name})`);
+          }}
+        />
       </div>
 
       {/* Global Import Cycle Schedule Modal */}
@@ -952,6 +1059,10 @@ export default function App() {
           }}
         />
       )}
+
+      {/* Global Interactive Notification System */}
+      <ColorfulNotificationModal />
+      <ColorfulToastContainer />
     </div>
   );
 }

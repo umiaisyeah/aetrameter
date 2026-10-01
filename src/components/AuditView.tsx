@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { AuditLog } from '../types';
+import { AuditLog, IndustryCustomer } from '../types';
 import { History, Trash2, Search, Filter, Calendar as CalendarIcon, X, User, CheckCircle2, RotateCcw } from 'lucide-react';
 
 interface AuditViewProps {
   logs: AuditLog[];
   onClearLogs: () => void;
+  customers?: IndustryCustomer[];
 }
 
 const MONTH_NAMES_MAP: Record<string, string> = {
@@ -37,7 +38,7 @@ const MONTH_CODE_SHORT: Record<string, string> = {
   '12': 'Des'
 };
 
-export const AuditView: React.FC<AuditViewProps> = ({ logs, onClearLogs }) => {
+export const AuditView: React.FC<AuditViewProps> = ({ logs, onClearLogs, customers = [] }) => {
   const [searchTxt, setSearchTxt] = useState('');
   const [userFilter, setUserFilter] = useState('ALL');
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<string>(''); // YYYY-MM-DD
@@ -172,7 +173,7 @@ export const AuditView: React.FC<AuditViewProps> = ({ logs, onClearLogs }) => {
                   Log Audit &amp; Rekam Jejak Aktivitas Sistem
                 </h2>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Seluruh transaksi stand meter, pembaruan cycle oleh <strong>Pak Kabul</strong> &amp; <strong>Pak Solihin</strong> (Admin Meter Reading), serta faktur invoice oleh <strong>Pak Yaya</strong> tercatat akuntabel.
+                  Seluruh transaksi stand meter, pembaruan cycle oleh <strong>Pak Kabul</strong> &amp; <strong>Pak Solihin</strong> (Tim Meter Reading), serta faktur invoice oleh <strong>Pak Yaya</strong> tercatat akuntabel.
                 </p>
               </div>
             </div>

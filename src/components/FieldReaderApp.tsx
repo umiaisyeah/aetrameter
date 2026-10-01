@@ -28,7 +28,8 @@ import {
   ListTodo,
   BarChart3,
   User,
-  Send
+  Send,
+  Image as ImageIcon
 } from 'lucide-react';
 import { showColorfulAlert } from '../utils/notificationSystem';
 import {
@@ -37,6 +38,8 @@ import {
   sortCyclesNaturally,
   normalizeReaderName
 } from '../utils/readerAssignmentHelper';
+import { RealtimeLocationMap } from './RealtimeLocationMap';
+import { PhotoGeotagStamp } from './PhotoGeotagStamp';
 
 interface FieldReaderAppProps {
   currentUser: UserProfile;
@@ -98,7 +101,7 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
   // Search, Cycle Filter, and Status Filter State
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCycleFilter, setSelectedCycleFilter] = useState<string>('ALL');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'Belum Dibaca' | 'Pending Verification' | 'Verified'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'Belum Dibaca' | 'Pending Verification' | 'Verified' | 'Bergeser'>('ALL');
   const [isScheduleDetailsOpen, setIsScheduleDetailsOpen] = useState<boolean>(false);
 
   // Notification Toast
@@ -208,6 +211,19 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
     return getAssignedCustomersForReader(readerTargetObj, customers);
   }, [readerTargetObj, customers]);
 
+  // Industry reading date shift tracking for field reader
+  const myShiftedCustomers = useMemo(() => {
+    return myAssignedCustomers.filter((c) => {
+      if (c.adaPergeseran) return true;
+      const sch = cycleSchedules?.find((s) => s.cycle.toLowerCase() === c.cycle.toLowerCase());
+      if (sch?.adaPergeseran) {
+        if (!sch.shiftedCustomerIds || sch.shiftedCustomerIds.length === 0) return true;
+        return sch.shiftedCustomerIds.includes(c.id);
+      }
+      return false;
+    });
+  }, [myAssignedCustomers, cycleSchedules]);
+
   // Detail jadwal penugasan dari admin untuk siklus-siklus pembaca meter ini (sorted & non-overlapping)
   const assignedCycleSchedules = useMemo(() => {
     if (!cycleSchedules || cycleSchedules.length === 0 || readerAssignedCycles.length === 0) return [];
@@ -233,14 +249,23 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
         (c.lokasi && c.lokasi.toLowerCase().includes(q)) ||
         c.cycle.toLowerCase().includes(q);
 
-      const matchStatus = statusFilter === 'ALL' || c.status === statusFilter;
+      const scheduleForCust = cycleSchedules?.find((s) => s.cycle.toLowerCase() === c.cycle.toLowerCase());
+      const isShifted = c.adaPergeseran || (scheduleForCust?.adaPergeseran && (!scheduleForCust.shiftedCustomerIds || scheduleForCust.shiftedCustomerIds.length === 0 || scheduleForCust.shiftedCustomerIds.includes(c.id)));
+
+      let matchStatus = true;
+      if (statusFilter === 'Bergeser') {
+        matchStatus = Boolean(isShifted);
+      } else if (statusFilter !== 'ALL') {
+        matchStatus = c.status === statusFilter;
+      }
+
       const matchCycle =
         selectedCycleFilter === 'ALL' ||
         c.cycle.toLowerCase() === selectedCycleFilter.toLowerCase();
 
       return matchSearch && matchStatus && matchCycle;
     });
-  }, [myAssignedCustomers, searchQuery, statusFilter, selectedCycleFilter]);
+  }, [myAssignedCustomers, searchQuery, statusFilter, selectedCycleFilter, cycleSchedules]);
 
   // Statistics
   const totalMyCust = myAssignedCustomers.length;
@@ -420,7 +445,17 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
       status: 'Pending Verification',
       fotoMeter: fotoMeterPreview || '',
       fotoBPM: fotoBPMPreview || '',
-      lokasiGps: gpsLocation || 'Lat: -6.187214, Long: 106.541290',
+      lokasiGps: gpsLocation || `Lat: ${gpsCoords.lat.toFixed(6)}, Long: ${gpsCoords.lng.toFixed(6)}`,
+      latitude: gpsCoords.lat,
+      longitude: gpsCoords.lng,
+      gpsAkurasiMeter: 3.5,
+      altitudeMeter: 26.0,
+      meterLatitude: gpsCoords.lat,
+      meterLongitude: gpsCoords.lng,
+      bpmLatitude: Number((gpsCoords.lat + 0.00008).toFixed(6)),
+      bpmLongitude: Number((gpsCoords.lng + 0.00010).toFixed(6)),
+      meterWaktuFoto: waktuStr,
+      bpmWaktuFoto: waktuStr,
       waktuBaca: waktuStr,
       petugasBaca: currentUser.name,
       kategoriPetugas: currentUser.kategori || 'Kontraktor (PT Hideco)',
@@ -449,7 +484,7 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></div>
           <span className="font-extrabold text-[#0055A5] dark:text-blue-400 truncate">
-            SIMBA-IN Mobile App
+            SIMBA Mobile App
           </span>
           <span className="hidden sm:inline text-slate-400 shrink-0">· Akun Petugas Lapangan</span>
         </div>
@@ -520,40 +555,62 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
           isFieldDarkMode ? 'bg-slate-900 text-slate-100 border-slate-800' : 'bg-white text-slate-800 border-slate-200'
         } flex flex-col h-[88vh] max-h-[880px] overflow-hidden`}
       >
+        {/* ===================== SYNCHRONIZED RUNNING TEXT (HP TAILORED) ===================== */}
+        <div className="bg-gradient-to-r from-[#001738] via-[#004b93] via-[#0284c7] via-[#059669] via-[#d97706] to-[#E86216] text-white py-1 px-2.5 text-[10px] font-extrabold flex items-center gap-1.5 overflow-hidden border-b border-white/15 shadow-sm">
+          <span className="bg-gradient-to-r from-amber-300 to-orange-400 text-slate-950 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider shrink-0 flex items-center gap-1 shadow-xs">
+            <Sparkles className="w-2.5 h-2.5 text-slate-950 animate-spin" />
+            <span>SIMBA HP</span>
+          </span>
+          <div className="flex-1 overflow-hidden whitespace-nowrap">
+            <div className="inline-block animate-marquee font-extrabold tracking-wide text-white drop-shadow-xs">
+              📱 SIMBA (SISTEM INTEGRASI METERING &amp; BILLING AETRA AIR TANGERANG) • SINKRONISASI REALTIME PETUGAS LAPANGAN • PETUGAS: {currentUser.name.toUpperCase()} ({currentUser.kategori || 'PEMBACA METER'}) • {myAssignedCustomers.length} INDUSTRI DITUGASKAN • STATUS: ONLINE TERHUBUNG KE SISTEM • PT AETRA AIR TANGERANG
+            </div>
+          </div>
+          <span className="flex items-center gap-1 text-[9px] font-mono font-bold bg-white/20 px-1.5 py-0.2 rounded-full border border-white/20 text-white shrink-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span>SYNC</span>
+          </span>
+        </div>
+
+        {/* Micro Rainbow Accent Stripe */}
+        <div className="h-0.5 bg-gradient-to-r from-cyan-400 via-blue-500 via-emerald-400 via-amber-400 to-[#E86216]" />
 
         {/* ===================== APP TOP HEADER ===================== */}
         <div className={`px-4 py-3.5 border-b flex flex-col gap-2 ${
           isFieldDarkMode
-            ? 'bg-gradient-to-r from-slate-950 via-slate-900 to-blue-950/60 border-slate-800'
-            : 'bg-gradient-to-r from-white via-blue-50/40 to-orange-50/30 border-slate-200'
+            ? 'bg-gradient-to-r from-slate-950 via-[#071933] to-blue-950/80 border-slate-800'
+            : 'bg-gradient-to-r from-white via-blue-50/60 to-orange-50/50 border-slate-200'
         }`}>
           {/* Row 1: Logo, App Title, Role Badge, and Real-time Clock */}
           <div className="flex items-center justify-between gap-2.5">
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              <div className="p-1 rounded-xl bg-white dark:bg-slate-800 shadow-xs border border-slate-200 dark:border-slate-700 shrink-0 flex items-center justify-center">
+              <div className="p-1.5 rounded-2xl bg-white dark:bg-slate-800 shadow-md border border-slate-200 dark:border-slate-700 shrink-0 flex items-center justify-center">
                 <AetraLogo variant="icon" className="w-8 h-8 shrink-0" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <h1 className="font-black text-sm tracking-tight text-[#0055A5] dark:text-blue-400 leading-none">
-                    SIMBA-IN MOBILE
+                    SIMBA MOBILE
                   </h1>
-                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide shrink-0 ${
+                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide shrink-0 shadow-2xs ${
                     currentUser.kategori?.includes('Key Account')
                       ? 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
                       : 'bg-orange-100 text-[#E86216] dark:bg-orange-950/80 dark:text-orange-300 border border-orange-200 dark:border-orange-800'
                   }`}>
                     {currentUser.kategori?.includes('Key Account') ? 'Key Account' : 'Kontraktor'}
                   </span>
+                  <span className="px-1.5 py-0.2 rounded-full text-[8px] font-black uppercase tracking-wide bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                    Live
+                  </span>
                 </div>
                 <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5 truncate">
-                  Pencatatan Meter Industri
+                  Sistem Integrasi Metering &amp; Billing — Dokumentasi BPM Lapangan
                 </p>
               </div>
             </div>
 
             {/* Quick Real-Time Digital Clock */}
-            <div className="shrink-0 text-right bg-white/80 dark:bg-slate-800/80 backdrop-blur-xs px-2.5 py-1 rounded-xl border border-slate-200/80 dark:border-slate-700 shadow-xs">
+            <div className="shrink-0 text-right bg-white/90 dark:bg-slate-800/90 backdrop-blur-xs px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs">
               <div className="flex items-center justify-end gap-1 font-mono font-black text-xs text-[#0055A5] dark:text-blue-400 leading-none">
                 <Clock className="w-3 h-3 text-emerald-500 animate-pulse shrink-0" />
                 <span>{realTimeClock.timeStr}:{realTimeClock.secondsStr}</span>
@@ -850,7 +907,7 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
 
                     {/* Status Filter Pills */}
                     <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-                      {(['ALL', 'Belum Dibaca', 'Pending Verification', 'Verified'] as const).map((st) => {
+                      {(['ALL', 'Belum Dibaca', 'Pending Verification', 'Verified', 'Bergeser'] as const).map((st) => {
                         const isSel = statusFilter === st;
                         const label =
                           st === 'ALL'
@@ -859,7 +916,9 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                             ? 'Belum Catat'
                             : st === 'Pending Verification'
                             ? 'Pending Admin'
-                            : 'Terverifikasi';
+                            : st === 'Verified'
+                            ? 'Terverifikasi'
+                            : `📅 Bergeser (${myShiftedCustomers.length})`;
                         return (
                           <button
                             key={st}
@@ -868,6 +927,8 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                             className={`px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition cursor-pointer border ${
                               isSel
                                 ? 'bg-[#0055A5] dark:bg-blue-600 text-white shadow-xs border-blue-400 font-black'
+                                : st === 'Bergeser' && myShiftedCustomers.length > 0
+                                ? 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950 dark:text-amber-200 dark:border-amber-700 font-extrabold'
                                 : isFieldDarkMode
                                 ? 'bg-slate-800 text-slate-200 hover:text-white border-slate-700/80 hover:bg-slate-750'
                                 : 'bg-slate-100 text-slate-700 hover:text-slate-900 border-slate-200'
@@ -879,6 +940,76 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                       })}
                     </div>
                   </div>
+
+                  {/* SECTION DEDIKASI: INDUSTRI BERGESER HARI BACA */}
+                  {myShiftedCustomers.length > 0 && (
+                    <div className="p-3.5 rounded-2xl bg-gradient-to-br from-amber-50 via-orange-50/60 to-amber-100/50 dark:from-amber-950/80 dark:via-slate-900 dark:to-orange-950/60 border-2 border-amber-400 dark:border-amber-600 space-y-2.5 shadow-md">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold shadow-xs">
+                            <Clock className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <h4 className="font-black text-xs text-amber-950 dark:text-amber-100 uppercase tracking-wide flex items-center gap-2">
+                              <span>SECTION INDUSTRI BERGESER HARI BACA</span>
+                              <span className="px-2 py-0.2 rounded-full bg-amber-600 text-white font-mono text-[9px] font-black shadow-2xs">
+                                {myShiftedCustomers.length} Industri
+                              </span>
+                            </h4>
+                            <p className="text-[11px] text-amber-800 dark:text-amber-300 font-medium leading-tight mt-0.5">
+                              Tersinkronisasi otomatis dari Jadwal Cycle Admin SIMBA
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setStatusFilter(statusFilter === 'Bergeser' ? 'ALL' : 'Bergeser')}
+                          className="px-2.5 py-1 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-[10px] transition shadow-xs flex items-center gap-1 cursor-pointer shrink-0"
+                        >
+                          <span>{statusFilter === 'Bergeser' ? 'Tampilkan Semua' : 'Filter Section Ini'}</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Mini list of shifted industries for quick preview */}
+                      <div className="grid grid-cols-1 gap-1.5 pt-1">
+                        {myShiftedCustomers.slice(0, 3).map((cust) => {
+                          const scheduleForCust = cycleSchedules?.find((s) => s.cycle.toLowerCase() === cust.cycle.toLowerCase());
+                          const shiftHariHBaru = cust.hariHPergeseran || scheduleForCust?.hariH;
+                          const shiftTglBaru = cust.tanggalPergeseranBaru || scheduleForCust?.tanggalPergeseranBaru || (shiftHariHBaru ? `${String(shiftHariHBaru).padStart(2, '0')} Sep 2026` : '');
+                          const shiftAlasanStr = cust.alasanPergeseran || scheduleForCust?.alasanPergeseran || 'Penyesuaian Jadwal';
+
+                          return (
+                            <div
+                              key={cust.id}
+                              onClick={() => handleOpenReadingForm(cust)}
+                              className="p-2 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-amber-300 dark:border-amber-800 flex items-center justify-between text-xs gap-2 cursor-pointer hover:border-amber-500 transition shadow-2xs"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <span className="font-extrabold text-slate-900 dark:text-white truncate block text-[11px]">
+                                  {cust.nama}
+                                </span>
+                                <span className="text-[9px] font-mono text-slate-500 dark:text-slate-400">
+                                  {cust.id} · {cust.cycle} · Alasan: {shiftAlasanStr}
+                                </span>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <span className="px-2 py-0.5 rounded-lg bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200 font-mono font-black text-[10px] border border-amber-300 dark:border-amber-700">
+                                  Tgl {shiftHariHBaru || '—'} ({shiftTglBaru})
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {myShiftedCustomers.length > 3 && (
+                          <p className="text-[10px] text-amber-800 dark:text-amber-300 font-bold text-center italic pt-0.5">
+                            + {myShiftedCustomers.length - 3} industri bergeser lainnya (Klik tombol filter di atas untuk melihat seluruhnya)
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Customer Cards List */}
                   <div className="flex flex-col gap-4 pt-1">
@@ -897,6 +1028,12 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                         const isUnread = cust.status === 'Belum Dibaca';
                         const waterUsage = !isUnread && cust.skrg > 0 ? Math.max(0, cust.skrg - cust.lalu) : 0;
 
+                        const scheduleForCust = cycleSchedules?.find((s) => s.cycle.toLowerCase() === cust.cycle.toLowerCase());
+                        const isShifted = cust.adaPergeseran || (scheduleForCust?.adaPergeseran && (!scheduleForCust.shiftedCustomerIds || scheduleForCust.shiftedCustomerIds.length === 0 || scheduleForCust.shiftedCustomerIds.includes(cust.id)));
+                        const shiftHariHBaru = cust.hariHPergeseran || scheduleForCust?.hariH;
+                        const shiftTglBaru = cust.tanggalPergeseranBaru || scheduleForCust?.tanggalPergeseranBaru || (shiftHariHBaru ? `${String(shiftHariHBaru).padStart(2, '0')} Sep 2026` : '');
+                        const shiftAlasanStr = cust.alasanPergeseran || scheduleForCust?.alasanPergeseran || 'Penyesuaian Jadwal';
+
                         return (
                           <div
                             key={cust.id}
@@ -911,6 +1048,27 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                             <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
                               isDone ? 'bg-emerald-500' : isPending ? 'bg-blue-500' : 'bg-amber-500'
                             }`} />
+
+                            {/* Alert Badge for Industry Reading Shift */}
+                            {isShifted && (
+                              <div className="p-2.5 rounded-xl bg-amber-100/90 dark:bg-amber-950/80 border border-amber-300 dark:border-amber-700 text-xs font-semibold text-amber-950 dark:text-amber-100 flex items-start gap-2 shadow-2xs">
+                                <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                                <div className="space-y-0.5">
+                                  <p className="font-black text-[10px] text-amber-900 dark:text-amber-200 uppercase tracking-wide flex items-center gap-1.5">
+                                    <span>⚠️ PERGESERAN HARI BACA</span>
+                                    <span className="px-1.5 py-0.2 rounded bg-amber-500 text-white font-mono text-[9px] font-extrabold">
+                                      Jadwal Baru
+                                    </span>
+                                  </p>
+                                  <p className="text-[11px] text-amber-900 dark:text-amber-200 font-extrabold">
+                                    Hari H Asli: Tgl {cust.hariHOriginal || scheduleForCust?.hariHOriginal || 8} ➔ <strong className="underline text-amber-800 dark:text-amber-100 font-mono">Hari H Aktual: Tgl {shiftHariHBaru} ({shiftTglBaru})</strong>
+                                  </p>
+                                  <p className="text-[10px] text-amber-700 dark:text-amber-300 italic">
+                                    Alasan: {shiftAlasanStr}
+                                  </p>
+                                </div>
+                              </div>
+                            )}
 
                             <div className="flex items-start justify-between gap-3 pl-1 [word-break:break-word]">
                               <div className="flex flex-col gap-1.5 min-w-0 flex-1 [word-break:break-word]">
@@ -1362,99 +1520,175 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                 )}
               </div>
 
-              {/* Photo Capture Inputs (Meter & BPM) */}
-              <div className="grid grid-cols-2 gap-2.5 text-xs">
+              {/* Photo Capture Inputs (Meter & BPM - Dual Options: Auto Kamera vs Galeri) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
                 {/* Foto Stand Meter */}
-                <div className={`p-2.5 rounded-2xl border space-y-1.5 min-w-0 ${
+                <div className={`p-2.5 rounded-2xl border space-y-2 min-w-0 ${
                   isFieldDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
                 }`}>
                   <div className="flex items-center justify-between text-[10px] font-bold gap-1">
-                    <span className="flex items-center gap-1 text-slate-700 dark:text-slate-300 truncate">
-                      <Camera className="w-3 h-3 text-blue-500 shrink-0" /> Foto Meter
+                    <span className="flex items-center gap-1 text-slate-700 dark:text-slate-300 truncate font-extrabold">
+                      <Camera className="w-3.5 h-3.5 text-blue-500 shrink-0" /> Foto Stand Meter
                     </span>
-                    {fotoMeterPreview && <span className="text-emerald-500 shrink-0">✓ OK</span>}
+                    {fotoMeterPreview && <span className="text-emerald-500 font-extrabold shrink-0">✓ Tersimpan</span>}
                   </div>
 
                   {fotoMeterPreview ? (
-                    <div className="relative h-28 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 group">
+                    <div className="relative h-36 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 group">
                       <img src={fotoMeterPreview} alt="Meter" className="w-full h-full object-cover" />
                       
                       {/* OCR Scanning Laser Animation */}
                       {isOcrScanning && (
-                        <div className="absolute inset-0 bg-blue-900/40 backdrop-blur-xs flex flex-col items-center justify-center text-white">
+                        <div className="absolute inset-0 bg-blue-900/50 backdrop-blur-xs flex flex-col items-center justify-center text-white p-2 z-20">
                           <div className="w-full h-1 bg-cyan-400 shadow-[0_0_12px_cyan] animate-pulse absolute top-1/2 -translate-y-1/2"></div>
                           <Scan className="w-6 h-6 animate-spin text-cyan-300 mb-1" />
-                          <span className="text-[9px] font-black uppercase tracking-wider bg-black/60 px-1.5 py-0.5 rounded">
+                          <span className="text-[9px] font-black uppercase tracking-wider bg-black/70 px-2 py-0.5 rounded-full">
                             OCR AI Scanning...
                           </span>
                         </div>
                       )}
 
-                      <label className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer text-white font-bold text-[10px] transition">
-                        <span>Ganti Foto</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          onChange={(e) => handlePhotoUpload(e, 'meter')}
-                          className="hidden"
-                        />
-                      </label>
+                      {/* Realtime GPS Geotag Stamp */}
+                      {!isOcrScanning && (
+                        <PhotoGeotagStamp customer={{ ...activeCustomer, fotoMeter: fotoMeterPreview }} photoType="meter" />
+                      )}
+
+                      <div className="absolute inset-0 bg-slate-950/80 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center gap-1.5 p-2 transition z-30">
+                        <span className="text-white font-extrabold text-[10px] mb-0.5">Ubah Foto Meter:</span>
+                        <div className="flex items-center gap-1.5 w-full">
+                          <label className="flex-1 py-1.5 px-1.5 bg-[#0055A5] hover:bg-[#003E78] text-white font-extrabold text-[9px] rounded-lg text-center cursor-pointer transition flex items-center justify-center gap-1 shadow-xs">
+                            <Camera className="w-3 h-3 shrink-0" />
+                            <span>Kamera</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              onChange={(e) => handlePhotoUpload(e, 'meter')}
+                              className="hidden"
+                            />
+                          </label>
+                          <label className="flex-1 py-1.5 px-1.5 bg-slate-700 hover:bg-slate-600 text-white font-extrabold text-[9px] rounded-lg text-center cursor-pointer transition flex items-center justify-center gap-1 shadow-xs">
+                            <ImageIcon className="w-3 h-3 shrink-0" />
+                            <span>Galeri</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handlePhotoUpload(e, 'meter')}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
+                      </div>
                     </div>
                   ) : (
-                    <label className="h-28 border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-400 rounded-xl flex flex-col items-center justify-center p-2 text-center cursor-pointer transition bg-white/50 dark:bg-slate-900/50">
-                      <Camera className="w-6 h-6 text-blue-500 mb-1 shrink-0" />
-                      <span className="font-bold text-[10px] text-slate-700 dark:text-slate-300 break-words leading-tight">Ambil Foto Meter</span>
-                      <span className="text-[8px] text-slate-400 mt-0.5 break-words">Auto-OCR Stand Meter</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        onChange={(e) => handlePhotoUpload(e, 'meter')}
-                        className="hidden"
-                      />
-                    </label>
+                    <div className="p-3 border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-400 rounded-xl flex flex-col items-center justify-center text-center bg-white/60 dark:bg-slate-900/60 space-y-2">
+                      <div className="text-center">
+                        <span className="font-extrabold text-[11px] text-slate-800 dark:text-slate-200 block leading-tight">Input Foto Stand Meter</span>
+                        <span className="text-[9px] text-slate-400 block mt-0.5 font-medium">Pilih salah satu metode unggah:</span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 w-full">
+                        <label className="flex-1 py-2 px-1 bg-[#0055A5] hover:bg-[#003E78] active:scale-95 text-white font-black text-[10px] rounded-xl text-center cursor-pointer transition flex items-center justify-center gap-1 shadow-xs">
+                          <Camera className="w-3.5 h-3.5 shrink-0 text-cyan-300" />
+                          <span>Kamera</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={(e) => handlePhotoUpload(e, 'meter')}
+                            className="hidden"
+                          />
+                        </label>
+                        <label className="flex-1 py-2 px-1 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 active:scale-95 text-slate-800 dark:text-slate-100 font-black text-[10px] rounded-xl text-center cursor-pointer transition flex items-center justify-center gap-1 border border-slate-300 dark:border-slate-700 shadow-2xs">
+                          <ImageIcon className="w-3.5 h-3.5 shrink-0 text-blue-600 dark:text-blue-400" />
+                          <span>Galeri</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handlePhotoUpload(e, 'meter')}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+                    </div>
                   )}
                 </div>
 
                 {/* Foto Lembar BPM Fisik */}
-                <div className={`p-2.5 rounded-2xl border space-y-1.5 min-w-0 ${
+                <div className={`p-2.5 rounded-2xl border space-y-2 min-w-0 ${
                   isFieldDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
                 }`}>
                   <div className="flex items-center justify-between text-[10px] font-bold gap-1">
-                    <span className="flex items-center gap-1 text-slate-700 dark:text-slate-300 truncate">
-                      <FileCheck className="w-3 h-3 text-[#E86216] shrink-0" /> Foto BPM
+                    <span className="flex items-center gap-1 text-slate-700 dark:text-slate-300 truncate font-extrabold">
+                      <FileCheck className="w-3.5 h-3.5 text-[#E86216] shrink-0" /> Foto BPM Fisik
                     </span>
-                    {fotoBPMPreview && <span className="text-emerald-500 shrink-0">✓ OK</span>}
+                    {fotoBPMPreview && <span className="text-emerald-500 font-extrabold shrink-0">✓ Tersimpan</span>}
                   </div>
 
                   {fotoBPMPreview ? (
-                    <div className="relative h-28 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 group">
+                    <div className="relative h-36 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 group">
                       <img src={fotoBPMPreview} alt="BPM" className="w-full h-full object-cover" />
-                      <label className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer text-white font-bold text-[10px] transition">
-                        <span>Ganti Foto</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          onChange={(e) => handlePhotoUpload(e, 'bpm')}
-                          className="hidden"
-                        />
-                      </label>
+                      {/* Realtime GPS Geotag Stamp */}
+                      <PhotoGeotagStamp customer={{ ...activeCustomer, fotoBPM: fotoBPMPreview }} photoType="bpm" />
+                      
+                      <div className="absolute inset-0 bg-slate-950/80 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center gap-1.5 p-2 transition z-30">
+                        <span className="text-white font-extrabold text-[10px] mb-0.5">Ubah Foto BPM:</span>
+                        <div className="flex items-center gap-1.5 w-full">
+                          <label className="flex-1 py-1.5 px-1.5 bg-[#E86216] hover:bg-orange-600 text-white font-extrabold text-[9px] rounded-lg text-center cursor-pointer transition flex items-center justify-center gap-1 shadow-xs">
+                            <Camera className="w-3 h-3 shrink-0" />
+                            <span>Kamera</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              onChange={(e) => handlePhotoUpload(e, 'bpm')}
+                              className="hidden"
+                            />
+                          </label>
+                          <label className="flex-1 py-1.5 px-1.5 bg-slate-700 hover:bg-slate-600 text-white font-extrabold text-[9px] rounded-lg text-center cursor-pointer transition flex items-center justify-center gap-1 shadow-xs">
+                            <ImageIcon className="w-3 h-3 shrink-0" />
+                            <span>Galeri</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handlePhotoUpload(e, 'bpm')}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
+                      </div>
                     </div>
                   ) : (
-                    <label className="h-28 border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-orange-400 rounded-xl flex flex-col items-center justify-center p-2 text-center cursor-pointer transition bg-white/50 dark:bg-slate-900/50">
-                      <FileCheck className="w-6 h-6 text-orange-500 mb-1 shrink-0" />
-                      <span className="font-bold text-[10px] text-slate-700 dark:text-slate-300 break-words leading-tight">Ambil Foto BPM</span>
-                      <span className="text-[8px] text-slate-400 mt-0.5 break-words">Bukti Fisik Tertulis</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        onChange={(e) => handlePhotoUpload(e, 'bpm')}
-                        className="hidden"
-                      />
-                    </label>
+                    <div className="p-3 border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-orange-400 rounded-xl flex flex-col items-center justify-center text-center bg-white/60 dark:bg-slate-900/60 space-y-2">
+                      <div className="text-center">
+                        <span className="font-extrabold text-[11px] text-slate-800 dark:text-slate-200 block leading-tight">Input Foto Dokumen BPM</span>
+                        <span className="text-[9px] text-slate-400 block mt-0.5 font-medium">Pilih salah satu metode unggah:</span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 w-full">
+                        <label className="flex-1 py-2 px-1 bg-[#E86216] hover:bg-orange-600 active:scale-95 text-white font-black text-[10px] rounded-xl text-center cursor-pointer transition flex items-center justify-center gap-1 shadow-xs">
+                          <Camera className="w-3.5 h-3.5 shrink-0 text-amber-200" />
+                          <span>Kamera</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={(e) => handlePhotoUpload(e, 'bpm')}
+                            className="hidden"
+                          />
+                        </label>
+                        <label className="flex-1 py-2 px-1 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 active:scale-95 text-slate-800 dark:text-slate-100 font-black text-[10px] rounded-xl text-center cursor-pointer transition flex items-center justify-center gap-1 border border-slate-300 dark:border-slate-700 shadow-2xs">
+                          <ImageIcon className="w-3.5 h-3.5 shrink-0 text-orange-600 dark:text-orange-400" />
+                          <span>Galeri</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handlePhotoUpload(e, 'bpm')}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1547,6 +1781,11 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                   ⚠️ Peringatan: Stand sekarang lebih kecil dari stand lalu ({activeCustomer.lalu.toLocaleString()} m³). Periksa kembali angka meter!
                 </p>
               )}
+            </div>
+
+            {/* Integrated Realtime Location Map */}
+            <div className="space-y-1">
+              <RealtimeLocationMap customer={activeCustomer} height="h-44 sm:h-52" />
             </div>
 
             {/* Field Notes */}
