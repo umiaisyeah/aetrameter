@@ -226,12 +226,12 @@ export default function App() {
         }
       } catch {}
 
-      // 2. Supabase if configured with valid HTTP/HTTPS URL
+      // 2. Supabase if configured with valid HTTP/HTTPS URL and tables are ready
       try {
         const config = getSupabaseConfig();
         if (config.isConfigured) {
           const test = await testSupabaseConnection();
-          if (test.success) {
+          if (test.success && test.tablesReady) {
             setIsSupabaseConnected(true);
             const remoteCusts = await fetchSupabaseCustomers();
             if (remoteCusts && remoteCusts.length > 0) setCustomers(remoteCusts);
@@ -274,8 +274,15 @@ export default function App() {
           const cloud = await fetchCloudState();
           if (cloud && cloud.customers && cloud.customers.length > 0) {
             setCustomers((prev) => {
-              // Deep compare length and timestamps to avoid unnecessary re-renders
-              if (JSON.stringify(prev) !== JSON.stringify(cloud.customers)) {
+              // Deep compare length and key properties to avoid unnecessary re-renders
+              if (prev.length !== cloud.customers.length) {
+                return cloud.customers;
+              }
+              const hasChange = cloud.customers.some((c, i) => {
+                const p = prev[i];
+                return !p || p.id !== c.id || p.skrg !== c.skrg || p.status !== c.status || p.catatan !== c.catatan;
+              });
+              if (hasChange) {
                 return cloud.customers;
               }
               return prev;
@@ -283,7 +290,7 @@ export default function App() {
           }
           if (cloud && cloud.meterReaders && cloud.meterReaders.length > 0) {
             setMeterReaders((prev) => {
-              if (JSON.stringify(prev) !== JSON.stringify(cloud.meterReaders)) {
+              if (prev.length !== cloud.meterReaders.length) {
                 return cloud.meterReaders;
               }
               return prev;
@@ -291,7 +298,7 @@ export default function App() {
           }
           if (cloud && cloud.cycleSchedules && cloud.cycleSchedules.length > 0) {
             setCycleSchedules((prev) => {
-              if (JSON.stringify(prev) !== JSON.stringify(cloud.cycleSchedules)) {
+              if (prev.length !== cloud.cycleSchedules.length) {
                 return cloud.cycleSchedules;
               }
               return prev;
@@ -311,6 +318,7 @@ export default function App() {
 
   // Auto push state to cloud backend on change for cross-device sync
   useEffect(() => {
+    if (customers.length === 0) return;
     const timer = setTimeout(() => {
       pushCloudState({
         customers,
@@ -699,27 +707,37 @@ export default function App() {
   }, []);
 
   const handleSyncNow = async () => {
-    const config = getSupabaseConfig();
     try {
-      if (config.isConfigured) {
-        const [remoteCusts, remoteReaders, remoteSchedules] = await Promise.all([
-          fetchSupabaseCustomers(),
-          fetchSupabaseMeterReaders(),
-          fetchSupabaseCycleSchedules()
-        ]);
-
-        if (remoteCusts && remoteCusts.length > 0) {
-          setCustomers(remoteCusts);
-        }
-        if (remoteReaders && remoteReaders.length > 0) {
-          setMeterReaders(remoteReaders);
-        }
-        if (remoteSchedules && remoteSchedules.length > 0) {
-          setCycleSchedules(remoteSchedules);
-        }
+      // 1. Always sync with SIMBA Cloud Server first
+      const cloud = await fetchCloudState();
+      if (cloud && cloud.customers && cloud.customers.length > 0) {
+        setCustomers(cloud.customers);
+        if (cloud.meterReaders?.length) setMeterReaders(cloud.meterReaders);
+        if (cloud.cycleSchedules?.length) setCycleSchedules(cloud.cycleSchedules);
+        if (cloud.auditLogs?.length) setAuditLogs(cloud.auditLogs);
       }
 
-      // Also broadcast to other online devices/tabs
+      // 2. Also sync with Supabase if configured and tables exist
+      const config = getSupabaseConfig();
+      if (config.isConfigured) {
+        try {
+          const test = await testSupabaseConnection();
+          if (test.success && test.tablesReady) {
+            const [remoteCusts, remoteReaders, remoteSchedules] = await Promise.all([
+              fetchSupabaseCustomers(),
+              fetchSupabaseMeterReaders(),
+              fetchSupabaseCycleSchedules()
+            ]);
+
+            if (remoteCusts && remoteCusts.length > 0) setCustomers(remoteCusts);
+            if (remoteReaders && remoteReaders.length > 0) setMeterReaders(remoteReaders);
+            if (remoteSchedules && remoteSchedules.length > 0) setCycleSchedules(remoteSchedules);
+            setIsSupabaseConnected(true);
+          }
+        } catch {}
+      }
+
+      // 3. Broadcast to other open tabs
       try {
         const bc = new BroadcastChannel('aetra_simba_online_sync');
         bc.postMessage({ type: 'STATE_UPDATE', customers, meterReaders, cycleSchedules });
@@ -727,15 +745,15 @@ export default function App() {
       } catch {}
 
       showColorfulAlert({
-        title: 'Sinkronisasi Online Berhasil! 🔄',
-        message: 'Data pembacaan meter, penugasan, dan tagihan berhasil disinkronkan secara real-time dengan server cloud pusat.',
+        title: 'Sinkronisasi Otomatis Berhasil! 🔄',
+        message: 'Data pembacaan meter, penugasan petugas, dan tagihan industri telah disinkronkan secara real-time ke cloud.',
         type: 'success',
-        badge: 'ONLINE SYNC'
+        badge: 'AUTO-SYNC'
       });
     } catch (err: any) {
       showColorfulAlert({
-        title: 'Sinkronisasi Berhasil',
-        message: 'Data perangkat berhasil disinkronkan lintas perangkat.',
+        title: 'Sinkronisasi Selesai',
+        message: 'Data SIMBA telah tersinkronisasi lintas perangkat.',
         type: 'success',
         badge: 'SYNC'
       });

@@ -41,13 +41,40 @@ async function startServer() {
 
   app.post('/api/sync-state', (req, res) => {
     const { customers, meterReaders, cycleSchedules, auditLogs } = req.body;
-    if (customers) sharedState.customers = customers;
-    if (meterReaders) sharedState.meterReaders = meterReaders;
-    if (cycleSchedules) sharedState.cycleSchedules = cycleSchedules;
-    if (auditLogs) sharedState.auditLogs = auditLogs;
-    sharedState.updatedAt = new Date().toISOString();
-    saveStateToFile();
-    res.json({ success: true, message: 'State synchronized successfully across devices', updatedAt: sharedState.updatedAt });
+    let updated = false;
+
+    if (Array.isArray(customers) && customers.length > 0) {
+      sharedState.customers = customers;
+      updated = true;
+    }
+    if (Array.isArray(meterReaders) && meterReaders.length > 0) {
+      sharedState.meterReaders = meterReaders;
+      updated = true;
+    }
+    if (Array.isArray(cycleSchedules) && cycleSchedules.length > 0) {
+      sharedState.cycleSchedules = cycleSchedules;
+      updated = true;
+    }
+    if (Array.isArray(auditLogs) && auditLogs.length > 0) {
+      sharedState.auditLogs = auditLogs;
+      updated = true;
+    }
+
+    if (updated || req.body.forceUpdate) {
+      sharedState.updatedAt = new Date().toISOString();
+      saveStateToFile();
+    }
+
+    res.json({
+      success: true,
+      message: 'State synchronized successfully across devices',
+      updatedAt: sharedState.updatedAt,
+      counts: {
+        customers: sharedState.customers?.length || 0,
+        meterReaders: sharedState.meterReaders?.length || 0,
+        cycleSchedules: sharedState.cycleSchedules?.length || 0
+      }
+    });
   });
 
   const isProduction = process.env.NODE_ENV === 'production';

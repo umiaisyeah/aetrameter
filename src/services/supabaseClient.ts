@@ -17,16 +17,22 @@ export const isValidHttpUrl = (urlString?: string | null): boolean => {
   }
 };
 
-// Retrieve credentials from environment variables or custom localStorage config
+// Default project credentials provided by user
+const PRECONFIGURED_URL = 'https://gjfkulhavzpffnpvfmel.supabase.co';
+const PRECONFIGURED_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdqZmt1bGhhdnpwZmZucHZmbWVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3ODc5NjQsImV4cCI6MjEwNTM2Mzk2NH0.jfVgsZSy6Kk2NPkBvIOttLee-cIKd8yem9PxqpxyT_o';
+
+// Retrieve credentials from environment variables, localStorage, or preconfigured defaults
 export const getSupabaseConfig = () => {
   const envUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
   const envKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
 
   let storedUrl = '';
   let storedKey = '';
+  let isDisabled = false;
 
   if (typeof window !== 'undefined') {
     try {
+      isDisabled = localStorage.getItem('aetra_supabase_disabled') === 'true';
       storedUrl = (localStorage.getItem('aetra_supabase_url') || '').trim();
       storedKey = (localStorage.getItem('aetra_supabase_anon_key') || '').trim();
     } catch {
@@ -34,8 +40,18 @@ export const getSupabaseConfig = () => {
     }
   }
 
-  const url = storedUrl || envUrl;
-  const anonKey = storedKey || envKey;
+  // If user explicitly disconnected in UI, do not auto-force
+  if (isDisabled && !storedUrl && !storedKey) {
+    return {
+      url: '',
+      anonKey: '',
+      isConfigured: false,
+      source: 'none' as const
+    };
+  }
+
+  const url = storedUrl || envUrl || PRECONFIGURED_URL;
+  const anonKey = storedKey || envKey || PRECONFIGURED_KEY;
 
   const validUrl = isValidHttpUrl(url) && !url.includes('your-project-id.supabase.co');
   const validKey = Boolean(anonKey && anonKey !== 'your-supabase-anon-key' && anonKey.length > 10);
@@ -43,10 +59,10 @@ export const getSupabaseConfig = () => {
   const isConfigured = Boolean(validUrl && validKey);
 
   return {
-    url,
-    anonKey,
+    url: isConfigured ? url : '',
+    anonKey: isConfigured ? anonKey : '',
     isConfigured,
-    source: storedUrl ? ('localStorage' as const) : ('env' as const)
+    source: storedUrl ? ('localStorage' as const) : envUrl ? ('env' as const) : ('preconfigured' as const)
   };
 };
 
@@ -91,6 +107,7 @@ export const getSupabaseClient = (): SupabaseClient | null => {
 export const saveSupabaseConfig = (url: string, anonKey: string) => {
   if (typeof window !== 'undefined') {
     try {
+      localStorage.removeItem('aetra_supabase_disabled');
       const cleanUrl = url.trim();
       const cleanKey = anonKey.trim();
       if (cleanUrl) {
@@ -114,6 +131,7 @@ export const saveSupabaseConfig = (url: string, anonKey: string) => {
 export const clearSupabaseConfig = () => {
   if (typeof window !== 'undefined') {
     try {
+      localStorage.setItem('aetra_supabase_disabled', 'true');
       localStorage.removeItem('aetra_supabase_url');
       localStorage.removeItem('aetra_supabase_anon_key');
     } catch {}

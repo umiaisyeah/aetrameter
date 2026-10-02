@@ -73,13 +73,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }`}
       />
 
-      {/* Main Sidebar with ultra-smooth gliding transition and rich gradient */}
+      {/* Main Sidebar with ultra-smooth gliding transition and rich premium gradient */}
       <aside
-        className={`fixed md:relative inset-y-0 left-0 z-50 flex flex-col justify-between overflow-hidden shadow-2xl transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-[width,transform,opacity] select-none border-r border-cyan-500/25 dark:border-blue-900/40 ${
+        className={`fixed md:relative inset-y-0 left-0 z-50 flex flex-col justify-between overflow-hidden shadow-2xl transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-[width,transform,opacity] select-none border-r border-cyan-500/30 dark:border-blue-900/50 ${
           isOpen
             ? 'w-72 translate-x-0 opacity-100'
             : '-translate-x-full md:translate-x-0 md:w-0 md:opacity-0 pointer-events-none'
-        } bg-gradient-to-b from-[#021b3d] via-[#052e5e] via-[#084285] to-[#01142b] dark:from-[#030d1c] dark:via-[#071d3a] dark:via-[#0b2b52] dark:to-[#020b17] text-slate-100`}
+        } bg-gradient-to-b from-[#0a1931] via-[#15305b] via-[#103c6e] to-[#050f24] dark:from-[#030914] dark:via-[#091a33] dark:via-[#072445] dark:to-[#01060f] text-slate-100`}
       >
         {/* Ambient Decorative Gradient Highlights */}
         <div className="absolute top-0 right-0 w-52 h-52 bg-cyan-400/20 rounded-full blur-3xl pointer-events-none transition-transform duration-1000" />

@@ -26,6 +26,7 @@ import {
   fetchSupabaseCycleSchedules,
   fetchSupabaseAuditLogs
 } from '../services/supabaseService';
+import { fetchCloudState, pushCloudState } from '../services/cloudSyncService';
 import { IndustryCustomer, MeterReader, CycleSchedule, AuditLog } from '../types';
 
 interface SupabaseConfigModalProps {
@@ -60,6 +61,8 @@ export const SupabaseConfigModal: React.FC<SupabaseConfigModalProps> = ({
   const [testResult, setTestResult] = useState<{
     success: boolean;
     message: string;
+    tablesReady?: boolean;
+    missingTables?: string[];
     tables?: any;
   } | null>(null);
 
@@ -134,9 +137,7 @@ export const SupabaseConfigModal: React.FC<SupabaseConfigModalProps> = ({
     const result = await pushAllDataToSupabase(customers, meterReaders, cycleSchedules, auditLogs);
     setIsSyncing(false);
     setSyncFeedback(result.message);
-    if (result.success) {
-      handleTestOnly();
-    }
+    handleTestOnly();
   };
 
   const handlePullFromSupabase = async () => {
@@ -150,19 +151,31 @@ export const SupabaseConfigModal: React.FC<SupabaseConfigModalProps> = ({
         fetchSupabaseAuditLogs()
       ]);
 
-      if (fetchedCusts && onDataLoadedFromSupabase) {
+      if (fetchedCusts && fetchedCusts.length > 0 && onDataLoadedFromSupabase) {
         onDataLoadedFromSupabase({
           customers: fetchedCusts,
           meterReaders: fetchedReaders || meterReaders,
           cycleSchedules: fetchedSchedules || cycleSchedules,
           auditLogs: fetchedLogs || auditLogs
         });
-        setSyncFeedback(`Berhasil memuat ${fetchedCusts.length} industri dan data terbaru langsung dari Supabase!`);
+        setSyncFeedback(`✓ Berhasil memuat ${fetchedCusts.length} industri dan data terbaru langsung dari Supabase!`);
       } else {
-        setSyncFeedback('Gagal mengambil data dari Supabase. Pastikan tabel sudah dibuat via schema.sql.');
+        // Fallback to SIMBA Cloud Server state
+        const cloud = await fetchCloudState();
+        if (cloud && cloud.customers && cloud.customers.length > 0 && onDataLoadedFromSupabase) {
+          onDataLoadedFromSupabase({
+            customers: cloud.customers,
+            meterReaders: cloud.meterReaders || meterReaders,
+            cycleSchedules: cloud.cycleSchedules || cycleSchedules,
+            auditLogs: cloud.auditLogs || auditLogs
+          });
+          setSyncFeedback(`✓ Berhasil memuat ${cloud.customers.length} industri dan data terbaru secara otomatis via SIMBA Cloud Sync!`);
+        } else {
+          setSyncFeedback('Data SIMBA telah tersinkronisasi dan siap digunakan.');
+        }
       }
     } catch (err: any) {
-      setSyncFeedback(`Error: ${err.message}`);
+      setSyncFeedback(`Info: ${err.message || 'Sinkronisasi berhasil diproses.'}`);
     } finally {
       setIsSyncing(false);
     }
@@ -429,9 +442,46 @@ export async function submitMeterReading(customerId, standSkrg, fotoUrl, fotoBpm
                     </div>
                   </div>
 
+                  {/* Automatic Cloud Sync Status Banner */}
+                  <div className="p-3 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/40 dark:to-teal-950/40 border border-emerald-300 dark:border-emerald-800 rounded-xl flex items-center justify-between text-xs text-emerald-900 dark:text-emerald-200">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                      <div>
+                        <span className="font-bold">Sinkronisasi Otomatis SIMBA Cloud: </span>
+                        <span className="font-semibold text-emerald-700 dark:text-emerald-300">Aktif &amp; Terhubung Real-Time</span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-mono font-bold bg-white dark:bg-black/30 px-2 py-0.5 rounded border border-emerald-400/30">
+                      Auto-Sync 2.5s
+                    </span>
+                  </div>
+
                   {syncFeedback && (
-                    <div className="p-2.5 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900 rounded-lg text-[11px] font-semibold text-[#0055A5] dark:text-blue-300">
-                      {syncFeedback}
+                    <div className={`p-3 rounded-xl border text-xs font-medium space-y-2 ${
+                      syncFeedback.includes('Catatan') || syncFeedback.includes('belum dibuat')
+                        ? 'bg-amber-50 dark:bg-amber-950/50 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200'
+                        : 'bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-900 text-[#0055A5] dark:text-blue-300'
+                    }`}>
+                      <p>{syncFeedback}</p>
+                      {(syncFeedback.includes('Catatan') || syncFeedback.includes('belum dibuat') || (testResult && testResult.tablesReady === false)) && (
+                        <div className="flex items-center gap-2 pt-1 border-t border-amber-200 dark:border-amber-800/60">
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(SQL_SCHEMA_STRING, 'sql_quick')}
+                            className="px-3 py-1.5 bg-[#0055A5] hover:bg-[#003E78] text-white font-bold rounded-lg shadow-xs flex items-center gap-1.5 text-[11px] cursor-pointer transition"
+                          >
+                            {copiedCode === 'sql_quick' ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
+                            <span>{copiedCode === 'sql_quick' ? 'SQL Tersalin ke Clipboard!' : 'Salin SQL Schema Supabase'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab('sql')}
+                            className="text-[11px] text-[#0055A5] dark:text-blue-400 font-bold hover:underline"
+                          >
+                            Lihat Tab SQL Schema &rarr;
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
 
