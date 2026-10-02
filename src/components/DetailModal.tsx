@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { IndustryCustomer, UserProfile } from '../types';
 import { X, AlertTriangle, Info, Mail, Printer, CheckCircle, Camera, FileCheck, MapPin, Radio } from 'lucide-react';
 import meterGaugeImg from '../assets/images/meter_industrial_gauge_1790243358407.jpg';
@@ -167,8 +168,13 @@ export const DetailModal: React.FC<DetailModalProps> = ({
     return `${x},${y}`;
   }).join(' ');
 
-  return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+  return createPortal(
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[99999] flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+    >
       <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-3xl w-full overflow-hidden shadow-2xl border border-slate-100 dark:border-slate-700 max-h-[92vh] flex flex-col text-slate-800 dark:text-slate-100 my-auto">
         {/* Header */}
         <div className="bg-[#003E78] dark:bg-slate-900 text-white p-4 flex justify-between items-center shrink-0">
@@ -575,6 +581,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

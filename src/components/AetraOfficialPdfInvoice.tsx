@@ -111,8 +111,24 @@ export const AetraOfficialPdfInvoice: React.FC<AetraOfficialPdfInvoiceProps> = (
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-2 sm:p-4 md:p-6 overflow-y-auto print:p-0 print:bg-white print:fixed-none">
+  // ESC key listener to easily close modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-[999999] flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-2 sm:p-4 md:p-6 overflow-y-auto print:p-0 print:bg-white print:fixed-none"
+    >
       <div className="bg-slate-100 dark:bg-slate-900 w-full max-w-5xl rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[96vh] my-auto relative z-10 print:max-h-none print:m-0 print:border-none print:shadow-none print:w-full print:rounded-none">
         {/* Top Control Bar (Hidden on Print) */}
         <div className="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between gap-3 border-b border-slate-800 print:hidden shrink-0 flex-wrap">
@@ -833,6 +849,7 @@ export const AetraOfficialPdfInvoice: React.FC<AetraOfficialPdfInvoiceProps> = (
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

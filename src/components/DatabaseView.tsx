@@ -13,7 +13,10 @@ import {
   Calendar,
   Layers,
   FileSpreadsheet,
-  Lock
+  Lock,
+  AlertTriangle,
+  Filter,
+  Clock
 } from 'lucide-react';
 import meterGaugeImg from '../assets/images/meter_industrial_gauge_1790243358407.jpg';
 import bpmDocImg from '../assets/images/meter_bpm_document_1790243369057.jpg';
@@ -91,6 +94,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   // Filter states
   const [filterCycle, setFilterCycle] = useState('ALL');
   const [filterKelas, setFilterKelas] = useState('ALL');
+  const [filterPergeseran, setFilterPergeseran] = useState<'ALL' | 'bergeser' | 'reguler'>('ALL');
 
   // Checkbox selection state
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -367,11 +371,47 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
     });
   };
 
+  // Helper to check if customer has a shifted reading date (Industri Bergeser)
+  const isCustomerShifted = (
+    c: IndustryCustomer
+  ): { isShifted: boolean; reason?: string; newDate?: string; selisih?: number } => {
+    if (c.adaPergeseran) {
+      return {
+        isShifted: true,
+        reason: c.alasanPergeseran || c.keteranganPergeseran || 'Jadwal Khusus Pabrik',
+        newDate: c.tanggalPergeseranBaru,
+        selisih: (c.hariHPergeseran || 0) - (c.hariHOriginal || 0)
+      };
+    }
+    const sch = cycleSchedules?.find((s) => s.cycle.toLowerCase() === c.cycle.toLowerCase());
+    if (sch?.adaPergeseran) {
+      if (!sch.shiftedCustomerIds || sch.shiftedCustomerIds.length === 0 || sch.shiftedCustomerIds.includes(c.id)) {
+        return {
+          isShifted: true,
+          reason: sch.alasanPergeseran || sch.keteranganPergeseran || 'Penyesuaian Jadwal Cycle',
+          newDate: sch.tanggalPergeseranBaru || (sch.hariHOriginal ? `Tgl ${sch.hariHOriginal + (sch.selisihHariPergeseran || 1)}` : undefined),
+          selisih: sch.selisihHariPergeseran || 1
+        };
+      }
+    }
+    return { isShifted: false };
+  };
+
+  const totalShiftedCount = customers.filter((c) => isCustomerShifted(c).isShifted).length;
+  const totalRegulerCount = customers.length - totalShiftedCount;
+
   // Filtered master data
   const filteredList = customers.filter((c) => {
     const matchCycle = filterCycle === 'ALL' || c.cycle === filterCycle;
     const matchKelas = filterKelas === 'ALL' || c.kelas === filterKelas;
-    return matchCycle && matchKelas;
+    const shiftInfo = isCustomerShifted(c);
+    let matchPergeseran = true;
+    if (filterPergeseran === 'bergeser') {
+      matchPergeseran = shiftInfo.isShifted;
+    } else if (filterPergeseran === 'reguler') {
+      matchPergeseran = !shiftInfo.isShifted;
+    }
+    return matchCycle && matchKelas && matchPergeseran;
   });
 
   // Cycle distribution count
@@ -754,6 +794,35 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                     <option value="Bronze">Bronze</option>
                   </select>
 
+                  {/* Filter Status Jadwal & Industri Bergeser */}
+                  <select
+                    value={filterPergeseran}
+                    onChange={(e) => setFilterPergeseran(e.target.value as any)}
+                    className="px-2.5 py-1 text-xs font-semibold bg-white dark:bg-slate-700 border rounded-lg text-slate-700 dark:text-slate-100"
+                  >
+                    <option value="ALL">Semua Jadwal ({customers.length})</option>
+                    <option value="bergeser">⚠️ Industri Bergeser ({totalShiftedCount})</option>
+                    <option value="reguler">Jadwal Reguler ({totalRegulerCount})</option>
+                  </select>
+
+                  {/* Quick Toggle Button for Industri Bergeser */}
+                  <button
+                    type="button"
+                    onClick={() => setFilterPergeseran(filterPergeseran === 'bergeser' ? 'ALL' : 'bergeser')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border whitespace-nowrap shrink-0 ${
+                      filterPergeseran === 'bergeser'
+                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-xs ring-2 ring-amber-400/40'
+                        : 'bg-amber-100/70 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border-amber-300/60 dark:border-amber-700 hover:bg-amber-200 dark:hover:bg-amber-900/60'
+                    }`}
+                    title="Klik untuk filter cepat daftar pabrik yang jadwal bacanya tidak sesuai dengan cycle reguler"
+                  >
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <span className="whitespace-nowrap">Industri Bergeser</span>
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-900/20 dark:bg-black/40 font-mono font-black shrink-0">
+                      {totalShiftedCount}
+                    </span>
+                  </button>
+
                   <div className="ml-auto flex items-center gap-2">
                     {selectedIds.length > 0 && (
                       <button
@@ -803,6 +872,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                     ) : (
                       filteredList.map((item) => {
                         const isChecked = selectedIds.includes(item.id);
+                        const shiftInfo = isCustomerShifted(item);
                         return (
                           <tr
                             key={item.id}
@@ -819,12 +889,27 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                                 className="w-4 h-4 rounded text-[#0055A5] focus:ring-[#0055A5] cursor-pointer"
                               />
                             </td>
-                            <td className="p-3 font-mono font-bold text-[#E86216]">{item.id}</td>
+                            <td className="p-3 font-mono font-bold text-[#E86216]">
+                              {item.id}
+                              {shiftInfo.isShifted && (
+                                <span className="block mt-0.5" title="Jadwal Baca Bergeser">
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[8px] font-black uppercase bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                                    <AlertTriangle className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" /> Bergeser
+                                  </span>
+                                </span>
+                              )}
+                            </td>
                             <td className="p-3 font-bold text-slate-800 dark:text-slate-100">
-                              {item.nama}
+                              <div>{item.nama}</div>
                               <span className="block text-[10px] text-slate-400 font-normal">
                                 {item.email}
                               </span>
+                              {shiftInfo.isShifted && (
+                                <div className="text-[10px] text-amber-700 dark:text-amber-300 font-medium mt-0.5 flex items-center gap-1">
+                                  <Clock className="w-3 h-3 text-amber-500 shrink-0" />
+                                  <span>{shiftInfo.reason} {shiftInfo.newDate ? `· ${shiftInfo.newDate}` : ''}</span>
+                                </div>
+                              )}
                             </td>
                             <td className="p-3 font-semibold text-[#0055A5] dark:text-blue-400">
                               {item.cycle}

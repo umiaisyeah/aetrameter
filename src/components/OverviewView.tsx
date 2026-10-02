@@ -37,6 +37,7 @@ import { ImportCycleScheduleModal } from './ImportCycleScheduleModal';
 import { OfficialAetraInvoiceModal } from './OfficialAetraInvoiceModal';
 import { SectionProgressHub } from './SectionProgressHub';
 import { WorkflowStatusBadge } from './WorkflowStatusBadge';
+import { ExportDropdownButton } from './ExportDropdownButton';
 import { showColorfulAlert } from '../utils/notificationSystem';
 import {
   ResponsiveContainer,
@@ -454,6 +455,14 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               </p>
             </div>
           </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <ExportDropdownButton
+              customers={filteredCustomers}
+              section="verification"
+              label="Unduh Rekap Verifikasi"
+              className="z-20"
+            />
+          </div>
         </div>
       )}
 
@@ -477,13 +486,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={onExportCSV}
-              className="px-3.5 py-2 rounded-xl bg-emerald-700/80 text-white font-bold text-xs hover:bg-emerald-600 transition border border-emerald-500/40 shadow-xs flex items-center gap-2 cursor-pointer"
-            >
-              <Download className="w-4 h-4" />
-              <span>Ekspor CSV</span>
-            </button>
+            <ExportDropdownButton
+              customers={filteredCustomers}
+              section="billing"
+              label="Unduh Rekap Billing"
+              className="z-20"
+            />
           </div>
         </div>
       )}
@@ -570,13 +578,17 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               </button>
             )}
 
-            <button
-              onClick={onExportCSV}
-              className="px-3 py-1.5 text-xs font-bold bg-[#0055A5] hover:bg-[#003E78] text-white rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Ekspor CSV</span>
-            </button>
+            <ExportDropdownButton
+              customers={filteredCustomers}
+              section={
+                workflowFilter === 'Pending Verification'
+                  ? 'verification'
+                  : workflowFilter === 'Verified'
+                  ? 'billing'
+                  : 'monitoring'
+              }
+              label="Unduh Data"
+            />
           </div>
         </div>
 

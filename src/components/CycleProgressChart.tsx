@@ -178,7 +178,7 @@ export const CycleProgressChart: React.FC<CycleProgressChartProps> = ({
     return { total, comp, perc };
   }, [chartData]);
 
-  // Key account aggregate
+  // Key Account aggregate
   const keyAccountStats = useMemo(() => {
     const total = chartData.reduce((acc, c) => acc + c.keyAccountTotal, 0);
     const comp = chartData.reduce((acc, c) => acc + c.keyAccountCompleted, 0);
@@ -186,107 +186,135 @@ export const CycleProgressChart: React.FC<CycleProgressChartProps> = ({
     return { total, comp, perc };
   }, [chartData]);
 
-  // D3 Render Effect
+  // D3 Chart Rendering
   useEffect(() => {
-    if (!svgRef.current) return;
+    if (!svgRef.current || activeData.length === 0) return;
 
-    const svg = d3.select(svgRef.current);
-    svg.selectAll('*').remove();
+    // Clear previous SVG contents
+    d3.select(svgRef.current).selectAll('*').remove();
 
-    const margin = { top: 25, right: 25, bottom: 45, left: 45 };
+    const margin = { top: 30, right: 25, bottom: 55, left: 55 };
     const width = 850;
     const height = 280;
     const innerWidth = width - margin.left - margin.right;
     const innerHeight = height - margin.top - margin.bottom;
 
-    svg.attr('viewBox', `0 0 ${width} ${height}`).attr('class', 'w-full h-auto overflow-visible');
+    const svg = d3
+      .select(svgRef.current)
+      .attr('viewBox', `0 0 ${width} ${height}`)
+      .attr('preserveAspectRatio', 'xMidYMid meet')
+      .style('width', '100%')
+      .style('height', 'auto')
+      .style('overflow', 'visible');
 
-    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+    const g = svg
+      .append('g')
+      .attr('transform', `translate(${margin.left},${margin.top})`);
 
-    // X Scale
+    // X Scale (15 cycles)
     const xScale = d3
       .scaleBand()
       .domain(activeData.map((d) => d.cycle))
       .range([0, innerWidth])
-      .padding(0.24);
+      .padding(0.32);
 
     // Y Scale
-    const maxVal = metricMode === 'percentage' ? 100 : Math.max(5, d3.max(activeData, (d) => d.total) || 5);
-    const yScale = d3.scaleLinear().domain([0, maxVal]).nice().range([innerHeight, 0]);
+    const maxCount = Math.max(1, d3.max(activeData, (d) => d.total) || 5);
+    const yScale = d3
+      .scaleLinear()
+      .domain([0, metricMode === 'percentage' ? 100 : maxCount])
+      .nice()
+      .range([innerHeight, 0]);
 
-    // Grid lines
-    const yGrid = d3
+    // Color interpolation function
+    const getBarColor = (d: CycleChartData) => {
+      if (selectedCycleName === d.cycle) return '#E86216'; // Selected cycle orange highlight
+      if (d.percentage === 100) return '#10b981'; // 100% Completed (emerald)
+      if (d.percentage >= 50) return '#0055A5'; // Primary Aetra Blue
+      if (d.percentage > 0) return '#0284c7'; // Active blue
+      return '#cbd5e1'; // 0% unread slate
+    };
+
+    // Horizontal Grid Lines
+    const yTicks = metricMode === 'percentage' ? [0, 20, 40, 60, 80, 100] : undefined;
+    const yAxisGrid = d3
       .axisLeft(yScale)
       .tickSize(-innerWidth)
       .tickFormat(() => '')
       .ticks(5);
 
-    g.append('g')
-      .attr('class', 'grid-lines opacity-20 dark:opacity-10 stroke-slate-300 dark:stroke-slate-600')
-      .call(yGrid);
-
-    // Average Benchmark Line
-    if (metricMode === 'percentage' && overallAvgRate > 0) {
-      const avgY = yScale(overallAvgRate);
-      g.append('line')
-        .attr('x1', 0)
-        .attr('x2', innerWidth)
-        .attr('y1', avgY)
-        .attr('y2', avgY)
-        .attr('stroke', '#0055A5')
-        .attr('stroke-dasharray', '4,4')
-        .attr('stroke-width', 1.5)
-        .attr('opacity', 0.7);
-
-      g.append('text')
-        .attr('x', innerWidth - 5)
-        .attr('y', avgY - 6)
-        .attr('text-anchor', 'end')
-        .attr('fill', '#0055A5')
-        .attr('font-size', '10px')
-        .attr('font-weight', '700')
-        .text(`Rata-rata: ${overallAvgRate}%`);
+    if (yTicks) {
+      yAxisGrid.tickValues(yTicks);
     }
 
-    // Tooltip reference
+    g.append('g')
+      .attr('class', 'grid')
+      .call(yAxisGrid)
+      .selectAll('line')
+      .attr('stroke', '#e2e8f0')
+      .attr('stroke-dasharray', '3,3');
+
+    g.select('.grid .domain').remove();
+
+    // Average Benchmark Dotted Line
+    const avgY = yScale(overallAvgRate);
+    g.append('line')
+      .attr('x1', 0)
+      .attr('x2', innerWidth)
+      .attr('y1', avgY)
+      .attr('y2', avgY)
+      .attr('stroke', '#0284c7')
+      .attr('stroke-width', 1.8)
+      .attr('stroke-dasharray', '4,4');
+
+    g.append('text')
+      .attr('x', innerWidth)
+      .attr('y', avgY - 6)
+      .attr('text-anchor', 'end')
+      .attr('fill', '#0284c7')
+      .attr('font-size', '10px')
+      .attr('font-weight', '700')
+      .text(`Rata-rata: ${overallAvgRate}%`);
+
+    // Tooltip Selector
     const tooltip = d3.select('#d3-cycle-tooltip');
 
-    // Render Bars
+    // Bar Groups
     const barGroups = g
       .selectAll('.bar-group')
       .data(activeData)
       .enter()
       .append('g')
-      .attr('class', 'bar-group cursor-pointer');
+      .attr('class', 'bar-group')
+      .attr('cursor', 'pointer')
+      .on('click', (_, d) => {
+        setSelectedCycleName(d.cycle);
+        onSelectCycle(d.cycle);
+      });
 
-    // Background Bar Track
-    barGroups
-      .append('rect')
-      .attr('x', (d) => xScale(d.cycle) || 0)
-      .attr('y', 0)
-      .attr('width', xScale.bandwidth())
-      .attr('height', innerHeight)
-      .attr('rx', 6)
-      .attr('fill', '#f1f5f9')
-      .attr('class', 'dark:fill-slate-700/40')
-      .attr('opacity', 0.5);
+    // Background Bar Track (for 100% reference in percentage mode)
+    if (metricMode === 'percentage') {
+      barGroups
+        .append('rect')
+        .attr('x', (d) => xScale(d.cycle) || 0)
+        .attr('y', 0)
+        .attr('width', xScale.bandwidth())
+        .attr('height', innerHeight)
+        .attr('fill', '#f1f5f9')
+        .attr('rx', 4)
+        .attr('opacity', 0.6);
+    }
 
-    // Foreground Progress Bar
+    // Main Value Bar
     barGroups
       .append('rect')
       .attr('x', (d) => xScale(d.cycle) || 0)
       .attr('width', xScale.bandwidth())
       .attr('y', innerHeight)
       .attr('height', 0)
-      .attr('rx', 6)
-      .attr('fill', (d) => {
-        if (selectedCycleName === d.cycle) return '#E86216'; // Active orange
-        if (d.percentage === 100) return '#10b981'; // Completed emerald
-        if (d.percentage >= 50) return '#0055A5'; // Corporate Aetra Blue
-        if (d.percentage > 0) return '#0284c7'; // Light Blue
-        return '#cbd5e1'; // Untouched slate
-      })
-      .attr('stroke', (d) => (selectedCycleName === d.cycle ? '#c2410c' : 'none'))
+      .attr('rx', 4)
+      .attr('fill', (d) => getBarColor(d))
+      .attr('stroke', (d) => (selectedCycleName === d.cycle ? '#fff' : 'none'))
       .attr('stroke-width', (d) => (selectedCycleName === d.cycle ? 2 : 0))
       .transition()
       .duration(700)
@@ -337,17 +365,7 @@ export const CycleProgressChart: React.FC<CycleProgressChartProps> = ({
                   <span class="${d.percentage === 100 ? 'text-emerald-400' : 'text-blue-400'}">${d.percentage}%</span>
                 </div>
               </div>
-              <div class="pt-2 border-t border-slate-800 text-[10px] space-y-1">
-                <div class="text-amber-300 font-semibold flex items-center justify-between">
-                  <span>Kontraktor (${d.hidecoReader}):</span>
-                  <span>${d.hidecoCompleted}/${d.hidecoTotal}</span>
-                </div>
-                <div class="text-blue-300 font-semibold flex items-center justify-between">
-                  <span>Key Account (${d.keyAccountReader}):</span>
-                  <span>${d.keyAccountCompleted}/${d.keyAccountTotal}</span>
-                </div>
-              </div>
-              <p class="text-[9px] text-slate-400 italic text-center pt-1 border-t border-slate-800">
+              <p class="text-[9px] text-slate-400 italic text-center pt-1.5 border-t border-slate-800">
                 Klik bar untuk menyaring data industri ke cycle ini
               </p>
             </div>
@@ -368,16 +386,10 @@ export const CycleProgressChart: React.FC<CycleProgressChartProps> = ({
           .attr('transform', 'scale(1)');
 
         tooltip.style('opacity', 0).style('display', 'none');
-      })
-      .on('click', (_, d) => {
-        setSelectedCycleName(d.cycle);
-        onSelectCycle(d.cycle);
       });
 
-    // Value Labels on Top of Bars
-    g.selectAll('.bar-label')
-      .data(activeData)
-      .enter()
+    // Top Bar Value Labels
+    barGroups
       .append('text')
       .attr('class', 'bar-label select-none')
       .attr('x', (d) => (xScale(d.cycle) || 0) + xScale.bandwidth() / 2)
@@ -453,7 +465,7 @@ export const CycleProgressChart: React.FC<CycleProgressChartProps> = ({
         style={{ opacity: 0, display: 'none' }}
       ></div>
 
-      {/* Header and Controls: Note: Title does NOT contain "visualisasi D3.js:" */}
+      {/* Header and Controls */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b border-slate-100 dark:border-slate-700 pb-4">
         <div>
           <div className="flex items-center gap-2">
