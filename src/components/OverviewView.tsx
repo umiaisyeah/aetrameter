@@ -27,7 +27,8 @@ import {
   Sparkles,
   Receipt,
   Search,
-  Trash2
+  Trash2,
+  RefreshCw
 } from 'lucide-react';
 import { CycleProgressChart } from './CycleProgressChart';
 import { MeterReaderProgressSection } from './MeterReaderProgressSection';
@@ -64,6 +65,8 @@ interface OverviewViewProps {
   onDeleteCustomer?: (id: string) => void;
   onDeleteBatchCustomers?: (ids: string[]) => void;
   currentUser: UserProfile;
+  onSyncNow?: () => void;
+  isSyncing?: boolean;
 }
 
 export const OverviewView: React.FC<OverviewViewProps> = ({
@@ -82,7 +85,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   onBatchUpdateStatus,
   onDeleteCustomer,
   onDeleteBatchCustomers,
-  currentUser
+  currentUser,
+  onSyncNow,
+  isSyncing = false
 }) => {
   const [isImportScheduleOpen, setIsImportScheduleOpen] = useState<boolean>(false);
   const [industrySearchQuery, setIndustrySearchQuery] = useState<string>('');
@@ -517,6 +522,19 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               <option value="Verified">Verified (Ready Billing)</option>
               <option value="Invoiced">Invoiced</option>
             </select>
+
+            {onSyncNow && (
+              <button
+                type="button"
+                onClick={onSyncNow}
+                disabled={isSyncing}
+                className="px-3 py-1.5 text-xs font-bold bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                title="Sinkronisasi Otomatis Real-Time (Klik untuk sinkronkan manual sekarang)"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 ${isSyncing ? 'animate-spin' : ''}`} />
+                <span>{isSyncing ? 'Menyinkronkan...' : 'Auto-Sync Aktif'}</span>
+              </button>
+            )}
 
             <button
               onClick={onExportCSV}

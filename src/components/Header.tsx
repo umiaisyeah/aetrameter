@@ -13,7 +13,8 @@ import {
   Check,
   CalendarDays,
   Menu,
-  Sparkles
+  Sparkles,
+  RefreshCw
 } from 'lucide-react';
 import { UserProfile, CycleSchedule } from '../types';
 import { SimbaLogo } from './SimbaLogo';
@@ -36,6 +37,9 @@ interface HeaderProps {
   isSupabaseConnected?: boolean;
   onSwitchToFieldReader?: () => void;
   onToggleSidebar?: () => void;
+  onSyncNow?: () => void;
+  isSyncing?: boolean;
+  lastSyncText?: string;
 }
 
 const MONTH_NAMES = [
@@ -70,7 +74,10 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSupabaseModal,
   isSupabaseConnected = false,
   onSwitchToFieldReader,
-  onToggleSidebar
+  onToggleSidebar,
+  onSyncNow,
+  isSyncing = false,
+  lastSyncText = 'Baru saja'
 }) => {
   const [timeStr, setTimeStr] = useState('');
   const [dateStr, setDateStr] = useState('');
@@ -315,6 +322,24 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           )}
         </div>
+
+        {/* Real-time Auto-Sync Indicator & Instant Trigger Button */}
+        {onSyncNow && (
+          <button
+            type="button"
+            onClick={onSyncNow}
+            disabled={isSyncing}
+            className="px-3 py-1.5 text-xs font-bold bg-blue-50/90 dark:bg-blue-950/70 hover:bg-blue-100 dark:hover:bg-blue-900 text-[#0055A5] dark:text-blue-300 border border-blue-200/80 dark:border-blue-800 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+            title="Sinkronisasi Otomatis Cloud Real-Time (Klik untuk sinkronkan sekarang)"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-[#0055A5] dark:text-blue-400 ${isSyncing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline font-bold">Sinkronisasi:</span>
+            <span className="flex items-center gap-1 font-mono text-[11px] text-emerald-600 dark:text-emerald-400 font-extrabold">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>{isSyncing ? 'Menyinkronkan...' : 'Otomatis'}</span>
+            </span>
+          </button>
+        )}
 
         {/* Dark Mode Toggle */}
         <button

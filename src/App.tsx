@@ -39,12 +39,19 @@ import {
   insertSupabaseAuditLog,
   subscribeToFieldReaderUpdates
 } from './services/supabaseService';
-import { fetchCloudState, pushCloudState } from './services/cloudSyncService';
+import { fetchCloudState, pushCloudState, pushCustomerReading, pushStatusUpdate, subscribeToCloudEvents } from './services/cloudSyncService';
 
 export default function App() {
   // Always show login page first upon opening the application
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(true);
+
+  // Sync state tracking refs to eliminate race-conditions and push ping-pongs
+  const isReceivingRemoteUpdateRef = React.useRef<boolean>(false);
+  const lastRemoteUpdatedAtRef = React.useRef<string>('');
+  const lastSyncTimestampRef = React.useRef<number>(Date.now());
+  const [lastSyncText, setLastSyncText] = useState<string>('Baru saja');
+  const [isSyncingLive, setIsSyncingLive] = useState<boolean>(false);
 
   const [customers, setCustomers] = useState<IndustryCustomer[]>(() => {
     const saved = localStorage.getItem('aetra_industri_data');
@@ -70,7 +77,7 @@ export default function App() {
         }
       } catch {}
     }
-    return [];
+    return INITIAL_CUSTOMERS;
   });
 
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => {
@@ -211,14 +218,68 @@ export default function App() {
 
   // Cloud Backend & Supabase Initial Load & Realtime Sync across devices
   useEffect(() => {
-    let unsubscribe: (() => void) | null = null;
+    let unsubscribeSupabase: (() => void) | null = null;
     let pollInterval: any = null;
 
+    // 1. Live Server-Sent Events (SSE) stream for instantaneous (< 50ms) auto-sync across devices
+    const unsubscribeSSE = subscribeToCloudEvents((event) => {
+      if (!event) return;
+      lastSyncTimestampRef.current = Date.now();
+      setLastSyncText('Baru saja');
+
+      if (event.type === 'READING_SAVED' && event.customer) {
+        isReceivingRemoteUpdateRef.current = true;
+        setCustomers((prev) => {
+          const exists = prev.some((c) => c.id === event.customer.id);
+          if (exists) {
+            return prev.map((c) => (c.id === event.customer.id ? event.customer : c));
+          }
+          return [event.customer, ...prev];
+        });
+
+        if (event.auditLog) {
+          setAuditLogs((prev) => [event.auditLog, ...prev]);
+        }
+
+        showToast({
+          title: '📥 Stand Baru Masuk dari Lapangan! 🛰️',
+          message: `${event.customer.petugasBaca || 'Petugas'} telah mencatat ${event.customer.nama} (Stand: ${(event.customer.skrg || 0).toLocaleString()} m³).`,
+          type: 'info'
+        });
+      } else if (event.type === 'STATUS_UPDATED' && Array.isArray(event.ids)) {
+        isReceivingRemoteUpdateRef.current = true;
+        setCustomers((prev) =>
+          prev.map((c) =>
+            event.ids.includes(c.id) ? { ...c, status: event.status, catatan: event.note || c.catatan } : c
+          )
+        );
+        if (event.auditLog) {
+          setAuditLogs((prev) => [event.auditLog, ...prev]);
+        }
+      } else if (event.type === 'STATE_UPDATE') {
+        isReceivingRemoteUpdateRef.current = true;
+        if (Array.isArray(event.customers) && event.customers.length > 0) {
+          setCustomers(event.customers);
+        }
+        if (Array.isArray(event.meterReaders) && event.meterReaders.length > 0) {
+          setMeterReaders(event.meterReaders);
+        }
+        if (Array.isArray(event.cycleSchedules) && event.cycleSchedules.length > 0) {
+          setCycleSchedules(event.cycleSchedules);
+        }
+        if (Array.isArray(event.auditLogs) && event.auditLogs.length > 0) {
+          setAuditLogs(event.auditLogs);
+        }
+      }
+    });
+
     const initCloudSync = async () => {
-      // 1. Fetch from cloud backend (/api/sync-state)
+      // 2. Initial fetch from cloud backend (/api/sync-state)
       try {
         const cloud = await fetchCloudState();
         if (cloud) {
+          isReceivingRemoteUpdateRef.current = true;
+          if (cloud.updatedAt) lastRemoteUpdatedAtRef.current = cloud.updatedAt;
           if (cloud.customers && cloud.customers.length > 0) setCustomers(cloud.customers);
           if (cloud.meterReaders && cloud.meterReaders.length > 0) setMeterReaders(cloud.meterReaders);
           if (cloud.cycleSchedules && cloud.cycleSchedules.length > 0) setCycleSchedules(cloud.cycleSchedules);
@@ -226,7 +287,7 @@ export default function App() {
         }
       } catch {}
 
-      // 2. Supabase if configured with valid HTTP/HTTPS URL and tables are ready
+      // 3. Supabase if configured with valid HTTP/HTTPS URL and tables are ready
       try {
         const config = getSupabaseConfig();
         if (config.isConfigured) {
@@ -234,14 +295,18 @@ export default function App() {
           if (test.success && test.tablesReady) {
             setIsSupabaseConnected(true);
             const remoteCusts = await fetchSupabaseCustomers();
-            if (remoteCusts && remoteCusts.length > 0) setCustomers(remoteCusts);
+            if (remoteCusts && remoteCusts.length > 0) {
+              isReceivingRemoteUpdateRef.current = true;
+              setCustomers(remoteCusts);
+            }
             const remoteReaders = await fetchSupabaseMeterReaders();
             if (remoteReaders && remoteReaders.length > 0) setMeterReaders(remoteReaders);
             const remoteSchedules = await fetchSupabaseCycleSchedules();
             if (remoteSchedules && remoteSchedules.length > 0) setCycleSchedules(remoteSchedules);
 
-            unsubscribe = subscribeToFieldReaderUpdates(
+            unsubscribeSupabase = subscribeToFieldReaderUpdates(
               (updatedCust) => {
+                isReceivingRemoteUpdateRef.current = true;
                 setCustomers((prev) => {
                   const exists = prev.some((c) => c.id === updatedCust.id);
                   if (exists) {
@@ -251,6 +316,7 @@ export default function App() {
                 });
               },
               (deletedId) => {
+                isReceivingRemoteUpdateRef.current = true;
                 setCustomers((prev) => prev.filter((c) => c.id !== deletedId));
               },
               (newLog) => {
@@ -264,61 +330,51 @@ export default function App() {
           setIsSupabaseConnected(false);
         }
       } catch (e) {
-        console.warn('Supabase initialization bypassed:', e);
         setIsSupabaseConnected(false);
       }
 
-      // 3. Fast background polling for cross-device realtime sync (every 2.5 seconds)
+      // 4. Fallback polling for cross-device realtime sync (every 3 seconds)
       pollInterval = setInterval(async () => {
         try {
           const cloud = await fetchCloudState();
-          if (cloud && cloud.customers && cloud.customers.length > 0) {
-            setCustomers((prev) => {
-              // Deep compare length and key properties to avoid unnecessary re-renders
-              if (prev.length !== cloud.customers.length) {
-                return cloud.customers;
-              }
-              const hasChange = cloud.customers.some((c, i) => {
-                const p = prev[i];
-                return !p || p.id !== c.id || p.skrg !== c.skrg || p.status !== c.status || p.catatan !== c.catatan;
-              });
-              if (hasChange) {
-                return cloud.customers;
-              }
-              return prev;
-            });
-          }
-          if (cloud && cloud.meterReaders && cloud.meterReaders.length > 0) {
-            setMeterReaders((prev) => {
-              if (prev.length !== cloud.meterReaders.length) {
-                return cloud.meterReaders;
-              }
-              return prev;
-            });
-          }
-          if (cloud && cloud.cycleSchedules && cloud.cycleSchedules.length > 0) {
-            setCycleSchedules((prev) => {
-              if (prev.length !== cloud.cycleSchedules.length) {
-                return cloud.cycleSchedules;
-              }
-              return prev;
-            });
+          if (cloud && cloud.updatedAt && cloud.updatedAt !== lastRemoteUpdatedAtRef.current) {
+            lastRemoteUpdatedAtRef.current = cloud.updatedAt;
+            isReceivingRemoteUpdateRef.current = true;
+
+            if (cloud.customers && cloud.customers.length > 0) {
+              setCustomers(cloud.customers);
+            }
+            if (cloud.meterReaders && cloud.meterReaders.length > 0) {
+              setMeterReaders(cloud.meterReaders);
+            }
+            if (cloud.cycleSchedules && cloud.cycleSchedules.length > 0) {
+              setCycleSchedules(cloud.cycleSchedules);
+            }
+            if (cloud.auditLogs && cloud.auditLogs.length > 0) {
+              setAuditLogs(cloud.auditLogs);
+            }
+            setLastSyncText('Baru saja');
           }
         } catch {}
-      }, 2500);
+      }, 3000);
     };
 
     initCloudSync();
 
     return () => {
-      if (unsubscribe) unsubscribe();
+      unsubscribeSSE();
+      if (unsubscribeSupabase) unsubscribeSupabase();
       if (pollInterval) clearInterval(pollInterval);
     };
   }, []);
 
-  // Auto push state to cloud backend on change for cross-device sync
+  // Safe auto push state to cloud backend on change for cross-device sync (preventing push feedback loops)
   useEffect(() => {
     if (customers.length === 0) return;
+    if (isReceivingRemoteUpdateRef.current) {
+      isReceivingRemoteUpdateRef.current = false;
+      return;
+    }
     const timer = setTimeout(() => {
       pushCloudState({
         customers,
@@ -326,7 +382,7 @@ export default function App() {
         cycleSchedules,
         auditLogs
       }).catch(() => {});
-    }, 400);
+    }, 600);
     return () => clearTimeout(timer);
   }, [customers, meterReaders, cycleSchedules, auditLogs]);
 
@@ -418,8 +474,21 @@ export default function App() {
       return nextCusts;
     });
 
-    // Instant cloud push
-    pushCloudState({ customers: nextCusts, updatedAt: new Date().toISOString() }).catch(() => {});
+    const now = new Date();
+    const timeFormatted = `${now.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'][now.getMonth()]} ${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+    const logEntry: AuditLog = {
+      id: `log-${Date.now()}`,
+      time: timeFormatted,
+      user: updated.petugasBaca || currentUser?.name || 'Petugas Lapangan',
+      role: updated.kategoriPetugas || 'Tim Meter Reading',
+      desc: `Pencatat meter ${updated.petugasBaca || currentUser?.name || 'Petugas'} mencatat stand ${updated.nama} (${updated.id}) ke angka ${updated.skrg.toLocaleString()} m³`,
+      type: 'update'
+    };
+
+    setAuditLogs((prev) => [logEntry, ...prev]);
+
+    // Instant cloud push via dedicated high-speed reading sync endpoint (instant SSE push to admin)
+    pushCustomerReading(updated, logEntry).catch(() => {});
     upsertSupabaseCustomer(updated).catch(() => {});
 
     // Instant multi-tab broadcast
@@ -434,10 +503,8 @@ export default function App() {
       bc.close();
     } catch {}
 
-    logActivity(
-      `Pencatat meter ${updated.petugasBaca || currentUser?.name || 'Petugas'} mengirim hasil pembacaan stand ${updated.nama} (${updated.id}) ke angka ${updated.skrg.toLocaleString()} m³`,
-      'update'
-    );
+    lastSyncTimestampRef.current = Date.now();
+    setLastSyncText('Baru saja');
     setSelectedCustomerForDetail(null);
   };
 
@@ -453,7 +520,21 @@ export default function App() {
       return nextCusts;
     });
 
-    pushCloudState({ customers: nextCusts, updatedAt: new Date().toISOString() }).catch(() => {});
+    const now = new Date();
+    const timeFormatted = `${now.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'][now.getMonth()]} ${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+    const invoiceLog: AuditLog = {
+      id: `log-${Date.now()}`,
+      time: timeFormatted,
+      user: currentUser?.name || 'Pak Yaya',
+      role: currentUser?.title || 'Tim Billing & Invoicing',
+      desc: `Menerbitkan faktur tagihan & email untuk ${updated.nama} (${updated.id})`,
+      type: 'invoice'
+    };
+
+    setAuditLogs((prev) => [invoiceLog, ...prev]);
+
+    // Instant cloud push via reading endpoint
+    pushCustomerReading(invoicedCust, invoiceLog).catch(() => {});
     upsertSupabaseCustomer(invoicedCust).catch(() => {});
 
     try {
@@ -467,10 +548,8 @@ export default function App() {
       bc.close();
     } catch {}
 
-    logActivity(
-      `Menerbitkan faktur tagihan & email untuk ${updated.nama} (${updated.id})`,
-      'invoice'
-    );
+    lastSyncTimestampRef.current = Date.now();
+    setLastSyncText('Baru saja');
     setSelectedCustomerForDetail(invoicedCust);
   };
 
@@ -547,8 +626,9 @@ export default function App() {
     newStatus: WorkflowStatus,
     note?: string
   ) => {
-    setCustomers((prev) =>
-      prev.map((c) => {
+    let nextCusts: IndustryCustomer[] = [];
+    setCustomers((prev) => {
+      nextCusts = prev.map((c) => {
         if (ids.includes(c.id)) {
           return {
             ...c,
@@ -557,13 +637,41 @@ export default function App() {
           };
         }
         return c;
-      })
-    );
+      });
+      return nextCusts;
+    });
+
+    const now = new Date();
+    const timeFormatted = `${now.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'][now.getMonth()]} ${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+    const logEntry: AuditLog = {
+      id: `log-${Date.now()}`,
+      time: timeFormatted,
+      user: currentUser ? currentUser.name : 'Admin SIMBA',
+      role: currentUser ? currentUser.title : 'Management',
+      desc: `Memperbarui status ${ids.length} industri menjadi '${newStatus}'`,
+      type: 'update'
+    };
+
+    setAuditLogs((prev) => [logEntry, ...prev]);
+
+    // Push status update to cloud backend and broadcast via SSE
+    pushStatusUpdate(ids, newStatus, note, logEntry).catch(() => {});
     batchUpdateSupabaseStatus(ids, newStatus, note).catch(() => {});
-    logActivity(
-      `Memperbarui status ${ids.length} industri menjadi '${newStatus}'`,
-      'update'
-    );
+
+    try {
+      const bc = new BroadcastChannel('aetra_simba_online_sync');
+      bc.postMessage({
+        type: 'STATUS_UPDATED',
+        ids,
+        status: newStatus,
+        note,
+        customers: nextCusts
+      });
+      bc.close();
+    } catch {}
+
+    lastSyncTimestampRef.current = Date.now();
+    setLastSyncText('Baru saja');
   };
 
   // Meter Reader handlers
@@ -707,10 +815,13 @@ export default function App() {
   }, []);
 
   const handleSyncNow = async () => {
+    setIsSyncingLive(true);
     try {
       // 1. Always sync with SIMBA Cloud Server first
       const cloud = await fetchCloudState();
       if (cloud && cloud.customers && cloud.customers.length > 0) {
+        isReceivingRemoteUpdateRef.current = true;
+        if (cloud.updatedAt) lastRemoteUpdatedAtRef.current = cloud.updatedAt;
         setCustomers(cloud.customers);
         if (cloud.meterReaders?.length) setMeterReaders(cloud.meterReaders);
         if (cloud.cycleSchedules?.length) setCycleSchedules(cloud.cycleSchedules);
@@ -729,7 +840,10 @@ export default function App() {
               fetchSupabaseCycleSchedules()
             ]);
 
-            if (remoteCusts && remoteCusts.length > 0) setCustomers(remoteCusts);
+            if (remoteCusts && remoteCusts.length > 0) {
+              isReceivingRemoteUpdateRef.current = true;
+              setCustomers(remoteCusts);
+            }
             if (remoteReaders && remoteReaders.length > 0) setMeterReaders(remoteReaders);
             if (remoteSchedules && remoteSchedules.length > 0) setCycleSchedules(remoteSchedules);
             setIsSupabaseConnected(true);
@@ -744,19 +858,22 @@ export default function App() {
         bc.close();
       } catch {}
 
-      showColorfulAlert({
-        title: 'Sinkronisasi Otomatis Berhasil! 🔄',
+      lastSyncTimestampRef.current = Date.now();
+      setLastSyncText('Baru saja');
+
+      showToast({
+        title: '⚡ Sinkronisasi Otomatis Berhasil!',
         message: 'Data pembacaan meter, penugasan petugas, dan tagihan industri telah disinkronkan secara real-time ke cloud.',
-        type: 'success',
-        badge: 'AUTO-SYNC'
+        type: 'success'
       });
     } catch (err: any) {
-      showColorfulAlert({
+      showToast({
         title: 'Sinkronisasi Selesai',
         message: 'Data SIMBA telah tersinkronisasi lintas perangkat.',
-        type: 'success',
-        badge: 'SYNC'
+        type: 'info'
       });
+    } finally {
+      setIsSyncingLive(false);
     }
   };
 
@@ -946,6 +1063,9 @@ export default function App() {
           onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
           isSupabaseConnected={isSupabaseConnected}
           onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+          onSyncNow={handleSyncNow}
+          isSyncing={isSyncingLive}
+          lastSyncText={lastSyncText}
           onSwitchToFieldReader={() => {
             const firstReader = meterReaders[0];
             const fieldUser: UserProfile = {
@@ -992,6 +1112,8 @@ export default function App() {
               onDeleteCustomer={handleDeleteCustomer}
               onDeleteBatchCustomers={handleDeleteBatchCustomers}
               currentUser={currentUser}
+              onSyncNow={handleSyncNow}
+              isSyncing={isSyncingLive}
             />
           )}
 

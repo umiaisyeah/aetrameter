@@ -7,12 +7,14 @@ export const isTableNotFoundError = (error: any): boolean => {
   if (!error) return false;
   const msg = String(error.message || '').toLowerCase();
   const code = String(error.code || '');
+  // If the error explicitly mentions a missing column, it is NOT a missing table!
+  if (msg.includes('column') && msg.includes('does not exist')) return false;
   return (
     code === 'PGRST205' ||
     code === '42P01' ||
     msg.includes('could not find the table') ||
     msg.includes('schema cache') ||
-    (msg.includes('relation') && msg.includes('does not exist'))
+    (msg.includes('relation') && msg.includes('does not exist') && !msg.includes('column'))
   );
 };
 

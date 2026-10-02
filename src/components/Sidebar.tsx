@@ -207,6 +207,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
 
+          {/* Real-time Cloud Auto-Sync Status Badge */}
+          <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-white/10 border border-white/15 text-[10px]">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="font-bold text-white">Sinkronisasi Otomatis</span>
+            </div>
+            <span className="font-mono text-emerald-300 font-extrabold text-[9px] bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-400/30">
+              REAL-TIME
+            </span>
+          </div>
+
           <div className="pt-1.5 border-t border-white/10 flex items-center justify-between text-[10px] text-blue-300/70 font-medium">
             <span>PT Aetra Air Tangerang</span>
             <span className="font-mono">© 2026</span>

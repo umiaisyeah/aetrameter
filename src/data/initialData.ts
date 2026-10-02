@@ -53,7 +53,9 @@ export const USER_PROFILES: Record<string, UserProfile> = {
   }
 };
 
-export const INITIAL_CUSTOMERS: IndustryCustomer[] = [];
+import customersList from './customersData.json';
+
+export const INITIAL_CUSTOMERS: IndustryCustomer[] = (customersList as IndustryCustomer[]) || [];
 
 export const INITIAL_AUDIT_LOGS: AuditLog[] = [
   {
