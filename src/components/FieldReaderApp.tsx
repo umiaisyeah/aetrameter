@@ -457,6 +457,7 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
       meterWaktuFoto: waktuStr,
       bpmWaktuFoto: waktuStr,
       waktuBaca: waktuStr,
+      waktuBacaTimestamp: now.getTime(),
       petugasBaca: currentUser.name,
       kategoriPetugas: currentUser.kategori || 'Kontraktor (PT Hideco)',
       catatan: catatan.trim() // Terisi HANYA apabila pencatat/pembaca meter melakukan pengisian
@@ -1155,128 +1156,152 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
             </div>
           )}
 
-          {/* ======================= TAB 2: MONITORING KESELURUHAN ======================= */}
+          {/* ======================= TAB 2: MONITORING PRIBADI PETUGAS ======================= */}
           {mobileTab === 'monitoring' && (
             <div className="space-y-3.5 animate-in fade-in duration-150">
               <div className={`p-3.5 rounded-2xl border ${
                 isFieldDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'
               }`}>
-                <h2 className="font-black text-xs text-slate-900 dark:text-white flex items-center gap-1.5 flex-wrap">
-                  <BarChart3 className="w-4 h-4 text-[#E86216] shrink-0" />
-                  <span className="break-words">Monitoring Progress Catat Meter Lapangan</span>
-                </h2>
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="font-black text-xs text-slate-900 dark:text-white flex items-center gap-1.5 flex-wrap">
+                    <BarChart3 className="w-4 h-4 text-[#E86216] shrink-0" />
+                    <span>Monitoring Capaian Saya</span>
+                  </h2>
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-blue-100 text-[#0055A5] dark:bg-blue-950 dark:text-blue-300">
+                    {currentUser.name}
+                  </span>
+                </div>
                 <p className="text-[11px] text-slate-400 mt-0.5 break-words leading-relaxed">
-                  Status keterbacaan seluruh siklus cycle dan tim petugas lapangan.
+                  Status dan progres pembacaan stand meter industri yang ditugaskan khusus ke akun Anda.
                 </p>
               </div>
 
-              {/* Monitoring per Cycle (1 - 15) */}
-              <div className="space-y-2">
-                <h3 className="font-bold text-xs text-slate-700 dark:text-slate-300 px-1 break-words">
-                  Progress Seluruh Cycle (Cycle 1 s/d 15)
-                </h3>
-
-                {cycleProgressStats.map((st) => (
-                  <div
-                    key={st.cycle}
-                    className={`p-3 rounded-2xl border transition ${
-                      st.isMyCycle
-                        ? isFieldDarkMode
-                          ? 'bg-blue-950/30 border-blue-800/80'
-                          : 'bg-blue-50/70 border-blue-200'
-                        : isFieldDarkMode
-                        ? 'bg-slate-900 border-slate-800'
-                        : 'bg-white border-slate-200'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between text-xs mb-1.5 gap-2">
-                      <div className="flex items-center gap-1.5 min-w-0 flex-1 flex-wrap">
-                        <span className="font-black text-slate-900 dark:text-white text-xs break-words">
-                          {st.cycle}
-                        </span>
-                        {st.isMyCycle && (
-                          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-[#E86216] text-white shrink-0">
-                            Tugas Saya
-                          </span>
-                        )}
-                        <span className="text-[10px] text-slate-400 break-words leading-tight">
-                          · {st.petugasUtama}
-                        </span>
-                      </div>
-                      <span className="font-mono font-bold text-xs text-[#0055A5] dark:text-blue-400 shrink-0 whitespace-nowrap">
-                        {st.percent}%
-                      </span>
-                    </div>
-
-                    {/* Progress Bar */}
-                    <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden mb-2">
-                      <div
-                        className={`h-full rounded-full transition-all duration-300 ${
-                          st.percent === 100
-                            ? 'bg-emerald-500'
-                            : st.percent >= 50
-                            ? 'bg-[#0055A5]'
-                            : 'bg-[#E86216]'
-                        }`}
-                        style={{ width: `${st.percent}%` }}
-                      ></div>
-                    </div>
-
-                    <div className="flex items-center justify-between text-[10px] text-slate-400 gap-2 flex-wrap">
-                      <span className="break-words">Total: {st.total} Industri</span>
-                      <span className="break-words">Selesai: {st.verified + st.pending} / {st.total}</span>
-                    </div>
+              {/* Personal Overall Performance Summary */}
+              <div className={`p-4 rounded-3xl border shadow-sm ${
+                isFieldDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-gradient-to-br from-white to-blue-50/50 border-slate-200'
+              }`}>
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Total Capaian Pencatatan
+                    </span>
+                    <span className="text-xl font-black text-slate-900 dark:text-white mt-0.5 block">
+                      {myPercentComplete}% Selesai
+                    </span>
                   </div>
-                ))}
+                  <div className="text-right">
+                    <span className="text-[10px] font-mono font-bold text-[#0055A5] dark:text-blue-400 block">
+                      {verifiedCount + pendingCount} dari {totalMyCust} Industri
+                    </span>
+                    <span className="text-[9px] text-slate-400 block mt-0.5">
+                      Sisa: {unreadCount} Belum Dibaca
+                    </span>
+                  </div>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="w-full h-3 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden p-0.5">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 shadow-xs ${
+                      myPercentComplete === 100
+                        ? 'bg-emerald-500'
+                        : myPercentComplete >= 50
+                        ? 'bg-[#0055A5]'
+                        : 'bg-[#E86216]'
+                    }`}
+                    style={{ width: `${myPercentComplete}%` }}
+                  />
+                </div>
+
+                {/* 3 Metric Cards */}
+                <div className="grid grid-cols-3 gap-2 mt-3.5 pt-3 border-t border-slate-200/80 dark:border-slate-800 text-center">
+                  <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
+                    <span className="text-[9px] font-bold text-slate-400 block uppercase">Total Tugas</span>
+                    <span className="font-mono font-black text-sm text-slate-800 dark:text-slate-100 mt-0.5 block">
+                      {totalMyCust}
+                    </span>
+                  </div>
+                  <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-900/60">
+                    <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-400 block uppercase">Sudah Dibaca</span>
+                    <span className="font-mono font-black text-sm text-emerald-700 dark:text-emerald-300 mt-0.5 block">
+                      {verifiedCount + pendingCount}
+                    </span>
+                  </div>
+                  <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-900/60">
+                    <span className="text-[9px] font-bold text-amber-700 dark:text-amber-400 block uppercase">Belum Dibaca</span>
+                    <span className="font-mono font-black text-sm text-amber-700 dark:text-amber-300 mt-0.5 block">
+                      {unreadCount}
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              {/* Progress per Tim Petugas */}
-              <div className="space-y-2 pt-2">
+              {/* Monitoring per Assigned Cycle HANYA milik pembaca meter ini */}
+              <div className="space-y-2">
                 <h3 className="font-bold text-xs text-slate-700 dark:text-slate-300 px-1 break-words">
-                  Progress Tim Pembaca Meter
+                  Rincian Penugasan Siklus Cycle Anda ({assignedCycleSchedules.length} Cycle)
                 </h3>
 
-                {readerProgressStats.map((rp) => (
-                  <div
-                    key={rp.reader.id}
-                    className={`p-3 rounded-2xl border ${
-                      rp.reader.id === currentUser.readerId
-                        ? isFieldDarkMode
-                          ? 'bg-orange-950/20 border-orange-800/80'
-                          : 'bg-orange-50/60 border-orange-200'
-                        : isFieldDarkMode
-                        ? 'bg-slate-900 border-slate-800'
-                        : 'bg-white border-slate-200'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between text-xs mb-1 gap-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-extrabold text-slate-900 dark:text-white break-words">
-                            {rp.reader.nama}
+                {assignedCycleSchedules.length === 0 ? (
+                  <div className={`p-4 rounded-2xl border text-center text-xs text-slate-400 ${
+                    isFieldDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+                  }`}>
+                    Belum ada siklus cycle yang ditugaskan ke akun Anda.
+                  </div>
+                ) : (
+                  assignedCycleSchedules.map((cs) => {
+                    const cycleCusts = myAssignedCustomers.filter(
+                      (c) => c.cycle.toLowerCase() === cs.cycle.toLowerCase()
+                    );
+                    const total = cycleCusts.length;
+                    const done = cycleCusts.filter((c) => c.status !== 'Belum Dibaca').length;
+                    const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+
+                    return (
+                      <div
+                        key={cs.cycle}
+                        className={`p-3 rounded-2xl border transition ${
+                          isFieldDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between text-xs mb-1.5 gap-2">
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                            <span className="font-black text-slate-900 dark:text-white text-xs">
+                              {cs.cycle}
+                            </span>
+                            <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-blue-100 text-[#0055A5] dark:bg-blue-950 dark:text-blue-300">
+                              {total} Industri
+                            </span>
+                          </div>
+                          <span className="font-mono font-extrabold text-xs text-[#0055A5] dark:text-cyan-400">
+                            {done}/{total} ({percent}%)
                           </span>
-                          <span className={`px-1.5 py-0.2 rounded text-[8px] font-black uppercase shrink-0 ${
-                            rp.reader.kategori === 'Key Account'
-                              ? 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300'
-                              : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
-                          }`}>
-                            {rp.reader.kategori}
+                        </div>
+
+                        {/* Mini progress bar */}
+                        <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden mb-2">
+                          <div
+                            className={`h-full rounded-full transition-all duration-300 ${
+                              percent === 100
+                                ? 'bg-emerald-500'
+                                : percent >= 50
+                                ? 'bg-[#0055A5]'
+                                : 'bg-[#E86216]'
+                            }`}
+                            style={{ width: `${percent}%` }}
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between text-[10px] text-slate-400">
+                          <span>Jadwal: {cs.schedule?.tanggalMulai || 'Bulan Ini'} - {cs.schedule?.tanggalSelesai || 'Akhir Bulan'}</span>
+                          <span className={percent === 100 ? 'text-emerald-600 font-bold' : 'text-amber-600 font-bold'}>
+                            {percent === 100 ? '✓ Selesai Terbaca' : `Sisa ${total - done} Industri`}
                           </span>
                         </div>
                       </div>
-                      <span className="font-mono font-bold text-xs text-[#0055A5] dark:text-blue-400 shrink-0 whitespace-nowrap">
-                        {rp.percent}%
-                      </span>
-                    </div>
-
-                    <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden mt-2">
-                      <div
-                        className="h-full bg-gradient-to-r from-[#0055A5] to-[#E86216] rounded-full"
-                        style={{ width: `${rp.percent}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                ))}
+                    );
+                  })
+                )}
               </div>
             </div>
           )}

@@ -25,6 +25,20 @@ export type CustomerClass = 'Premium' | 'Platinum' | 'Gold' | 'Silver' | 'Bronze
 
 export type WorkflowStatus = 'Belum Dibaca' | 'Pending Verification' | 'Verified' | 'Invoiced';
 
+export interface WorkflowHistoryItem {
+  stage: 'pencatatan' | 'verifikasi' | 'invoicing';
+  title: string;
+  user: string;
+  role: string;
+  time: string;
+  timestampMs?: number;
+  stand?: number;
+  volume?: number;
+  notes?: string;
+  gps?: string;
+  fotoUrl?: string;
+}
+
 export type ReaderCategory = 'Kontraktor (PT Hideco)' | 'Key Account' | 'Kontraktor' | string;
 
 export interface MeterReader {
@@ -96,6 +110,12 @@ export interface IndustryCustomer {
   bpmLatitude?: number;
   bpmLongitude?: number;
   bpmWaktuFoto?: string;
+  waktuBacaTimestamp?: number;
+  verifiedBy?: string;
+  verifiedAt?: string;
+  invoicedBy?: string;
+  invoicedAt?: string;
+  workflowHistory?: WorkflowHistoryItem[];
   // Pergeseran Hari Baca Industri
   adaPergeseran?: boolean;
   tanggalPergeseranBaru?: string;

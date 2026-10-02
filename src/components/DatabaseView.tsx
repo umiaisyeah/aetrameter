@@ -20,6 +20,7 @@ import bpmDocImg from '../assets/images/meter_bpm_document_1790243369057.jpg';
 import { MeterReaderManagementSection } from './MeterReaderManagementSection';
 import { CycleScheduleSection } from './CycleScheduleSection';
 import { ImportCycleScheduleModal } from './ImportCycleScheduleModal';
+import { WorkflowStatusBadge } from './WorkflowStatusBadge';
 import { showColorfulAlert, showToast } from '../utils/notificationSystem';
 import { getReaderCategory } from '../utils/readerAssignmentHelper';
 
@@ -840,9 +841,11 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                               </span>
                             </td>
                             <td className="p-3">
-                              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                                {item.status}
-                              </span>
+                              <WorkflowStatusBadge
+                                status={item.status}
+                                showProgressTrack={true}
+                                showPhotoBadge={false}
+                              />
                             </td>
                             <td className="p-3 text-center">
                               <button

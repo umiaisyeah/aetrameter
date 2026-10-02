@@ -34,6 +34,7 @@ import { MeterReaderProgressSection } from './MeterReaderProgressSection';
 import { ImportCycleScheduleModal } from './ImportCycleScheduleModal';
 import { OfficialAetraInvoiceModal } from './OfficialAetraInvoiceModal';
 import { SectionProgressHub } from './SectionProgressHub';
+import { WorkflowStatusBadge } from './WorkflowStatusBadge';
 import { showColorfulAlert } from '../utils/notificationSystem';
 import {
   ResponsiveContainer,
@@ -124,9 +125,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     onSelectCycle(newCycle);
   };
 
-  // Filtered rows for the table including industry progress search
+  // Filtered rows for the table including industry progress search & chronological reading sort
   const filteredCustomers = useMemo(() => {
-    return customers.filter((c) => {
+    const list = customers.filter((c) => {
       // 1. Workflow filter
       if (workflowFilter !== 'ALL' && c.status !== workflowFilter) return false;
 
@@ -144,6 +145,28 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       }
 
       return true;
+    });
+
+    // Helper to get chronological timestamp of meter reading
+    const getReadingTime = (c: IndustryCustomer): number => {
+      if (c.waktuBacaTimestamp) return c.waktuBacaTimestamp;
+      if (!c.waktuBaca) return 0;
+      const parsed = Date.parse(c.waktuBaca);
+      if (!isNaN(parsed)) return parsed;
+      return 0;
+    };
+
+    // Sort order: If viewing Pending Verification or Verified, prioritize reading order (FIFO: yang dibaca terlebih dulu)
+    return [...list].sort((a, b) => {
+      const timeA = getReadingTime(a);
+      const timeB = getReadingTime(b);
+
+      if (workflowFilter === 'Pending Verification' || workflowFilter === 'Verified') {
+        if (timeA && timeB) return timeA - timeB; // Yang dibaca lebih dulu muncul pertama
+        if (timeA) return -1;
+        if (timeB) return 1;
+      }
+      return 0;
     });
   }, [customers, workflowFilter, industrySearchQuery]);
 
@@ -715,25 +738,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                         </>
                       )}
                       <td className="p-3.5">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span
-                            className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${badgeColor}`}
-                          >
-                            {item.status}
-                          </span>
-                          {item.status === 'Belum Dibaca' || !item.fotoMeter ? (
-                            <span className="text-[9px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800">
-                              📷 Foto &amp; BPM: Menunggu Petugas
-                            </span>
-                          ) : (
-                            <span className="text-[9px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
-                              ✓ Foto &amp; BPM Terlampir
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[10px] text-slate-400 mt-1 max-w-xs truncate">
-                          {item.catatan || '-'}
-                        </p>
+                        <WorkflowStatusBadge
+                          status={item.status}
+                          catatan={item.catatan}
+                          hasPhoto={Boolean(item.fotoMeter)}
+                          showProgressTrack={true}
+                          showPhotoBadge={true}
+                        />
                       </td>
                       <td className="p-3.5 text-center">
                         <div className="flex items-center justify-center gap-1.5">

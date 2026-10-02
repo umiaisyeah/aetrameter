@@ -6,6 +6,8 @@ import bpmDocImg from '../assets/images/meter_bpm_document_1790243369057.jpg';
 import { showColorfulAlert } from '../utils/notificationSystem';
 import { RealtimeLocationMap } from './RealtimeLocationMap';
 import { PhotoGeotagStamp } from './PhotoGeotagStamp';
+import { PhotoLightboxModal } from './PhotoLightboxModal';
+import { IndustryWorkflowTracker } from './IndustryWorkflowTracker';
 import { calculateAetraInvoice, formatRupiah } from '../utils/aetraInvoiceCalculator';
 
 interface DetailModalProps {
@@ -31,6 +33,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
   const [catatan, setCatatan] = useState<string>(customer?.catatan || '');
   const [showOutlookBox, setShowOutlookBox] = useState<boolean>(false);
   const [outlookLink, setOutlookLink] = useState<string>('');
+  const [lightboxPhoto, setLightboxPhoto] = useState<'meter' | 'bpm' | null>(null);
 
   useEffect(() => {
     if (customer) {
@@ -78,13 +81,20 @@ export const DetailModal: React.FC<DetailModalProps> = ({
   const isBillingUser = canManageBilling;
 
   const handleSave = () => {
+    const now = new Date();
+    const waktuStr = `${now.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })} ${String(
+      now.getHours()
+    ).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} WIB`;
+
     if (canManageBilling) {
       // Billing user executes invoice process
       const updated: IndustryCustomer = {
         ...customer,
         skrg: currentStand,
         status: 'Invoiced',
-        catatan: `Faktur tagihan diterbitkan oleh ${currentUser.name} (${new Date().toLocaleDateString('id-ID')})`
+        invoicedBy: `${currentUser.name} (${currentUser.title})`,
+        invoicedAt: waktuStr,
+        catatan: `Faktur tagihan diterbitkan oleh ${currentUser.name} (${waktuStr})`
       };
 
       const mailto = `mailto:${encodeURIComponent(customer.email)}?subject=${encodeURIComponent(
@@ -120,6 +130,8 @@ export const DetailModal: React.FC<DetailModalProps> = ({
         ...customer,
         skrg: currentStand > 0 ? currentStand : customer.skrg,
         status: 'Verified',
+        verifiedBy: `${currentUser.name} (${currentUser.title})`,
+        verifiedAt: waktuStr,
         catatan: catatan.trim() || `Diverifikasi resmi oleh ${currentUser.name} (Tim Meter Reading)`,
         history: updatedHistory,
         fotoMeter: customer.fotoMeter || meterGaugeImg,
