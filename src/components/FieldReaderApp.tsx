@@ -126,6 +126,15 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
 
   useEffect(() => {
     localStorage.setItem('aetra_field_reader_dark_mode', String(isFieldDarkMode));
+    if (isFieldDarkMode) {
+      document.documentElement.classList.add('dark');
+      document.body.classList.add('dark');
+      document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.body.classList.remove('dark');
+      document.documentElement.removeAttribute('data-theme');
+    }
   }, [isFieldDarkMode]);
 
   // Real-time clock timer updates every second
@@ -496,7 +505,7 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
 
   return (
     <div className={`min-h-screen transition-colors duration-200 ${
-      isFieldDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-800'
+      isFieldDarkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-800'
     } flex flex-col items-center justify-start p-0 sm:p-4 md:p-6 font-sans selection:bg-orange-500 selection:text-white`}>
       
       {/* Top Desktop Controls Bar */}
@@ -572,7 +581,7 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
       {/* ===================== NATURAL RESPONSIVE APP CONTAINER ===================== */}
       <div
         className={`w-full max-w-4xl mx-auto rounded-2xl border shadow-xl ${
-          isFieldDarkMode ? 'bg-slate-900 text-slate-100 border-slate-800' : 'bg-white text-slate-800 border-slate-200'
+          isFieldDarkMode ? 'dark bg-slate-900 text-slate-100 border-slate-800' : 'bg-white text-slate-800 border-slate-200'
         } flex flex-col h-[88vh] max-h-[880px] overflow-hidden`}
       >
         {/* ===================== SYNCHRONIZED RUNNING TEXT (HP TAILORED) ===================== */}
@@ -1060,8 +1069,8 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                             onClick={() => handleOpenReadingForm(cust)}
                             className={`p-4 rounded-2xl border transition duration-150 cursor-pointer hover:shadow-md flex flex-col gap-3.5 [word-break:break-word] relative overflow-hidden ${
                               isFieldDarkMode
-                                ? 'bg-slate-900/90 hover:bg-slate-850 border-slate-800 hover:border-blue-700/60'
-                                : 'bg-white hover:bg-slate-50/90 border-slate-200 hover:border-blue-300'
+                                ? 'bg-slate-900 hover:bg-slate-850 border-slate-700/80 hover:border-blue-500 shadow-md text-white'
+                                : 'bg-white hover:bg-slate-50/90 border-slate-200 hover:border-blue-300 text-slate-800'
                             }`}
                           >
                             {/* Left colored border accent strip */}
@@ -1071,19 +1080,23 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
 
                             {/* Alert Badge for Industry Reading Shift */}
                             {isShifted && (
-                              <div className="p-2.5 rounded-xl bg-amber-100/90 dark:bg-amber-950/80 border border-amber-300 dark:border-amber-700 text-xs font-semibold text-amber-950 dark:text-amber-100 flex items-start gap-2 shadow-2xs">
-                                <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                              <div className={`p-2.5 rounded-xl border text-xs font-semibold flex items-start gap-2 shadow-2xs ${
+                                isFieldDarkMode
+                                  ? 'bg-amber-950/80 border-amber-700/80 text-amber-200'
+                                  : 'bg-amber-100/90 border-amber-300 text-amber-950'
+                              }`}>
+                                <Clock className={`w-4 h-4 shrink-0 mt-0.5 ${isFieldDarkMode ? 'text-amber-400' : 'text-amber-600'}`} />
                                 <div className="space-y-0.5">
-                                  <p className="font-black text-[10px] text-amber-900 dark:text-amber-200 uppercase tracking-wide flex items-center gap-1.5">
-                                    <span>⚠️ PERGESERAN HARI BACA</span>
+                                  <p className="font-black text-[10px] uppercase tracking-wide flex items-center gap-1.5">
+                                    <span className={isFieldDarkMode ? 'text-amber-300' : 'text-amber-900'}>⚠️ PERGESERAN HARI BACA</span>
                                     <span className="px-1.5 py-0.2 rounded bg-amber-500 text-white font-mono text-[9px] font-extrabold">
                                       Jadwal Baru
                                     </span>
                                   </p>
-                                  <p className="text-[11px] text-amber-900 dark:text-amber-200 font-extrabold">
-                                    Hari H Asli: Tgl {cust.hariHOriginal || scheduleForCust?.hariHOriginal || 8} ➔ <strong className="underline text-amber-800 dark:text-amber-100 font-mono">Hari H Aktual: Tgl {shiftHariHBaru} ({shiftTglBaru})</strong>
+                                  <p className={`text-[11px] font-extrabold ${isFieldDarkMode ? 'text-amber-200' : 'text-amber-900'}`}>
+                                    Hari H Asli: Tgl {cust.hariHOriginal || scheduleForCust?.hariHOriginal || 8} ➔ <strong className={`underline font-mono ${isFieldDarkMode ? 'text-amber-100' : 'text-amber-800'}`}>Hari H Aktual: Tgl {shiftHariHBaru} ({shiftTglBaru})</strong>
                                   </p>
-                                  <p className="text-[10px] text-amber-700 dark:text-amber-300 italic">
+                                  <p className={`text-[10px] italic ${isFieldDarkMode ? 'text-amber-300/90' : 'text-amber-700'}`}>
                                     Alasan: {shiftAlasanStr}
                                   </p>
                                 </div>
@@ -1093,76 +1106,134 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                             <div className="flex items-start justify-between gap-3 pl-1 [word-break:break-word]">
                               <div className="flex flex-col gap-1.5 min-w-0 flex-1 [word-break:break-word]">
                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="font-mono text-[10px] font-black px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 shrink-0 border border-slate-200 dark:border-slate-700">
+                                  <span className={`font-mono text-[10px] font-black px-2 py-0.5 rounded-md shrink-0 border ${
+                                    isFieldDarkMode
+                                      ? 'bg-slate-800 text-slate-100 border-slate-700'
+                                      : 'bg-slate-100 text-slate-700 border-slate-200'
+                                  }`}>
                                     {cust.id}
                                   </span>
-                                  <span className="font-bold text-[10px] px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-950 text-[#0055A5] dark:text-blue-300 shrink-0 border border-blue-200 dark:border-blue-800">
+                                  <span className={`font-bold text-[10px] px-2 py-0.5 rounded-md shrink-0 border ${
+                                    isFieldDarkMode
+                                      ? 'bg-blue-950 text-blue-200 border-blue-800'
+                                      : 'bg-blue-100 text-[#0055A5] border-blue-200'
+                                  }`}>
                                     {cust.cycle}
                                   </span>
-                                  <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-md shrink-0 ${
+                                  <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-md shrink-0 border ${
                                     cust.kelas === 'Premium'
-                                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                                      : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                                      ? isFieldDarkMode
+                                        ? 'bg-amber-950/80 text-amber-200 border-amber-800'
+                                        : 'bg-amber-100 text-amber-800 border-amber-200'
+                                      : isFieldDarkMode
+                                      ? 'bg-slate-800 text-slate-200 border-slate-700'
+                                      : 'bg-slate-100 text-slate-700 border-slate-200'
                                   }`}>
                                     {cust.kelas}
                                   </span>
                                 </div>
 
-                                <h3 className="font-black text-sm text-slate-900 dark:text-white leading-snug break-words [word-break:break-word]">
+                                <h3 className={`font-black text-sm leading-snug break-words [word-break:break-word] ${
+                                  isFieldDarkMode ? 'text-white drop-shadow-2xs' : 'text-slate-900'
+                                }`}>
                                   {cust.nama}
                                 </h3>
 
-                                <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-slate-500 dark:text-slate-300 min-w-0 [word-break:break-word]">
-                                  <MapPin className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 shrink-0" />
+                                <div className={`flex items-center gap-1.5 text-[10px] sm:text-xs min-w-0 [word-break:break-word] ${
+                                  isFieldDarkMode ? 'text-slate-300' : 'text-slate-600'
+                                }`}>
+                                  <MapPin className={`w-3.5 h-3.5 shrink-0 ${isFieldDarkMode ? 'text-blue-400' : 'text-blue-500'}`} />
                                   <span className="break-words [word-break:break-word] leading-tight truncate">{cust.lokasi || 'Kabupaten Tangerang'}</span>
                                 </div>
                               </div>
 
                               {/* Status Badge */}
                               <div className="shrink-0 text-right">
-                                <span className={`inline-block px-2.5 py-1 rounded-full text-[9px] sm:text-[10px] font-black uppercase whitespace-nowrap shadow-2xs ${
+                                <span className={`inline-block px-2.5 py-1 rounded-full text-[9px] sm:text-[10px] font-black uppercase whitespace-nowrap shadow-2xs border ${
                                   isDone
-                                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700'
+                                    ? isFieldDarkMode
+                                      ? 'bg-emerald-950 text-emerald-300 border-emerald-600'
+                                      : 'bg-emerald-100 text-emerald-800 border-emerald-300'
                                     : isPending
-                                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200 border border-blue-300 dark:border-blue-700'
-                                    : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200 border border-amber-300 dark:border-amber-700'
+                                    ? isFieldDarkMode
+                                      ? 'bg-blue-950 text-blue-300 border-blue-600'
+                                      : 'bg-blue-100 text-blue-800 border-blue-300'
+                                    : isFieldDarkMode
+                                    ? 'bg-amber-950 text-amber-300 border-amber-600'
+                                    : 'bg-amber-100 text-amber-800 border-amber-300'
                                 }`}>
                                   {isDone ? 'Verified' : isPending ? 'Pending' : 'Belum Baca'}
                                 </span>
                               </div>
                             </div>
 
-                            {/* Stand Lalu vs Stand Sekarang vs Pemakaian Air - Colorful Palette */}
+                            {/* Stand Lalu vs Stand Sekarang vs Pemakaian Air - Colorful High-Contrast Palette */}
                             <div className="grid grid-cols-3 gap-2 text-center text-xs pl-1 [word-break:break-word]">
-                              <div className="flex flex-col gap-1 min-w-0 p-2 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-700/60 [word-break:break-word]">
-                                <span className="text-[9px] text-emerald-800 dark:text-emerald-300 block font-bold uppercase truncate">Stand Lalu</span>
-                                <span className="font-mono font-bold text-emerald-900 dark:text-emerald-200 text-xs sm:text-sm break-words [word-break:break-word] block leading-tight">
+                              <div className={`flex flex-col gap-1 min-w-0 p-2.5 rounded-xl border [word-break:break-word] ${
+                                isFieldDarkMode
+                                  ? 'bg-emerald-950/60 border-emerald-700/80 text-emerald-100 shadow-inner'
+                                  : 'bg-emerald-50/80 border-emerald-200/80 text-emerald-900'
+                              }`}>
+                                <span className={`text-[9px] block font-extrabold uppercase truncate ${
+                                  isFieldDarkMode ? 'text-emerald-400' : 'text-emerald-800'
+                                }`}>
+                                  Stand Lalu
+                                </span>
+                                <span className={`font-mono font-black text-xs sm:text-sm break-words [word-break:break-word] block leading-tight ${
+                                  isFieldDarkMode ? 'text-emerald-200' : 'text-emerald-900'
+                                }`}>
                                   {cust.lalu.toLocaleString()} m³
                                 </span>
                               </div>
 
-                              <div className="flex flex-col gap-1 min-w-0 p-2 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-700/60 [word-break:break-word]">
-                                <span className="text-[9px] text-[#0055A5] dark:text-blue-300 block font-bold uppercase truncate">Stand Kini</span>
-                                <span className="font-mono font-extrabold text-[#0055A5] dark:text-blue-200 text-xs sm:text-sm break-words [word-break:break-word] block leading-tight">
+                              <div className={`flex flex-col gap-1 min-w-0 p-2.5 rounded-xl border [word-break:break-word] ${
+                                isFieldDarkMode
+                                  ? 'bg-blue-950/60 border-blue-700/80 text-blue-100 shadow-inner'
+                                  : 'bg-blue-50/80 border-blue-200/80 text-[#0055A5]'
+                              }`}>
+                                <span className={`text-[9px] block font-extrabold uppercase truncate ${
+                                  isFieldDarkMode ? 'text-blue-400' : 'text-[#0055A5]'
+                                }`}>
+                                  Stand Kini
+                                </span>
+                                <span className={`font-mono font-black text-xs sm:text-sm break-words [word-break:break-word] block leading-tight ${
+                                  isFieldDarkMode ? 'text-blue-200' : 'text-[#0055A5]'
+                                }`}>
                                   {!isUnread && cust.skrg > 0 ? `${cust.skrg.toLocaleString()} m³` : '—'}
                                 </span>
                               </div>
 
-                              <div className="flex flex-col gap-1 min-w-0 p-2 rounded-xl bg-orange-50/80 dark:bg-orange-950/40 border border-orange-200/80 dark:border-orange-700/60 [word-break:break-word]">
-                                <span className="text-[9px] text-[#E86216] dark:text-orange-300 block font-bold uppercase truncate">Pemakaian</span>
-                                <span className="font-mono font-black text-[#E86216] dark:text-orange-200 text-xs sm:text-sm break-words [word-break:break-word] block leading-tight">
+                              <div className={`flex flex-col gap-1 min-w-0 p-2.5 rounded-xl border [word-break:break-word] ${
+                                isFieldDarkMode
+                                  ? 'bg-orange-950/60 border-orange-700/80 text-orange-100 shadow-inner'
+                                  : 'bg-orange-50/80 border-orange-200/80 text-[#E86216]'
+                              }`}>
+                                <span className={`text-[9px] block font-extrabold uppercase truncate ${
+                                  isFieldDarkMode ? 'text-orange-400' : 'text-[#E86216]'
+                                }`}>
+                                  Pemakaian
+                                </span>
+                                <span className={`font-mono font-black text-xs sm:text-sm break-words [word-break:break-word] block leading-tight ${
+                                  isFieldDarkMode ? 'text-orange-200' : 'text-[#E86216]'
+                                }`}>
                                   {!isUnread && cust.skrg > 0 ? `${waterUsage.toLocaleString()} m³` : '—'}
                                 </span>
                               </div>
                             </div>
 
                             {/* Timestamp and action hint */}
-                            <div className="flex items-center justify-between text-[10px] sm:text-xs text-slate-500 dark:text-slate-300 gap-3 pl-1 [word-break:break-word]">
-                              <span className="break-words [word-break:break-word] leading-tight min-w-0 flex-1 truncate">
+                            <div className="flex items-center justify-between text-[10px] sm:text-xs gap-3 pl-1 [word-break:break-word]">
+                              <span className={`break-words [word-break:break-word] leading-tight min-w-0 flex-1 truncate ${
+                                isFieldDarkMode ? 'text-slate-300' : 'text-slate-500'
+                              }`}>
                                 {cust.waktuBaca ? `🕒 ${cust.waktuBaca}` : '⚡ Ketuk untuk mulai mencatat stand'}
                               </span>
-                              <span className="text-[#0055A5] dark:text-blue-300 font-bold flex items-center gap-1 shrink-0 whitespace-nowrap bg-blue-50 dark:bg-blue-950/80 px-2 py-0.5 rounded-lg border border-blue-200 dark:border-blue-800">
-                                {isUnread ? 'Catat Stand' : 'Edit Stand'} <ChevronRight className="w-3 h-3 shrink-0" />
+                              <span className={`font-bold flex items-center gap-1 shrink-0 whitespace-nowrap px-2.5 py-1 rounded-xl border transition ${
+                                isFieldDarkMode
+                                  ? 'bg-blue-600 hover:bg-blue-500 text-white border-blue-500 shadow-sm'
+                                  : 'bg-blue-50 hover:bg-blue-100 text-[#0055A5] border-blue-200'
+                              }`}>
+                                {isUnread ? 'Catat Stand' : 'Edit Stand'} <ChevronRight className="w-3.5 h-3.5 shrink-0" />
                               </span>
                             </div>
                           </div>
@@ -1311,9 +1382,9 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                           />
                         </div>
 
-                        <div className="flex items-center justify-between text-[10px] text-slate-400">
+                        <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
                           <span>Jadwal: {cs.schedule?.tanggalMulai || 'Bulan Ini'} - {cs.schedule?.tanggalSelesai || 'Akhir Bulan'}</span>
-                          <span className={percent === 100 ? 'text-emerald-600 font-bold' : 'text-amber-600 font-bold'}>
+                          <span className={percent === 100 ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-amber-600 dark:text-amber-400 font-bold'}>
                             {percent === 100 ? '✓ Selesai Terbaca' : `Sisa ${total - done} Industri`}
                           </span>
                         </div>
@@ -1495,10 +1566,14 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                     {realTimeClock.timeStr}:{realTimeClock.secondsStr} WIB
                   </span>
                 </div>
-                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white mt-1 leading-snug break-words">
+                <h3 className={`font-extrabold text-sm mt-1 leading-snug break-words ${
+                  isFieldDarkMode ? 'text-white drop-shadow-2xs' : 'text-slate-900'
+                }`}>
                   {activeCustomer.nama}
                 </h3>
-                <p className="text-[11px] text-slate-400 break-words leading-tight mt-0.5">{activeCustomer.lokasi || 'Kabupaten Tangerang'}</p>
+                <p className={`text-[11px] break-words leading-tight mt-0.5 ${
+                  isFieldDarkMode ? 'text-slate-300' : 'text-slate-500'
+                }`}>{activeCustomer.lokasi || 'Kabupaten Tangerang'}</p>
               </div>
               <button
                 type="button"
@@ -1763,10 +1838,16 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                       Master
                     </span>
                   </div>
-                  <div className="p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-slate-800 dark:text-slate-100 font-black text-sm break-words">
+                  <div className={`p-2.5 border rounded-xl font-mono font-black text-sm break-words ${
+                    isFieldDarkMode
+                      ? 'bg-slate-800 border-slate-700 text-slate-100'
+                      : 'bg-white border-slate-200 text-slate-800'
+                  }`}>
                     {activeCustomer.lalu.toLocaleString()}
                   </div>
-                  <span className="text-[9px] text-slate-500 dark:text-slate-400 mt-0.5 block break-words font-medium">
+                  <span className={`text-[9px] mt-0.5 block break-words font-medium ${
+                    isFieldDarkMode ? 'text-slate-400' : 'text-slate-500'
+                  }`}>
                     ✓ Sinkron Excel Admin
                   </span>
                 </div>
@@ -1774,11 +1855,15 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                 {/* Stand Sekarang (Auto OCR / Manual) */}
                 <div className="min-w-0">
                   <div className="flex items-center justify-between mb-1 gap-1">
-                    <label className="block text-[10px] font-bold uppercase text-blue-600 dark:text-blue-300 truncate">
+                    <label className={`block text-[10px] font-bold uppercase truncate ${
+                      isFieldDarkMode ? 'text-blue-300' : 'text-blue-600'
+                    }`}>
                       Stand Sekarang (m³) *
                     </label>
                     {ocrConfidence && (
-                      <span className="text-[8px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 shrink-0">
+                      <span className={`text-[8px] font-bold px-1.5 py-0.2 rounded shrink-0 ${
+                        isFieldDarkMode ? 'bg-emerald-950 text-emerald-300 border border-emerald-700' : 'bg-emerald-100 text-emerald-700'
+                      }`}>
                         OCR {ocrConfidence}%
                       </span>
                     )}
@@ -1789,25 +1874,39 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                     value={inputSkrg}
                     onChange={(e) => setInputSkrg(e.target.value)}
                     placeholder="Contoh: 14500"
-                    className="w-full p-2.5 bg-white dark:bg-slate-900 border-2 border-blue-500 dark:border-blue-400 rounded-xl font-mono text-sm font-black text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    className={`w-full p-2.5 border-2 rounded-xl font-mono text-sm font-black focus:outline-none focus:ring-2 focus:ring-blue-400 ${
+                      isFieldDarkMode
+                        ? 'bg-slate-800 border-blue-400 text-white placeholder:text-slate-500'
+                        : 'bg-white border-blue-500 text-slate-900 placeholder:text-slate-400'
+                    }`}
                   />
-                  <span className="text-[9px] text-blue-600 dark:text-blue-300 mt-0.5 block font-semibold break-words leading-tight">
+                  <span className={`text-[9px] mt-0.5 block font-semibold break-words leading-tight ${
+                    isFieldDarkMode ? 'text-blue-300' : 'text-blue-600'
+                  }`}>
                     Diisi otomatis oleh OCR / edit
                   </span>
                 </div>
               </div>
 
               {/* DIRECT WATER USAGE VOLUME (LANGSUNG TAMPILKAN VOLUMENYA TANPA RUMUS) */}
-              <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2.5">
+              <div className={`p-3 rounded-xl border flex items-center justify-between gap-2.5 ${
+                isFieldDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+              }`}>
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-950/60 text-[#E86216] flex items-center justify-center shrink-0">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                    isFieldDarkMode ? 'bg-orange-950/80 text-orange-300 border border-orange-800/60' : 'bg-orange-100 text-[#E86216]'
+                  }`}>
                     <Droplets className="w-4 h-4" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 block leading-tight truncate">
+                    <span className={`text-[10px] font-bold uppercase block leading-tight truncate ${
+                      isFieldDarkMode ? 'text-slate-400' : 'text-slate-500'
+                    }`}>
                       Pemakaian Air Bulan Ini
                     </span>
-                    <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200 break-words leading-tight">
+                    <span className={`text-[11px] font-bold break-words leading-tight ${
+                      isFieldDarkMode ? 'text-slate-100' : 'text-slate-800'
+                    }`}>
                       Volume Pemakaian
                     </span>
                   </div>
