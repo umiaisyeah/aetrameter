@@ -135,26 +135,49 @@ ALTER TABLE public.cycle_schedules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 
 -- Allow read & write for public/anon key (Admin Dashboard & Field Reader App)
-CREATE POLICY "Public full access to industry_customers" 
+DROP POLICY IF EXISTS "Public full access to industry_customers" ON public.industry_customers;
+DROP POLICY IF EXISTS "Allow public all access" ON public.industry_customers;
+CREATE POLICY "Allow public all access" 
     ON public.industry_customers FOR ALL USING (true) WITH CHECK (true);
 
-CREATE POLICY "Public full access to meter_readers" 
+DROP POLICY IF EXISTS "Public full access to meter_readers" ON public.meter_readers;
+DROP POLICY IF EXISTS "Allow public all access" ON public.meter_readers;
+CREATE POLICY "Allow public all access" 
     ON public.meter_readers FOR ALL USING (true) WITH CHECK (true);
 
-CREATE POLICY "Public full access to cycle_schedules" 
+DROP POLICY IF EXISTS "Public full access to cycle_schedules" ON public.cycle_schedules;
+DROP POLICY IF EXISTS "Allow public all access" ON public.cycle_schedules;
+CREATE POLICY "Allow public all access" 
     ON public.cycle_schedules FOR ALL USING (true) WITH CHECK (true);
 
-CREATE POLICY "Public full access to audit_logs" 
+DROP POLICY IF EXISTS "Public full access to audit_logs" ON public.audit_logs;
+DROP POLICY IF EXISTS "Allow public all access" ON public.audit_logs;
+CREATE POLICY "Allow public all access" 
     ON public.audit_logs FOR ALL USING (true) WITH CHECK (true);
 
 -- ==============================================================================
 -- 8. Enable Supabase Realtime
 -- When field readers input meter readings on site, Admin dashboard updates live!
 -- ==============================================================================
-ALTER PUBLICATION supabase_realtime ADD TABLE public.industry_customers;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.meter_readers;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.cycle_schedules;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.audit_logs;
+DO $$ BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.industry_customers;
+EXCEPTION WHEN duplicate_object THEN null; WHEN others THEN null;
+END $$;
+
+DO $$ BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.meter_readers;
+EXCEPTION WHEN duplicate_object THEN null; WHEN others THEN null;
+END $$;
+
+DO $$ BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.cycle_schedules;
+EXCEPTION WHEN duplicate_object THEN null; WHEN others THEN null;
+END $$;
+
+DO $$ BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.audit_logs;
+EXCEPTION WHEN duplicate_object THEN null; WHEN others THEN null;
+END $$;
 
 -- ==============================================================================
 -- 9. Trigger for updated_at
