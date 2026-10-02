@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { IndustryCustomer } from '../types';
 import {
   KabupatenTangerangLogo,
@@ -111,8 +112,8 @@ export const AetraOfficialPdfInvoice: React.FC<AetraOfficialPdfInvoiceProps> = (
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white print:fixed-none">
-      <div className="bg-slate-100 dark:bg-slate-900 w-full max-w-5xl rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[96vh] my-auto print:max-h-none print:m-0 print:border-none print:shadow-none print:w-full print:rounded-none">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-2 sm:p-4 md:p-6 overflow-y-auto print:p-0 print:bg-white print:fixed-none">
+      <div className="bg-slate-100 dark:bg-slate-900 w-full max-w-5xl rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[96vh] my-auto relative z-10 print:max-h-none print:m-0 print:border-none print:shadow-none print:w-full print:rounded-none">
         {/* Top Control Bar (Hidden on Print) */}
         <div className="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between gap-3 border-b border-slate-800 print:hidden shrink-0 flex-wrap">
           <div className="flex items-center gap-2.5">

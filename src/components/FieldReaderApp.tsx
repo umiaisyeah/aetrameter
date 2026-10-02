@@ -40,6 +40,7 @@ import {
 } from '../utils/readerAssignmentHelper';
 import { RealtimeLocationMap } from './RealtimeLocationMap';
 import { PhotoGeotagStamp } from './PhotoGeotagStamp';
+import { LiveCameraModal } from './LiveCameraModal';
 
 interface FieldReaderAppProps {
   currentUser: UserProfile;
@@ -88,6 +89,9 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
   const [inputSkrg, setInputSkrg] = useState<string>('');
   const [fotoMeterPreview, setFotoMeterPreview] = useState<string | null>(null);
   const [fotoBPMPreview, setFotoBPMPreview] = useState<string | null>(null);
+  const [liveCameraTarget, setLiveCameraTarget] = useState<'meter' | 'bpm' | null>(null);
+  const [meterPhotoTime, setMeterPhotoTime] = useState<string | null>(null);
+  const [bpmPhotoTime, setBpmPhotoTime] = useState<string | null>(null);
   const [catatan, setCatatan] = useState<string>('');
   const [gpsLocation, setGpsLocation] = useState<string>('');
   const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number }>({ lat: -6.187214, lng: 106.541290 });
@@ -359,6 +363,8 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
     setInputSkrg(hasBeenRead ? String(cust.skrg) : '');
     setFotoMeterPreview(cust.fotoMeter || null);
     setFotoBPMPreview(cust.fotoBPM || null);
+    setMeterPhotoTime(cust.meterWaktuFoto || null);
+    setBpmPhotoTime(cust.bpmWaktuFoto || null);
 
     // Catatan lapangan HANYA terisi apabila pencatat/pembaca meter melakukan pengisian
     const isAutoNote =
@@ -409,11 +415,24 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
       const reader = new FileReader();
       reader.onloadend = () => {
         const dataUrl = reader.result as string;
+        const now = new Date();
+        const datePart = now.toLocaleDateString('id-ID', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric'
+        });
+        const hours = String(now.getHours()).padStart(2, '0');
+        const mins = String(now.getMinutes()).padStart(2, '0');
+        const secs = String(now.getSeconds()).padStart(2, '0');
+        const waktuStr = `${datePart} ${hours}:${mins}:${secs} WIB`;
+
         if (type === 'meter') {
           setFotoMeterPreview(dataUrl);
+          setMeterPhotoTime(waktuStr);
           runAutoRecognition(dataUrl);
         } else {
           setFotoBPMPreview(dataUrl);
+          setBpmPhotoTime(waktuStr);
         }
       };
       reader.readAsDataURL(file);
@@ -454,8 +473,8 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
       meterLongitude: gpsCoords.lng,
       bpmLatitude: Number((gpsCoords.lat + 0.00008).toFixed(6)),
       bpmLongitude: Number((gpsCoords.lng + 0.00010).toFixed(6)),
-      meterWaktuFoto: waktuStr,
-      bpmWaktuFoto: waktuStr,
+      meterWaktuFoto: meterPhotoTime || waktuStr,
+      bpmWaktuFoto: bpmPhotoTime || waktuStr,
       waktuBaca: waktuStr,
       waktuBacaTimestamp: now.getTime(),
       petugasBaca: currentUser.name,
@@ -1575,23 +1594,27 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
 
                       {/* Realtime GPS Geotag Stamp */}
                       {!isOcrScanning && (
-                        <PhotoGeotagStamp customer={{ ...activeCustomer, fotoMeter: fotoMeterPreview }} photoType="meter" />
+                        <PhotoGeotagStamp
+                          customer={{
+                            ...activeCustomer,
+                            fotoMeter: fotoMeterPreview,
+                            meterWaktuFoto: meterPhotoTime || activeCustomer.meterWaktuFoto
+                          }}
+                          photoType="meter"
+                        />
                       )}
 
                       <div className="absolute inset-0 bg-slate-950/80 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center gap-1.5 p-2 transition z-30">
                         <span className="text-white font-extrabold text-[10px] mb-0.5">Ubah Foto Meter:</span>
                         <div className="flex items-center gap-1.5 w-full">
-                          <label className="flex-1 py-1.5 px-1.5 bg-[#0055A5] hover:bg-[#003E78] text-white font-extrabold text-[9px] rounded-lg text-center cursor-pointer transition flex items-center justify-center gap-1 shadow-xs">
+                          <button
+                            type="button"
+                            onClick={() => setLiveCameraTarget('meter')}
+                            className="flex-1 py-1.5 px-1.5 bg-[#0055A5] hover:bg-[#003E78] text-white font-extrabold text-[9px] rounded-lg text-center cursor-pointer transition flex items-center justify-center gap-1 shadow-xs"
+                          >
                             <Camera className="w-3 h-3 shrink-0" />
                             <span>Kamera</span>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              capture="environment"
-                              onChange={(e) => handlePhotoUpload(e, 'meter')}
-                              className="hidden"
-                            />
-                          </label>
+                          </button>
                           <label className="flex-1 py-1.5 px-1.5 bg-slate-700 hover:bg-slate-600 text-white font-extrabold text-[9px] rounded-lg text-center cursor-pointer transition flex items-center justify-center gap-1 shadow-xs">
                             <ImageIcon className="w-3 h-3 shrink-0" />
                             <span>Galeri</span>
@@ -1613,17 +1636,14 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                       </div>
 
                       <div className="flex items-center gap-1.5 w-full">
-                        <label className="flex-1 py-2 px-1 bg-[#0055A5] hover:bg-[#003E78] active:scale-95 text-white font-black text-[10px] rounded-xl text-center cursor-pointer transition flex items-center justify-center gap-1 shadow-xs">
+                        <button
+                          type="button"
+                          onClick={() => setLiveCameraTarget('meter')}
+                          className="flex-1 py-2 px-1 bg-[#0055A5] hover:bg-[#003E78] active:scale-95 text-white font-black text-[10px] rounded-xl text-center cursor-pointer transition flex items-center justify-center gap-1 shadow-xs"
+                        >
                           <Camera className="w-3.5 h-3.5 shrink-0 text-cyan-300" />
                           <span>Kamera</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            capture="environment"
-                            onChange={(e) => handlePhotoUpload(e, 'meter')}
-                            className="hidden"
-                          />
-                        </label>
+                        </button>
                         <label className="flex-1 py-2 px-1 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 active:scale-95 text-slate-800 dark:text-slate-100 font-black text-[10px] rounded-xl text-center cursor-pointer transition flex items-center justify-center gap-1 border border-slate-300 dark:border-slate-700 shadow-2xs">
                           <ImageIcon className="w-3.5 h-3.5 shrink-0 text-blue-600 dark:text-blue-400" />
                           <span>Galeri</span>
@@ -1654,22 +1674,26 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                     <div className="relative h-36 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 group">
                       <img src={fotoBPMPreview} alt="BPM" className="w-full h-full object-cover" />
                       {/* Realtime GPS Geotag Stamp */}
-                      <PhotoGeotagStamp customer={{ ...activeCustomer, fotoBPM: fotoBPMPreview }} photoType="bpm" />
+                      <PhotoGeotagStamp
+                        customer={{
+                          ...activeCustomer,
+                          fotoBPM: fotoBPMPreview,
+                          bpmWaktuFoto: bpmPhotoTime || activeCustomer.bpmWaktuFoto
+                        }}
+                        photoType="bpm"
+                      />
                       
                       <div className="absolute inset-0 bg-slate-950/80 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center gap-1.5 p-2 transition z-30">
                         <span className="text-white font-extrabold text-[10px] mb-0.5">Ubah Foto BPM:</span>
                         <div className="flex items-center gap-1.5 w-full">
-                          <label className="flex-1 py-1.5 px-1.5 bg-[#E86216] hover:bg-orange-600 text-white font-extrabold text-[9px] rounded-lg text-center cursor-pointer transition flex items-center justify-center gap-1 shadow-xs">
+                          <button
+                            type="button"
+                            onClick={() => setLiveCameraTarget('bpm')}
+                            className="flex-1 py-1.5 px-1.5 bg-[#E86216] hover:bg-orange-600 text-white font-extrabold text-[9px] rounded-lg text-center cursor-pointer transition flex items-center justify-center gap-1 shadow-xs"
+                          >
                             <Camera className="w-3 h-3 shrink-0" />
                             <span>Kamera</span>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              capture="environment"
-                              onChange={(e) => handlePhotoUpload(e, 'bpm')}
-                              className="hidden"
-                            />
-                          </label>
+                          </button>
                           <label className="flex-1 py-1.5 px-1.5 bg-slate-700 hover:bg-slate-600 text-white font-extrabold text-[9px] rounded-lg text-center cursor-pointer transition flex items-center justify-center gap-1 shadow-xs">
                             <ImageIcon className="w-3 h-3 shrink-0" />
                             <span>Galeri</span>
@@ -1691,17 +1715,14 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                       </div>
 
                       <div className="flex items-center gap-1.5 w-full">
-                        <label className="flex-1 py-2 px-1 bg-[#E86216] hover:bg-orange-600 active:scale-95 text-white font-black text-[10px] rounded-xl text-center cursor-pointer transition flex items-center justify-center gap-1 shadow-xs">
+                        <button
+                          type="button"
+                          onClick={() => setLiveCameraTarget('bpm')}
+                          className="flex-1 py-2 px-1 bg-[#E86216] hover:bg-orange-600 active:scale-95 text-white font-black text-[10px] rounded-xl text-center cursor-pointer transition flex items-center justify-center gap-1 shadow-xs"
+                        >
                           <Camera className="w-3.5 h-3.5 shrink-0 text-amber-200" />
                           <span>Kamera</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            capture="environment"
-                            onChange={(e) => handlePhotoUpload(e, 'bpm')}
-                            className="hidden"
-                          />
-                        </label>
+                        </button>
                         <label className="flex-1 py-2 px-1 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 active:scale-95 text-slate-800 dark:text-slate-100 font-black text-[10px] rounded-xl text-center cursor-pointer transition flex items-center justify-center gap-1 border border-slate-300 dark:border-slate-700 shadow-2xs">
                           <ImageIcon className="w-3.5 h-3.5 shrink-0 text-orange-600 dark:text-orange-400" />
                           <span>Galeri</span>
@@ -1849,6 +1870,34 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Live Camera Viewfinder Modal for Stand Meter & BPM Photo Capture */}
+      {liveCameraTarget && activeCustomer && (
+        <LiveCameraModal
+          isOpen={Boolean(liveCameraTarget)}
+          onClose={() => setLiveCameraTarget(null)}
+          onCapture={(dataUrl, capturedTimestamp) => {
+            if (liveCameraTarget === 'meter') {
+              setFotoMeterPreview(dataUrl);
+              setMeterPhotoTime(capturedTimestamp);
+              runAutoRecognition(dataUrl);
+            } else {
+              setFotoBPMPreview(dataUrl);
+              setBpmPhotoTime(capturedTimestamp);
+            }
+          }}
+          title={
+            liveCameraTarget === 'meter'
+              ? 'Ambil Foto Stand Meter Fisik'
+              : 'Ambil Foto Dokumen Lembar BPM'
+          }
+          customerName={activeCustomer.nama}
+          customerId={activeCustomer.id}
+          readerName={currentUser.name}
+          gpsLocation={gpsLocation || `Lat: ${gpsCoords.lat.toFixed(6)}, Long: ${gpsCoords.lng.toFixed(6)}`}
+          photoType={liveCameraTarget}
+        />
       )}
     </div>
   );

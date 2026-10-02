@@ -1008,31 +1008,6 @@ export default function App() {
         />
       )}
 
-      {/* Detail & Inspection Modal */}
-      {selectedCustomerForDetail && (
-        <DetailModal
-          isOpen={true}
-          customer={selectedCustomerForDetail}
-          currentUser={currentUser}
-          onClose={() => setSelectedCustomerForDetail(null)}
-          onSaveReading={handleSaveReading}
-          onProcessInvoice={handleProcessInvoice}
-          onOpenPrintInvoice={(cust) => {
-            setSelectedCustomerForDetail(null);
-            setSelectedCustomerForInvoice(cust);
-          }}
-        />
-      )}
-
-      {/* Formal Printable Invoice Modal */}
-      {selectedCustomerForInvoice && (
-        <PrintInvoiceModal
-          isOpen={true}
-          customer={selectedCustomerForInvoice}
-          onClose={() => setSelectedCustomerForInvoice(null)}
-        />
-      )}
-
       {/* Sidebar Navigation */}
       <Sidebar
         activeTab={activeTab}
@@ -1174,6 +1149,31 @@ export default function App() {
             handleImportCycleSchedules(schedules);
             setIsImportScheduleOpen(false);
           }}
+        />
+      )}
+
+      {/* Detail & Inspection Modal */}
+      {selectedCustomerForDetail && (
+        <DetailModal
+          isOpen={true}
+          customer={selectedCustomerForDetail}
+          currentUser={currentUser}
+          onClose={() => setSelectedCustomerForDetail(null)}
+          onSaveReading={handleSaveReading}
+          onProcessInvoice={handleProcessInvoice}
+          onOpenPrintInvoice={(cust) => {
+            setSelectedCustomerForDetail(null);
+            setSelectedCustomerForInvoice(cust);
+          }}
+        />
+      )}
+
+      {/* Formal Printable Invoice Modal */}
+      {selectedCustomerForInvoice && (
+        <PrintInvoiceModal
+          isOpen={true}
+          customer={selectedCustomerForInvoice}
+          onClose={() => setSelectedCustomerForInvoice(null)}
         />
       )}
 

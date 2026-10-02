@@ -55,8 +55,12 @@ export const DetailModal: React.FC<DetailModalProps> = ({
   const materai = invCalc.meterai;
   const totalTagihan = invCalc.totalKeseluruhan;
 
-  // Anomaly calculation
-  const historyData = customer.history || [Math.max(0, lalu - 500), lalu];
+  // Anomaly & 3-period history trend calculation
+  const rawHistory = (customer.history && customer.history.length > 0)
+    ? customer.history
+    : [Math.max(0, lalu - 600), Math.max(0, lalu - 300), lalu];
+  // Strictly take the last 3 periods
+  const historyData = rawHistory.slice(-3);
   const prevUsage =
     historyData.length >= 2
       ? historyData[historyData.length - 1] - historyData[historyData.length - 2]
@@ -375,12 +379,12 @@ export const DetailModal: React.FC<DetailModalProps> = ({
             <RealtimeLocationMap customer={customer} height="h-64 sm:h-72" />
           </div>
 
-          {/* Historical Usage Graph (Sesuai Permintaan: Jangan ditampilkan pada tampilan Billing & Invoicing) */}
+          {/* Historical Usage Graph (Sesuai Permintaan: Jangan ditampilkan pada tampilan Billing & Invoicing, tampilkan 3 Periode Terakhir) */}
           {!canManageBilling && (
             <div className="bg-slate-50 dark:bg-slate-700/40 p-3.5 rounded-xl border border-slate-200 dark:border-slate-600">
               <div className="flex justify-between items-center mb-1">
                 <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                  📈 Tren Riwayat Pembacaan Meter (5 Periode Terakhir)
+                  📈 Tren Riwayat Pembacaan Meter (3 Periode Terakhir)
                 </p>
                 <span className="text-[10px] text-slate-400 font-mono">
                   Satuan: m³ (Meter Kubik)
@@ -397,24 +401,35 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                     points={points}
                   />
                   {historyData.map((val, idx) => {
-                    const x = (idx / (historyData.length - 1 || 1)) * (chartWidth - 20) + 10;
+                    const x = (idx / (historyData.length - 1 || 1)) * (chartWidth - 40) + 20;
                     const y =
                       chartHeight -
                       ((val - minHistoryVal) / (maxHistoryVal - minHistoryVal || 1)) *
-                        (chartHeight - 20) -
-                      10;
+                        (chartHeight - 30) -
+                      16;
+                    const periodLabel = idx === 0 ? 'Periode N-2' : idx === 1 ? 'Periode N-1' : 'Bulan Berjalan';
                     return (
                       <g key={idx}>
-                        <circle cx={x} cy={y} r="4" fill="#E86216" />
+                        <circle cx={x} cy={y} r="4.5" fill="#E86216" stroke="#fff" strokeWidth="1.5" />
                         <text
                           x={x}
                           y={y - 8}
                           textAnchor="middle"
                           fontSize="9"
-                          fill="#64748b"
-                          className="font-mono font-semibold"
+                          fill="#0055A5"
+                          className="font-mono font-bold dark:fill-blue-300"
                         >
-                          {val.toLocaleString()}
+                          {val.toLocaleString()} m³
+                        </text>
+                        <text
+                          x={x}
+                          y={chartHeight - 2}
+                          textAnchor="middle"
+                          fontSize="8"
+                          fill="#94a3b8"
+                          className="font-medium"
+                        >
+                          {periodLabel}
                         </text>
                       </g>
                     );
@@ -424,8 +439,12 @@ export const DetailModal: React.FC<DetailModalProps> = ({
             </div>
           )}
 
-          {/* Calculations Box */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-[#E6F0FA] dark:bg-slate-700/70 p-4 rounded-2xl border border-blue-200 dark:border-slate-600">
+          {/* Calculations Box: Verifikasi Reading HANYA menampilkan data fisik stand & volume (Total Tagihan & Invoice adalah ranah Tim Billing) */}
+          <div className={`grid gap-3 p-4 rounded-2xl border ${
+            canManageBilling
+              ? 'grid-cols-2 md:grid-cols-4 bg-[#E6F0FA] dark:bg-slate-700/70 border-blue-200 dark:border-slate-600'
+              : 'grid-cols-1 sm:grid-cols-3 bg-emerald-50/70 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800'
+          }`}>
             <div>
               <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px]">Stand Lalu</p>
               <p className="text-sm font-bold text-slate-800 dark:text-white font-mono tabular-nums">
@@ -443,10 +462,10 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                 placeholder="Belum Dicatat"
                 readOnly={isBillingUser}
                 onChange={(e) => setInputSkrg(Number(e.target.value))}
-                className={`w-full p-1.5 border border-blue-300 dark:border-slate-500 rounded-xl text-sm font-bold font-mono text-[#0055A5] dark:text-white focus:ring-2 focus:ring-[#0055A5] ${
-                  isBillingUser
-                    ? 'bg-slate-100 dark:bg-slate-800/80 cursor-not-allowed text-slate-500'
-                    : 'bg-white dark:bg-slate-800'
+                className={`w-full p-1.5 border rounded-xl text-sm font-bold font-mono focus:ring-2 ${
+                  canManageBilling
+                    ? 'border-blue-300 dark:border-slate-500 bg-slate-100 dark:bg-slate-800/80 cursor-not-allowed text-slate-500'
+                    : 'border-emerald-300 dark:border-emerald-600 bg-white dark:bg-slate-800 text-emerald-800 dark:text-white focus:ring-emerald-500'
                 }`}
               />
             </div>
@@ -458,39 +477,39 @@ export const DetailModal: React.FC<DetailModalProps> = ({
               </p>
             </div>
 
-            {/* Sesuai Permintaan: Untuk verifikasi reading, harga/tagihan tidak ditampilkan dulu. Harga baru muncul waktu di billing. */}
-            <div>
-              <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px] flex items-center justify-between">
-                <span>Bea Materai</span>
-                {canManageBilling && isMateraiRequired && (
-                  <span className="text-[9px] font-black bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 px-1.5 py-0.2 rounded font-sans">
-                    e-Materai Otomatis (&gt;5 Jt)
-                  </span>
-                )}
-              </p>
-              <p className="text-sm font-black text-slate-800 dark:text-slate-100 font-mono tabular-nums">
-                {canManageBilling
-                  ? materai > 0
-                    ? `Rp ${materai.toLocaleString()}`
-                    : 'Rp 0 (Bebas)'
-                  : '—'}
-              </p>
-            </div>
+            {/* Total Tagihan & Bea Materai HANYA untuk Tim Billing */}
+            {canManageBilling && (
+              <>
+                <div>
+                  <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px] flex items-center justify-between">
+                    <span>Bea Materai</span>
+                    {isMateraiRequired && (
+                      <span className="text-[9px] font-black bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 px-1.5 py-0.2 rounded font-sans">
+                        e-Materai (&gt;5 Jt)
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-sm font-black text-slate-800 dark:text-slate-100 font-mono tabular-nums">
+                    {materai > 0 ? `Rp ${materai.toLocaleString()}` : 'Rp 0 (Bebas)'}
+                  </p>
+                </div>
 
-            <div>
-              <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px]">
-                Total Tagihan {canManageBilling && isMateraiRequired ? '(+ e-Materai)' : ''}
-              </p>
-              <p className="text-sm font-black text-[#0055A5] dark:text-blue-400 font-mono tabular-nums">
-                {canManageBilling ? `Rp ${totalTagihan.toLocaleString()}` : 'Dihitung saat Billing'}
-              </p>
-            </div>
+                <div>
+                  <p className="text-slate-500 dark:text-slate-400 font-medium text-[11px]">
+                    Total Tagihan {isMateraiRequired ? '(+ e-Materai)' : ''}
+                  </p>
+                  <p className="text-sm font-black text-[#0055A5] dark:text-blue-400 font-mono tabular-nums">
+                    Rp {totalTagihan.toLocaleString()}
+                  </p>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Notes field */}
           <div>
             <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">
-              Catatan Lapangan & Status Pemeriksaan
+              Catatan Lapangan &amp; Status Pemeriksaan
             </label>
             <input
               type="text"
@@ -514,13 +533,16 @@ export const DetailModal: React.FC<DetailModalProps> = ({
             >
               Tutup
             </button>
-            <button
-              onClick={() => onOpenPrintInvoice(customer)}
-              className="px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-xs transition flex items-center gap-1.5"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Pratinjau Faktur</span>
-            </button>
+            {/* Pratinjau Faktur HANYA untuk Tim Billing (ranah billing) */}
+            {canManageBilling && (
+              <button
+                onClick={() => onOpenPrintInvoice(customer)}
+                className="px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-xs transition flex items-center gap-1.5"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Pratinjau Faktur</span>
+              </button>
+            )}
           </div>
 
           {canManageBilling && (
