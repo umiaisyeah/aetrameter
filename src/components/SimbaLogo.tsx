@@ -4,12 +4,16 @@ interface SimbaLogoProps {
   className?: string;
   variant?: 'full' | 'compact' | 'icon' | 'badge';
   darkTheme?: boolean;
+  animated?: boolean;
+  size?: number;
 }
 
 export const SimbaLogo: React.FC<SimbaLogoProps> = ({
   className = 'h-10',
   variant = 'full',
-  darkTheme = false
+  darkTheme = false,
+  animated = false,
+  size
 }) => {
   // Vector Emblem: Fusion of Water Wave, Precision Meter Gauge, and Integrated Billing Spark
   const Emblem = ({ size = 38 }: { size?: number }) => (
@@ -19,7 +23,7 @@ export const SimbaLogo: React.FC<SimbaLogoProps> = ({
       viewBox="0 0 48 48"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className="shrink-0 drop-shadow-sm select-none"
+      className={`shrink-0 drop-shadow-sm select-none ${animated ? 'animate-logo-wobble drop-shadow-md' : ''}`}
     >
       <defs>
         {/* Blue Gradient for Water / Metering */}
@@ -65,6 +69,7 @@ export const SimbaLogo: React.FC<SimbaLogoProps> = ({
         d="M24 8C24 8 34 19 34 26C34 31.5228 29.5228 36 24 36C18.4772 36 14 31.5228 14 26C14 19 24 8 24 8Z"
         fill="white"
         fillOpacity="0.12"
+        className={animated ? 'animate-wave-breathe' : ''}
       />
 
       {/* Meter Reading Circular Gauge Arc */}
@@ -76,6 +81,7 @@ export const SimbaLogo: React.FC<SimbaLogoProps> = ({
         strokeWidth="2.5"
         strokeDasharray="4 2.5"
         strokeOpacity="0.5"
+        className={animated ? 'animate-spin-dashed' : ''}
       />
 
       {/* Inner Speedometer Gauge Arc (Cyan) */}
@@ -86,18 +92,20 @@ export const SimbaLogo: React.FC<SimbaLogoProps> = ({
         strokeLinecap="round"
       />
 
-      {/* Dial Needle Indicator pointing to measured volume */}
-      <path
-        d="M24 24L29 17"
-        stroke="white"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-      />
-      <circle cx="24" cy="24" r="3" fill="white" />
-      <circle cx="24" cy="24" r="1.5" fill="#0055A5" />
+      {/* Animated Dial Needle Indicator pointing to measured volume */}
+      <g className={animated ? 'animate-needle-gauge' : ''}>
+        <path
+          d="M24 24L29 17"
+          stroke="white"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        />
+        <circle cx="24" cy="24" r="3" fill="white" />
+        <circle cx="24" cy="24" r="1.5" fill="#0055A5" />
+      </g>
 
       {/* Integrated Billing Checkmark & Receipt Emblem (Vibrant Orange Shield Accent) */}
-      <g transform="translate(18, 18)">
+      <g transform="translate(18, 18)" className={animated ? 'animate-pulse' : ''}>
         <circle cx="16" cy="16" r="10" fill="url(#simbaBillingGrad)" />
         <circle cx="16" cy="16" r="9.2" stroke="white" strokeWidth="1.2" strokeOpacity="0.6" />
         {/* Receipt Document / Check lines */}
@@ -115,7 +123,7 @@ export const SimbaLogo: React.FC<SimbaLogoProps> = ({
   if (variant === 'icon') {
     return (
       <div className={`inline-flex items-center justify-center select-none ${className}`} title="SIMBA - Sistem Integrasi Metering & Billing Aetra Air Tangerang">
-        <Emblem size={34} />
+        <Emblem size={size || 34} />
       </div>
     );
   }

@@ -7,26 +7,36 @@ import {
   ShieldCheck,
   User,
   ArrowRight,
+  ArrowLeft,
   Smartphone,
   Lock,
   Eye,
   EyeOff,
   AlertCircle,
   ChevronDown,
-  Sparkles,
-  Waves,
-  Zap
+  X
 } from 'lucide-react';
 
 interface ModalLoginProps {
   isOpen: boolean;
   onLogin: (user: UserProfile) => void;
   meterReaders?: MeterReader[];
+  initialPortal?: 'admin' | 'field_reader';
+  onBackToWelcome?: () => void;
+  onClose?: () => void;
 }
 
-export const ModalLogin: React.FC<ModalLoginProps> = ({ isOpen, onLogin, meterReaders = [] }) => {
+export const ModalLogin: React.FC<ModalLoginProps> = ({
+  isOpen,
+  onLogin,
+  meterReaders = [],
+  initialPortal,
+  onBackToWelcome,
+  onClose
+}) => {
   // Check URL query param or hash to separate entrance link
   const getInitialPortal = (): 'admin' | 'field_reader' => {
+    if (initialPortal) return initialPortal;
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const portal = params.get('portal') || params.get('mode');
@@ -39,6 +49,12 @@ export const ModalLogin: React.FC<ModalLoginProps> = ({ isOpen, onLogin, meterRe
 
   const [loginType, setLoginType] = useState<'admin' | 'field_reader'>(getInitialPortal);
   const [selectedAdminRole, setSelectedAdminRole] = useState<UserRole>('solihin');
+
+  useEffect(() => {
+    if (initialPortal) {
+      setLoginType(initialPortal);
+    }
+  }, [initialPortal]);
 
   // Available list of readers (fallback to INITIAL_METER_READERS if empty)
   const availableReaders = meterReaders.length > 0 ? meterReaders : INITIAL_METER_READERS;
@@ -124,107 +140,68 @@ export const ModalLogin: React.FC<ModalLoginProps> = ({ isOpen, onLogin, meterRe
     (r) => getReaderCategory(r.nama) !== 'Key Account'
   );
 
+  const isAdmin = loginType === 'admin';
+
   return (
-    <div className="fixed inset-0 bg-slate-900/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in-95 max-h-[92vh] overflow-y-auto">
+    <div className={`fixed inset-0 backdrop-blur-md z-50 flex items-center justify-center p-4 transition-colors duration-300 ${
+      isAdmin ? 'bg-slate-950/85' : 'bg-stone-950/85'
+    }`}>
+      <div className={`rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl transition-all duration-300 border-2 max-h-[92vh] overflow-y-auto relative ${
+        isAdmin
+          ? 'bg-white dark:bg-slate-900 border-[#0055A5]/40 shadow-[0_15px_50px_rgba(0,85,165,0.25)] text-slate-800 dark:text-slate-100'
+          : 'bg-white dark:bg-stone-900 border-[#E86216]/40 shadow-[0_15px_50px_rgba(232,98,22,0.25)] text-slate-800 dark:text-slate-100'
+      }`}>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+            title="Tutup"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
+
+        {/* Distinct Header per Portal */}
         <div className="text-center mb-5">
-          <div className="flex justify-center mb-3.5">
-            <div className="bg-slate-50 dark:bg-slate-700/50 py-3 px-5 rounded-2xl border border-slate-100 dark:border-slate-600 inline-flex shadow-sm items-center justify-center">
-              <AetraLogo />
+          <div className="flex justify-center mb-3">
+            <div className={`py-2.5 px-5 rounded-2xl border inline-flex shadow-sm items-center justify-center ${
+              isAdmin
+                ? 'bg-blue-50/80 dark:bg-blue-950/50 border-blue-200/80 dark:border-blue-800/80'
+                : 'bg-orange-50/80 dark:bg-orange-950/50 border-orange-200/80 dark:border-orange-800/80'
+            }`}>
+              <AetraLogo className="h-7" />
             </div>
           </div>
-          <h2 className="text-xl font-black text-[#0055A5] dark:text-blue-400">
-            {loginType === 'field_reader' ? 'Laman Masuk Pencatat Meter' : 'Laman Masuk Dashboard Admin'}
-          </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
-            {loginType === 'field_reader'
-              ? 'Portal Khusus Petugas Pembacaan Meter Lapangan'
-              : 'SIMBA — Sistem Integrasi Metering & Billing Aetra Air Tangerang'}
-          </p>
-          <div className="mt-1.5 flex items-center justify-center gap-1.5">
-            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-              loginType === 'field_reader'
-                ? 'bg-orange-100 text-[#E86216] dark:bg-orange-950/80 dark:text-orange-300'
-                : 'bg-blue-100 text-[#0055A5] dark:bg-blue-950/80 dark:text-blue-300'
+
+          <div className="mb-2">
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+              isAdmin
+                ? 'bg-blue-100 text-[#0055A5] dark:bg-blue-950/80 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                : 'bg-orange-100 text-[#E86216] dark:bg-orange-950/80 dark:text-orange-300 border border-orange-200 dark:border-orange-800'
             }`}>
-              {loginType === 'field_reader' ? '📱 PORTAL PETUGAS LAPANGAN' : '🛡️ PORTAL ADMIN KANTOR'}
+              {isAdmin ? (
+                <>
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>PORTAL ADMINISTRATOR KANTOR</span>
+                </>
+              ) : (
+                <>
+                  <Smartphone className="w-3.5 h-3.5" />
+                  <span>PORTAL PENCATAT METER LAPANGAN</span>
+                </>
+              )}
             </span>
           </div>
-        </div>
 
-        {/* Animated SIMBA Interactive Overview Banner */}
-        <div className="relative overflow-hidden rounded-2xl p-4 mb-4 bg-gradient-to-br from-[#003E78] via-[#0055A5] to-[#E86216] text-white shadow-lg border border-white/20 select-none">
-          {/* Animated Background Highlights & Pulsing Water Glow */}
-          <div className="absolute -right-8 -top-8 w-28 h-28 bg-white/20 rounded-full blur-xl pointer-events-none animate-pulse" />
-          <div className="absolute -left-6 -bottom-6 w-24 h-24 bg-amber-400/25 rounded-full blur-xl pointer-events-none animate-pulse" style={{ animationDelay: '1s' }} />
-          
-          <div className="relative z-10 space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5">
-                <span className="p-1 rounded-lg bg-white/20 text-amber-300 animate-spin" style={{ animationDuration: '6s' }}>
-                  <Sparkles className="w-3.5 h-3.5" />
-                </span>
-                <span className="font-black text-xs tracking-wider uppercase drop-shadow-xs flex items-center gap-1">
-                  <span>Tentang SIMBA</span>
-                  <Waves className="w-3.5 h-3.5 text-cyan-200 animate-bounce" />
-                </span>
-              </div>
-              <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-white/20 border border-white/25 flex items-center gap-1 shadow-xs">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                <span>ONLINE 2026</span>
-              </span>
-            </div>
-
-            <p className="text-[11px] leading-relaxed text-blue-50 font-medium">
-              <strong className="text-white font-extrabold">SIMBA</strong> (Sistem Integrasi Metering &amp; Billing Aetra Air Tangerang) adalah ekosistem terpadu operasional pembacaan meter industri: integrasi jadwal <strong>Cycle 1–15</strong>, pencatatan stand &amp; bukti geotagging BPM di lapangan, hingga verifikasi reading dan penerbitan faktur tagihan air resmi.
-            </p>
-
-            {/* Micro Animated Features Marquee Strip */}
-            <div className="pt-1 flex items-center gap-1.5 overflow-hidden">
-              <div className="flex items-center gap-1.5 animate-marquee whitespace-nowrap text-[9px] font-extrabold text-blue-100">
-                <span className="bg-white/15 px-2 py-0.5 rounded-md border border-white/15 flex items-center gap-1">
-                  <Zap className="w-2.5 h-2.5 text-amber-300" /> Live Sync Lapangan
-                </span>
-                <span className="bg-white/15 px-2 py-0.5 rounded-md border border-white/15">
-                  📸 Kamera Watermark &amp; OCR
-                </span>
-                <span className="bg-white/15 px-2 py-0.5 rounded-md border border-white/15">
-                  📍 GPS Geotagging Presisi
-                </span>
-                <span className="bg-white/15 px-2 py-0.5 rounded-md border border-white/15">
-                  📑 Faktur &amp; e-Materai Resmi
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Distinct Portal Entrance Switcher */}
-        <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-100 dark:bg-slate-700/60 rounded-2xl mb-4 text-xs font-bold">
-          <button
-            type="button"
-            onClick={() => handleSwitchPortal('admin')}
-            className={`py-2 px-3 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
-              loginType === 'admin'
-                ? 'bg-[#0055A5] text-white shadow-sm'
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Admin Kantor</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSwitchPortal('field_reader')}
-            className={`py-2 px-3 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
-              loginType === 'field_reader'
-                ? 'bg-[#E86216] text-white shadow-sm'
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <Smartphone className="w-3.5 h-3.5" />
-            <span>Pembaca Meter</span>
-          </button>
+          <h2 className={`text-xl font-black ${isAdmin ? 'text-[#0055A5] dark:text-blue-400' : 'text-[#E86216] dark:text-orange-400'}`}>
+            {isAdmin ? 'Laman Masuk Dashboard Admin' : 'Laman Masuk Pencatat Meter'}
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
+            {isAdmin
+              ? 'SIMBA — Kantor Pusat PT Aetra Air Tangerang'
+              : 'Aplikasi Mobile Pembacaan Meter Industri'}
+          </p>
         </div>
 
         {authError && (
@@ -235,7 +212,7 @@ export const ModalLogin: React.FC<ModalLoginProps> = ({ isOpen, onLogin, meterRe
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {loginType === 'admin' ? (
+          {isAdmin ? (
             <div>
               <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-1.5">
                 Pilih Akun Staf Admin
@@ -244,7 +221,7 @@ export const ModalLogin: React.FC<ModalLoginProps> = ({ isOpen, onLogin, meterRe
                 <select
                   value={selectedAdminRole}
                   onChange={(e) => setSelectedAdminRole(e.target.value as UserRole)}
-                  className="w-full pl-3.5 pr-9 py-3 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold focus:ring-2 focus:ring-[#0055A5] bg-slate-50 dark:bg-slate-700 text-slate-800 dark:text-white transition cursor-pointer"
+                  className="w-full pl-3.5 pr-9 py-3 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold focus:ring-2 focus:ring-[#0055A5] bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white transition cursor-pointer"
                 >
                   <optgroup label="📋 Tim Meter Reading (Akses Impor Database &amp; Verifikasi)">
                     <option value="solihin">Akhmad Solihin (Meter Reading)</option>
@@ -264,7 +241,13 @@ export const ModalLogin: React.FC<ModalLoginProps> = ({ isOpen, onLogin, meterRe
             </div>
           ) : (
             <div className="space-y-3.5">
-              {/* DROPDOWN PEMBACA METER (SESUAI MASTER DATA PEMBACA METER) */}
+              {/* Petugas Reminder */}
+              <div className="p-2.5 rounded-xl bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800/60 text-[11px] text-orange-900 dark:text-orange-200 flex items-center gap-2">
+                <Smartphone className="w-4 h-4 text-[#E86216] shrink-0" />
+                <span>Gunakan akun resmi petugas untuk mencatat stand meter, foto watermark, &amp; dokumen BPM.</span>
+              </div>
+
+              {/* DROPDOWN PEMBACA METER */}
               <div>
                 <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
                   <span>Nama Pembaca Meter</span>
@@ -278,7 +261,7 @@ export const ModalLogin: React.FC<ModalLoginProps> = ({ isOpen, onLogin, meterRe
                       setPasswordInput('');
                       setAuthError(null);
                     }}
-                    className="w-full px-3.5 py-3 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold focus:ring-2 focus:ring-[#E86216] bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white transition appearance-none cursor-pointer pr-10"
+                    className="w-full px-3.5 py-3 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold focus:ring-2 focus:ring-[#E86216] bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white transition appearance-none cursor-pointer pr-10"
                   >
                     {keyAccountReaders.length > 0 && (
                       <optgroup label="🌟 Key Account (PT Aetra Air Tangerang)">
@@ -304,7 +287,7 @@ export const ModalLogin: React.FC<ModalLoginProps> = ({ isOpen, onLogin, meterRe
                 </div>
               </div>
 
-              {/* Password Input (User types password themselves) */}
+              {/* Password Input */}
               <div>
                 <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
                   <span>Ketik Password Akun *</span>
@@ -320,7 +303,7 @@ export const ModalLogin: React.FC<ModalLoginProps> = ({ isOpen, onLogin, meterRe
                     placeholder={`Ketik password akun ${selectedReader?.nama || ''}...`}
                     required
                     autoFocus
-                    className="w-full pl-9 pr-10 py-3 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold focus:ring-2 focus:ring-[#E86216] bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white transition uppercase font-mono tracking-wider"
+                    className="w-full pl-9 pr-10 py-3 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold focus:ring-2 focus:ring-[#E86216] bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white transition uppercase font-mono tracking-wider"
                   />
                   <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3.5 pointer-events-none" />
                   <button
@@ -341,15 +324,69 @@ export const ModalLogin: React.FC<ModalLoginProps> = ({ isOpen, onLogin, meterRe
 
           <button
             type="submit"
-            className={`w-full py-3 rounded-xl font-black text-xs shadow-lg transition flex items-center justify-center gap-2 text-white cursor-pointer ${
-              loginType === 'admin'
-                ? 'bg-[#0055A5] hover:bg-[#003E78]'
-                : 'bg-[#E86216] hover:bg-orange-600'
+            className={`w-full py-3.5 rounded-xl font-black text-xs shadow-lg transition flex items-center justify-center gap-2 text-white cursor-pointer active:scale-98 ${
+              isAdmin
+                ? 'bg-gradient-to-r from-[#003E78] to-[#0055A5] hover:from-[#002f5a] hover:to-[#00478f]'
+                : 'bg-gradient-to-r from-[#C44800] to-[#E86216] hover:from-[#a83c00] hover:to-[#d0520d]'
             }`}
           >
-            <span>Masuk ke {loginType === 'admin' ? 'Dashboard Admin' : 'Aplikasi Pembaca Meter'}</span>
+            {isAdmin ? (
+              <>
+                <ShieldCheck className="w-4 h-4" />
+                <span>Masuk ke Dashboard Admin</span>
+              </>
+            ) : (
+              <>
+                <Smartphone className="w-4 h-4" />
+                <span>Masuk ke Aplikasi Pembaca Meter</span>
+              </>
+            )}
             <ArrowRight className="w-4 h-4" />
           </button>
+
+          {/* Differentiated Cross-Portal Switcher Card */}
+          <div className="pt-3 border-t border-slate-200 dark:border-slate-700/80 text-center">
+            {isAdmin ? (
+              <div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold mb-2">
+                  Petugas pembacaan meter di lapangan?
+                </p>
+                <button
+                  type="button"
+                  onClick={() => handleSwitchPortal('field_reader')}
+                  className="w-full py-2.5 px-3 rounded-xl bg-orange-50 hover:bg-orange-100 dark:bg-orange-950/40 dark:hover:bg-orange-900/50 text-[#E86216] dark:text-orange-300 font-bold text-xs border border-orange-200 dark:border-orange-800 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Smartphone className="w-3.5 h-3.5" />
+                  <span>Beralih ke Laman Petugas Lapangan →</span>
+                </button>
+              </div>
+            ) : (
+              <div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold mb-2">
+                  Staf manajemen kantor pusat atau billing?
+                </p>
+                <button
+                  type="button"
+                  onClick={() => handleSwitchPortal('admin')}
+                  className="w-full py-2.5 px-3 rounded-xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 text-[#0055A5] dark:text-blue-300 font-bold text-xs border border-blue-200 dark:border-blue-800 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Beralih ke Laman Admin Kantor →</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {onBackToWelcome && (
+            <button
+              type="button"
+              onClick={onBackToWelcome}
+              className="w-full mt-2 py-2 text-center text-xs font-bold text-slate-500 hover:text-[#0055A5] dark:text-slate-400 dark:hover:text-blue-300 transition flex items-center justify-center gap-1.5 cursor-pointer rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/60"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Kembali ke Halaman Pengenalan SIMBA</span>
+            </button>
+          )}
         </form>
       </div>
     </div>

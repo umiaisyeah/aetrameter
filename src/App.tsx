@@ -22,6 +22,7 @@ import { SectionNavBar } from './components/SectionNavBar';
 import { MobileBottomNavigation } from './components/MobileBottomNavigation';
 import { ColorfulNotificationModal } from './components/ColorfulNotificationModal';
 import { ColorfulToastContainer } from './components/ColorfulToastContainer';
+import { SimbaWelcomeScreen } from './components/SimbaWelcomeScreen';
 import { showColorfulAlert, showToast } from './utils/notificationSystem';
 import {
   getAssignedCyclesForReader,
@@ -42,9 +43,11 @@ import {
 import { fetchCloudState, pushCloudState, pushCustomerReading, pushStatusUpdate, subscribeToCloudEvents } from './services/cloudSyncService';
 
 export default function App() {
-  // Always show login page first upon opening the application
+  // Show Welcome Screen with SIMBA description first upon opening app link
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(true);
+  const [showWelcomeScreen, setShowWelcomeScreen] = useState<boolean>(true);
+  const [initialLoginPortal, setInitialLoginPortal] = useState<'admin' | 'field_reader'>('admin');
 
   // Sync state tracking refs to eliminate race-conditions and push ping-pongs
   const isReceivingRemoteUpdateRef = React.useRef<boolean>(false);
@@ -454,6 +457,7 @@ export default function App() {
   const handleLogout = () => {
     logActivity(`Keluar dari sistem.`);
     setCurrentUser(null);
+    setShowWelcomeScreen(true);
     setIsLoginModalOpen(true);
   };
 
@@ -952,12 +956,32 @@ export default function App() {
       });
   }, [customers, searchQuery, selectedCycle, selectedKelas, selectedBulan]);
 
-  // If user is not logged in yet, show Login Screen immediately!
+  // When user opens the app or clicks link, show SIMBA description & animated logo FIRST
   if (!currentUser) {
+    if (showWelcomeScreen) {
+      return (
+        <div className="min-h-screen bg-slate-900 font-sans antialiased">
+          <SimbaWelcomeScreen
+            onEnter={(targetPortal) => {
+              if (targetPortal) {
+                setInitialLoginPortal(targetPortal);
+              }
+              setShowWelcomeScreen(false);
+              setIsLoginModalOpen(true);
+            }}
+          />
+          <ColorfulNotificationModal />
+          <ColorfulToastContainer />
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center font-sans antialiased p-4">
         <ModalLogin
           isOpen={true}
+          initialPortal={initialLoginPortal}
+          onBackToWelcome={() => setShowWelcomeScreen(true)}
           onLogin={handleLogin}
           meterReaders={meterReaders}
         />
@@ -990,6 +1014,7 @@ export default function App() {
             isOpen={true}
             onLogin={handleLogin}
             meterReaders={meterReaders}
+            onClose={() => setIsLoginModalOpen(false)}
           />
         )}
         <ColorfulNotificationModal />
@@ -1010,6 +1035,7 @@ export default function App() {
           isOpen={true}
           onLogin={handleLogin}
           meterReaders={meterReaders}
+          onClose={() => setIsLoginModalOpen(false)}
         />
       )}
 

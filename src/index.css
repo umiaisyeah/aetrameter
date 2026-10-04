@@ -38,6 +38,151 @@
   animation-play-state: paused;
 }
 
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(0.8deg);
+  }
+}
+
+@keyframes rippleRing {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 0.45;
+  }
+  100% {
+    transform: scale(1.45);
+    opacity: 0;
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 25px rgba(0, 163, 224, 0.45), 0 0 50px rgba(0, 85, 165, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 45px rgba(0, 163, 224, 0.75), 0 0 80px rgba(232, 98, 22, 0.35);
+  }
+}
+
+@keyframes shimmerSweep {
+  0% {
+    transform: translateX(-150%) skewX(-20deg);
+  }
+  100% {
+    transform: translateX(250%) skewX(-20deg);
+  }
+}
+
+@keyframes rotateOrbit {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-float-slow {
+  animation: floatSlow 4s ease-in-out infinite;
+}
+
+.animate-ripple-ring {
+  animation: rippleRing 3.2s cubic-bezier(0.1, 0.5, 0.8, 1) infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 4s ease-in-out infinite;
+}
+
+.animate-shimmer-sweep {
+  animation: shimmerSweep 3.5s ease-in-out infinite;
+}
+
+.animate-rotate-orbit {
+  animation: rotateOrbit 22s linear infinite;
+}
+
+@keyframes needleGauge {
+  0% {
+    transform: rotate(-35deg);
+  }
+  25% {
+    transform: rotate(20deg);
+  }
+  50% {
+    transform: rotate(-5deg);
+  }
+  75% {
+    transform: rotate(35deg);
+  }
+  100% {
+    transform: rotate(-35deg);
+  }
+}
+
+@keyframes spinDashed {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes waveBreathe {
+  0%, 100% {
+    transform: scale(1) translateY(0);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.06) translateY(-1px);
+    opacity: 1;
+  }
+}
+
+@keyframes logoWobble {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-6px) rotate(-1.5deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(0deg);
+  }
+  75% {
+    transform: translateY(-4px) rotate(1.5deg);
+  }
+}
+
+.animate-needle-gauge {
+  transform-box: view-box;
+  transform-origin: 24px 24px;
+  animation: needleGauge 3.5s ease-in-out infinite;
+}
+
+.animate-spin-dashed {
+  transform-box: view-box;
+  transform-origin: 24px 24px;
+  animation: spinDashed 20s linear infinite;
+}
+
+.animate-wave-breathe {
+  transform-box: view-box;
+  transform-origin: 24px 24px;
+  animation: waveBreathe 3s ease-in-out infinite;
+}
+
+.animate-logo-wobble {
+  animation: logoWobble 4s ease-in-out infinite;
+}
+
 @media print {
   body {
     background: white !important;
