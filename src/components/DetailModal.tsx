@@ -176,18 +176,24 @@ export const DetailModal: React.FC<DetailModalProps> = ({
       className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[99999] flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
     >
       <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-3xl w-full overflow-hidden shadow-2xl border border-slate-100 dark:border-slate-700 max-h-[92vh] flex flex-col text-slate-800 dark:text-slate-100 my-auto">
-        {/* Header */}
-        <div className="bg-[#003E78] dark:bg-slate-900 text-white p-4 flex justify-between items-center shrink-0">
-          <div>
-            <h3 className="font-bold text-sm flex items-center gap-2">
-              <FileCheck className="w-4 h-4 text-orange-400" />
-              <span>Detail Pembacaan Meter, Dokumen BPM & Riwayat</span>
-            </h3>
-            <p className="text-[11px] text-blue-200">PT Aetra Air Tangerang - Unit Pelayanan Industri</p>
+        {/* Header - Brand Gradient with Aetra Air Tangerang Blue & Orange */}
+        <div className="bg-gradient-to-r from-[#003E78] via-[#0055A5] via-[#006bc7] to-[#E86216] text-white p-4 sm:p-5 flex justify-between items-center shrink-0 shadow-md">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2 rounded-xl bg-white/15 backdrop-blur-md border border-white/25 text-white shadow-xs shrink-0">
+              <FileCheck className="w-5 h-5 text-amber-300" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-black text-sm sm:text-base flex items-center gap-2 drop-shadow-xs truncate">
+                <span>Detail Pembacaan Meter, Dokumen BPM &amp; Alur Kerja</span>
+              </h3>
+              <p className="text-[11px] text-blue-100 font-medium truncate">PT Aetra Air Tangerang — Unit Pelayanan Pelanggan Industri</p>
+            </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="text-blue-200 hover:text-white transition p-1 rounded-lg"
+            className="text-white/80 hover:text-white hover:bg-white/15 transition p-1.5 rounded-xl border border-white/20 cursor-pointer shrink-0 ml-2"
+            title="Tutup dialog"
           >
             <X className="w-5 h-5" />
           </button>
@@ -259,6 +265,9 @@ export const DetailModal: React.FC<DetailModalProps> = ({
               </div>
             </div>
           )}
+
+          {/* Interactive Detailed Workflow Tracker with Step Timestamps and User Attribution */}
+          <IndustryWorkflowTracker customer={customer} />
 
           {/* Outlook success banner */}
           {showOutlookBox && (

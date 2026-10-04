@@ -187,7 +187,12 @@ export default function App() {
   const [selectedKelas, setSelectedKelas] = useState<string>('ALL');
   const [selectedBulan, setSelectedBulan] = useState<string>('ALL');
   const [workflowFilter, setWorkflowFilter] = useState<string>('ALL');
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 1024;
+    }
+    return true;
+  });
 
   // Dark mode
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {

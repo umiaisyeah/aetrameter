@@ -12,7 +12,10 @@ import {
   Eye,
   EyeOff,
   AlertCircle,
-  ChevronDown
+  ChevronDown,
+  Sparkles,
+  Waves,
+  Zap
 } from 'lucide-react';
 
 interface ModalLoginProps {
@@ -146,6 +149,53 @@ export const ModalLogin: React.FC<ModalLoginProps> = ({ isOpen, onLogin, meterRe
             }`}>
               {loginType === 'field_reader' ? '📱 PORTAL PETUGAS LAPANGAN' : '🛡️ PORTAL ADMIN KANTOR'}
             </span>
+          </div>
+        </div>
+
+        {/* Animated SIMBA Interactive Overview Banner */}
+        <div className="relative overflow-hidden rounded-2xl p-4 mb-4 bg-gradient-to-br from-[#003E78] via-[#0055A5] to-[#E86216] text-white shadow-lg border border-white/20 select-none">
+          {/* Animated Background Highlights & Pulsing Water Glow */}
+          <div className="absolute -right-8 -top-8 w-28 h-28 bg-white/20 rounded-full blur-xl pointer-events-none animate-pulse" />
+          <div className="absolute -left-6 -bottom-6 w-24 h-24 bg-amber-400/25 rounded-full blur-xl pointer-events-none animate-pulse" style={{ animationDelay: '1s' }} />
+          
+          <div className="relative z-10 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <span className="p-1 rounded-lg bg-white/20 text-amber-300 animate-spin" style={{ animationDuration: '6s' }}>
+                  <Sparkles className="w-3.5 h-3.5" />
+                </span>
+                <span className="font-black text-xs tracking-wider uppercase drop-shadow-xs flex items-center gap-1">
+                  <span>Tentang SIMBA</span>
+                  <Waves className="w-3.5 h-3.5 text-cyan-200 animate-bounce" />
+                </span>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-white/20 border border-white/25 flex items-center gap-1 shadow-xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                <span>ONLINE 2026</span>
+              </span>
+            </div>
+
+            <p className="text-[11px] leading-relaxed text-blue-50 font-medium">
+              <strong className="text-white font-extrabold">SIMBA</strong> (Sistem Integrasi Metering &amp; Billing Aetra Air Tangerang) adalah ekosistem terpadu operasional pembacaan meter industri: integrasi jadwal <strong>Cycle 1–15</strong>, pencatatan stand &amp; bukti geotagging BPM di lapangan, hingga verifikasi reading dan penerbitan faktur tagihan air resmi.
+            </p>
+
+            {/* Micro Animated Features Marquee Strip */}
+            <div className="pt-1 flex items-center gap-1.5 overflow-hidden">
+              <div className="flex items-center gap-1.5 animate-marquee whitespace-nowrap text-[9px] font-extrabold text-blue-100">
+                <span className="bg-white/15 px-2 py-0.5 rounded-md border border-white/15 flex items-center gap-1">
+                  <Zap className="w-2.5 h-2.5 text-amber-300" /> Live Sync Lapangan
+                </span>
+                <span className="bg-white/15 px-2 py-0.5 rounded-md border border-white/15">
+                  📸 Kamera Watermark &amp; OCR
+                </span>
+                <span className="bg-white/15 px-2 py-0.5 rounded-md border border-white/15">
+                  📍 GPS Geotagging Presisi
+                </span>
+                <span className="bg-white/15 px-2 py-0.5 rounded-md border border-white/15">
+                  📑 Faktur &amp; e-Materai Resmi
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 

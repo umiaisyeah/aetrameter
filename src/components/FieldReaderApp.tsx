@@ -448,15 +448,39 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
     }
   };
 
-  // Submit reading to admin
+  // Submit reading to admin (Semua isian wajib diisi kecuali catatan)
   const handleSubmitReading = (cust: IndustryCustomer) => {
     const skrgNum = Number(inputSkrg);
+
+    // 1. Validasi Stand Sekarang (Wajib > 0)
     if (!skrgNum || skrgNum <= 0) {
       showColorfulAlert({
-        title: 'Stand Meter Belum Valid',
-        message: 'Silakan masukkan nilai Stand Sekarang yang valid (harus lebih besar dari 0) sebelum mengirim laporan.',
+        title: 'Stand Meter Belum Diisi! ⚠️',
+        message: 'Nilai Stand Meter Sekarang (m³) wajib diisi dengan angka valid dan lebih besar dari 0 sebelum mengirim laporan hasil bacaan.',
         type: 'warning',
-        badge: 'VALIDASI NILAI'
+        badge: 'ISIAN WAJIB'
+      });
+      return;
+    }
+
+    // 2. Validasi Foto Stand Meter (Wajib)
+    if (!fotoMeterPreview) {
+      showColorfulAlert({
+        title: 'Foto Stand Meter Wajib Diunggah! 📸',
+        message: 'Foto fisik stand meter lapangan wajib diambil melalui kamera atau diunggah dari galeri sebagai bukti otentik sebelum mengirim bacaan.',
+        type: 'warning',
+        badge: 'FOTO METER WAJIB'
+      });
+      return;
+    }
+
+    // 3. Validasi Foto Dokumen BPM Fisik (Wajib)
+    if (!fotoBPMPreview) {
+      showColorfulAlert({
+        title: 'Foto Lembar BPM Fisik Wajib Diunggah! 📑',
+        message: 'Foto lembar dokumen BPM fisik (Bukti Pembacaan Meter) bertanda tangan wajib diambil atau diunggah sebelum mengirim bacaan.',
+        type: 'warning',
+        badge: 'FOTO BPM WAJIB'
       });
       return;
     }
@@ -1647,9 +1671,15 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                 }`}>
                   <div className="flex items-center justify-between text-[10px] font-bold gap-1">
                     <span className="flex items-center gap-1 text-slate-700 dark:text-slate-300 truncate font-extrabold">
-                      <Camera className="w-3.5 h-3.5 text-blue-500 shrink-0" /> Foto Stand Meter
+                      <Camera className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                      <span>Foto Stand Meter</span>
+                      <span className="text-rose-500 font-black text-[9px]">* (Wajib)</span>
                     </span>
-                    {fotoMeterPreview && <span className="text-emerald-500 font-extrabold shrink-0">✓ Tersimpan</span>}
+                    {fotoMeterPreview ? (
+                      <span className="text-emerald-500 font-extrabold shrink-0 bg-emerald-100 dark:bg-emerald-950/80 px-1.5 py-0.2 rounded border border-emerald-300 dark:border-emerald-700">✓ Terisi</span>
+                    ) : (
+                      <span className="text-rose-500 font-bold shrink-0 bg-rose-50 dark:bg-rose-950/80 px-1.5 py-0.2 rounded border border-rose-200 dark:border-rose-800">Wajib Diisi</span>
+                    )}
                   </div>
 
                   {fotoMeterPreview ? (
@@ -1740,9 +1770,15 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                 }`}>
                   <div className="flex items-center justify-between text-[10px] font-bold gap-1">
                     <span className="flex items-center gap-1 text-slate-700 dark:text-slate-300 truncate font-extrabold">
-                      <FileCheck className="w-3.5 h-3.5 text-[#E86216] shrink-0" /> Foto BPM Fisik
+                      <FileCheck className="w-3.5 h-3.5 text-[#E86216] shrink-0" />
+                      <span>Foto BPM Fisik</span>
+                      <span className="text-rose-500 font-black text-[9px]">* (Wajib)</span>
                     </span>
-                    {fotoBPMPreview && <span className="text-emerald-500 font-extrabold shrink-0">✓ Tersimpan</span>}
+                    {fotoBPMPreview ? (
+                      <span className="text-emerald-500 font-extrabold shrink-0 bg-emerald-100 dark:bg-emerald-950/80 px-1.5 py-0.2 rounded border border-emerald-300 dark:border-emerald-700">✓ Terisi</span>
+                    ) : (
+                      <span className="text-rose-500 font-bold shrink-0 bg-rose-50 dark:bg-rose-950/80 px-1.5 py-0.2 rounded border border-rose-200 dark:border-rose-800">Wajib Diisi</span>
+                    )}
                   </div>
 
                   {fotoBPMPreview ? (
@@ -1858,13 +1894,21 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                     <label className={`block text-[10px] font-bold uppercase truncate ${
                       isFieldDarkMode ? 'text-blue-300' : 'text-blue-600'
                     }`}>
-                      Stand Sekarang (m³) *
+                      Stand Sekarang (m³) * <span className="text-rose-500 font-black text-[9px]">(Wajib)</span>
                     </label>
-                    {ocrConfidence && (
+                    {ocrConfidence ? (
                       <span className={`text-[8px] font-bold px-1.5 py-0.2 rounded shrink-0 ${
                         isFieldDarkMode ? 'bg-emerald-950 text-emerald-300 border border-emerald-700' : 'bg-emerald-100 text-emerald-700'
                       }`}>
                         OCR {ocrConfidence}%
+                      </span>
+                    ) : Number(inputSkrg) > 0 ? (
+                      <span className="text-[8px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                        ✓ Terisi
+                      </span>
+                    ) : (
+                      <span className="text-[8px] font-bold px-1.5 py-0.2 rounded bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+                        Wajib
                       </span>
                     )}
                   </div>
@@ -1875,15 +1919,15 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                     onChange={(e) => setInputSkrg(e.target.value)}
                     placeholder="Contoh: 14500"
                     className={`w-full p-2.5 border-2 rounded-xl font-mono text-sm font-black focus:outline-none focus:ring-2 focus:ring-blue-400 ${
-                      isFieldDarkMode
-                        ? 'bg-slate-800 border-blue-400 text-white placeholder:text-slate-500'
-                        : 'bg-white border-blue-500 text-slate-900 placeholder:text-slate-400'
+                      Number(inputSkrg) > 0
+                        ? isFieldDarkMode ? 'bg-slate-800 border-blue-400 text-white' : 'bg-white border-blue-500 text-slate-900'
+                        : isFieldDarkMode ? 'bg-slate-800 border-rose-500/80 text-white' : 'bg-white border-rose-400 text-slate-900'
                     }`}
                   />
                   <span className={`text-[9px] mt-0.5 block font-semibold break-words leading-tight ${
                     isFieldDarkMode ? 'text-blue-300' : 'text-blue-600'
                   }`}>
-                    Diisi otomatis oleh OCR / edit
+                    Diisi otomatis oleh OCR / ketik angka
                   </span>
                 </div>
               </div>
@@ -1949,6 +1993,53 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
               />
             </div>
 
+            {/* Kelengkapan Isian Pembacaan Meter Status Bar */}
+            <div className={`p-3 rounded-2xl border text-xs ${
+              Number(inputSkrg) > 0 && fotoMeterPreview && fotoBPMPreview
+                ? isFieldDarkMode
+                  ? 'bg-emerald-950/60 border-emerald-700/80 text-emerald-200'
+                  : 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                : isFieldDarkMode
+                ? 'bg-amber-950/60 border-amber-700/80 text-amber-200'
+                : 'bg-amber-50 border-amber-300 text-amber-900'
+            }`}>
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <span className="font-extrabold text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                  {Number(inputSkrg) > 0 && fotoMeterPreview && fotoBPMPreview ? (
+                    <span className="text-emerald-600 dark:text-emerald-400 font-black">✓ SIAP KIRIM (3 DARI 3 ISIAN WAJIB TERPENUHI)</span>
+                  ) : (
+                    <span className="text-amber-600 dark:text-amber-400 font-black">⚠️ SEMUA ISIAN WAJIB DIISI (KECUALI CATATAN)</span>
+                  )}
+                </span>
+                <span className="font-mono font-black text-[10px] px-2 py-0.5 rounded-full bg-black/10 dark:bg-black/30">
+                  {[Number(inputSkrg) > 0, Boolean(fotoMeterPreview), Boolean(fotoBPMPreview)].filter(Boolean).length} / 3 Wajib
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5 text-[10px] font-bold">
+                <span className={`px-2 py-1 rounded-lg border text-center flex items-center justify-center gap-1 ${
+                  Number(inputSkrg) > 0
+                    ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-700 dark:text-emerald-300'
+                    : 'bg-rose-500/15 border-rose-500/40 text-rose-700 dark:text-rose-300'
+                }`}>
+                  {Number(inputSkrg) > 0 ? '✓' : '✗'} Stand Kini
+                </span>
+                <span className={`px-2 py-1 rounded-lg border text-center flex items-center justify-center gap-1 ${
+                  fotoMeterPreview
+                    ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-700 dark:text-emerald-300'
+                    : 'bg-rose-500/15 border-rose-500/40 text-rose-700 dark:text-rose-300'
+                }`}>
+                  {fotoMeterPreview ? '✓' : '✗'} Foto Meter
+                </span>
+                <span className={`px-2 py-1 rounded-lg border text-center flex items-center justify-center gap-1 ${
+                  fotoBPMPreview
+                    ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-700 dark:text-emerald-300'
+                    : 'bg-rose-500/15 border-rose-500/40 text-rose-700 dark:text-rose-300'
+                }`}>
+                  {fotoBPMPreview ? '✓' : '✗'} Foto BPM
+                </span>
+              </div>
+            </div>
+
             {/* Modal Actions */}
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800 flex-wrap">
               <button
@@ -1961,7 +2052,17 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
               <button
                 type="button"
                 onClick={() => handleSubmitReading(activeCustomer)}
-                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs transition shadow-md flex items-center gap-1.5 cursor-pointer break-words"
+                disabled={!(Number(inputSkrg) > 0 && fotoMeterPreview && fotoBPMPreview)}
+                className={`px-4 py-2.5 text-white font-black rounded-xl text-xs transition shadow-md flex items-center gap-1.5 break-words ${
+                  Number(inputSkrg) > 0 && fotoMeterPreview && fotoBPMPreview
+                    ? 'bg-emerald-600 hover:bg-emerald-700 cursor-pointer active:scale-95 shadow-emerald-500/20'
+                    : 'bg-slate-400 dark:bg-slate-700 cursor-not-allowed opacity-60'
+                }`}
+                title={
+                  Number(inputSkrg) > 0 && fotoMeterPreview && fotoBPMPreview
+                    ? 'Kirim hasil bacaan ke server SIMBA'
+                    : 'Harap lengkapi Stand Sekarang, Foto Meter, dan Foto BPM Fisik untuk mengirim'
+                }
               >
                 <Send className="w-3.5 h-3.5 shrink-0" />
                 <span>Kirim Bacaan &amp; Sinkron Admin</span>
