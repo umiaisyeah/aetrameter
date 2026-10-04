@@ -2,7 +2,7 @@ import React from 'react';
 
 interface SimbaLogoProps {
   className?: string;
-  variant?: 'full' | 'compact' | 'icon' | 'badge';
+  variant?: 'full' | 'compact' | 'icon' | 'badge' | 'header';
   darkTheme?: boolean;
   animated?: boolean;
   size?: number;
@@ -128,20 +128,20 @@ export const SimbaLogo: React.FC<SimbaLogoProps> = ({
     );
   }
 
-  if (variant === 'compact') {
+  if (variant === 'compact' || variant === 'header') {
     return (
-      <div className={`inline-flex items-center gap-2 select-none ${className}`} title="SIMBA - Sistem Integrasi Metering & Billing Aetra Air Tangerang">
-        <Emblem size={32} />
-        <div className="flex flex-col text-left leading-none">
-          <div className="flex items-center gap-1">
-            <span className="font-black text-base tracking-wider bg-gradient-to-r from-[#0055A5] via-[#0077CC] to-[#E86216] bg-clip-text text-transparent dark:from-blue-400 dark:to-orange-400">
-              SIMBA
-            </span>
-          </div>
-          <span className="text-[8px] font-bold text-slate-500 dark:text-slate-400 tracking-tight mt-0.5">
-            AETRA TANGERANG
+      <div className={`inline-flex flex-col justify-center select-none ${className}`} title="SIMBA - PT Aetra Air Tangerang">
+        {/* Logo SIMBA di atas dengan spacing huruf rapi */}
+        <div className="flex items-center gap-1.5 leading-none">
+          <Emblem size={size || 22} />
+          <span className="font-black text-sm tracking-[0.2em] bg-gradient-to-r from-[#0055A5] via-[#0077CC] to-[#E86216] bg-clip-text text-transparent dark:from-blue-400 dark:to-orange-400">
+            SIMBA
           </span>
         </div>
+        {/* Diikuti PT Aetra Air Tangerang di bawahnya */}
+        <span className="text-[9px] font-bold text-slate-600 dark:text-slate-300 tracking-tight leading-none mt-1 pl-0.5">
+          PT Aetra Air Tangerang
+        </span>
       </div>
     );
   }

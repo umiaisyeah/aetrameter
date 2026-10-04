@@ -9,7 +9,6 @@ import {
   Droplets
 } from 'lucide-react';
 import { SimbaLogo } from './SimbaLogo';
-import { AetraLogo } from './AetraLogo';
 
 interface SimbaWelcomeScreenProps {
   onEnter: (targetPortal?: 'admin' | 'field_reader') => void;
@@ -57,20 +56,6 @@ export const SimbaWelcomeScreen: React.FC<SimbaWelcomeScreenProps> = ({ onEnter 
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] h-[520px] bg-gradient-to-tr from-cyan-500/15 via-[#0055A5]/25 to-transparent rounded-full blur-3xl pointer-events-none animate-pulse" style={{ animationDuration: '8s' }} />
       <div className="absolute bottom-10 right-10 w-96 h-96 bg-gradient-to-br from-[#E86216]/20 to-amber-500/10 rounded-full blur-3xl pointer-events-none animate-pulse" style={{ animationDuration: '6s', animationDelay: '2s' }} />
       <div className="absolute top-12 left-10 w-80 h-80 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
-
-      {/* Top Brand Bar */}
-      <header className="relative z-10 max-w-5xl w-full mx-auto flex items-center justify-between gap-3 pb-4 border-b border-white/10">
-        <div className="bg-white/95 dark:bg-slate-900/90 backdrop-blur-md px-3.5 py-1.5 rounded-2xl shadow-lg border border-white/20 flex items-center shrink-0">
-          <AetraLogo className="h-7 sm:h-8" />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-bold bg-white/10 backdrop-blur-md border border-white/15 text-cyan-200">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-            <span>REAL-TIME LIVE SYSTEM</span>
-          </span>
-        </div>
-      </header>
 
       {/* Main Showcase Presentation Body */}
       <main className="relative z-10 max-w-5xl w-full mx-auto my-auto py-6 sm:py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
