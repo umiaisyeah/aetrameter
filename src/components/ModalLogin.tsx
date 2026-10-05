@@ -119,7 +119,7 @@ export const ModalLogin: React.FC<ModalLoginProps> = ({
         inputPass === 'AETRA123';
 
       if (!isPassValid) {
-        setAuthError(`Password tidak sesuai. Gunakan password resmi: ${selectedReader.password || 'ANJAR123'}`);
+        setAuthError('Password tidak sesuai. Silakan periksa kembali password akun pembaca meter.');
         return;
       }
 
@@ -322,21 +322,6 @@ export const ModalLogin: React.FC<ModalLoginProps> = ({
                     title={showPassword ? 'Sembunyikan password' : 'Lihat password'}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-                <div className="flex items-center justify-between text-[10px] mt-1.5 gap-2">
-                  <span className="text-slate-400 dark:text-slate-500">Password resmi:</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPasswordInput(selectedReader?.password || 'ANJAR123');
-                      setAuthError(null);
-                    }}
-                    className="font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 dark:hover:bg-amber-900/80 px-2 py-0.5 rounded-md border border-amber-300 dark:border-amber-700 transition cursor-pointer flex items-center gap-1"
-                    title="Klik untuk mengisi password otomatis"
-                  >
-                    <span>🔑 {selectedReader?.password || 'ANJAR123'}</span>
-                    <span className="text-[9px] underline opacity-80">(Klik Isi)</span>
                   </button>
                 </div>
               </div>
