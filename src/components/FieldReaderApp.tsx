@@ -29,8 +29,12 @@ import {
   BarChart3,
   User,
   Send,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Crosshair,
+  Edit3,
+  ExternalLink
 } from 'lucide-react';
+import { getCustomerCoordinates } from '../utils/gpsHelper';
 import { showColorfulAlert } from '../utils/notificationSystem';
 import {
   getAssignedCustomersForReader,
@@ -95,7 +99,12 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
   const [catatan, setCatatan] = useState<string>('');
   const [gpsLocation, setGpsLocation] = useState<string>('');
   const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number }>({ lat: -6.187214, lng: 106.541290 });
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
+  const [gpsAltitude, setGpsAltitude] = useState<number | null>(null);
   const [gpsLoading, setGpsLoading] = useState<boolean>(false);
+  const [isManualCoordsEdit, setIsManualCoordsEdit] = useState<boolean>(false);
+  const [manualLatInput, setManualLatInput] = useState<string>('-6.187214');
+  const [manualLngInput, setManualLngInput] = useState<string>('106.541290');
 
   // OCR and Auto-Recognition Simulation State
   const [isOcrScanning, setIsOcrScanning] = useState<boolean>(false);
@@ -190,10 +199,13 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
   }, [readerTargetObj, customers]);
 
   // Automatically fetch GPS based on Google Maps decimal degrees standard
-  const fetchCurrentGPS = () => {
+  const fetchCurrentGPS = (targetCust?: IndustryCustomer) => {
     if (!navigator.geolocation) {
-      setGpsLocation('Lat: -6.187214, Long: 106.541290');
-      setGpsCoords({ lat: -6.187214, lng: 106.541290 });
+      const fallback = targetCust ? getCustomerCoordinates(targetCust) : { lat: -6.187214, lng: 106.541290 };
+      setGpsLocation(`Lat: ${fallback.lat.toFixed(6)}, Long: ${fallback.lng.toFixed(6)}`);
+      setGpsCoords({ lat: fallback.lat, lng: fallback.lng });
+      setManualLatInput(String(fallback.lat.toFixed(6)));
+      setManualLngInput(String(fallback.lng.toFixed(6)));
       return;
     }
     setGpsLoading(true);
@@ -203,16 +215,66 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
         const lng = Number(pos.coords.longitude.toFixed(6));
         setGpsCoords({ lat, lng });
         setGpsLocation(`Lat: ${lat.toFixed(6)}, Long: ${lng.toFixed(6)}`);
+        setGpsAccuracy(pos.coords.accuracy ? Number(pos.coords.accuracy.toFixed(1)) : 3.2);
+        if (pos.coords.altitude) setGpsAltitude(Number(pos.coords.altitude.toFixed(1)));
+        setManualLatInput(String(lat.toFixed(6)));
+        setManualLngInput(String(lng.toFixed(6)));
         setGpsLoading(false);
       },
       (err) => {
         console.warn('GPS Error:', err);
-        setGpsLocation('Lat: -6.187214, Long: 106.541290');
-        setGpsCoords({ lat: -6.187214, lng: 106.541290 });
+        if (targetCust && typeof targetCust.latitude === 'number' && typeof targetCust.longitude === 'number') {
+          setGpsCoords({ lat: targetCust.latitude, lng: targetCust.longitude });
+          setGpsLocation(`Lat: ${targetCust.latitude.toFixed(6)}, Long: ${targetCust.longitude.toFixed(6)}`);
+          setManualLatInput(String(targetCust.latitude.toFixed(6)));
+          setManualLngInput(String(targetCust.longitude.toFixed(6)));
+        } else if (targetCust) {
+          const fallback = getCustomerCoordinates(targetCust);
+          setGpsCoords({ lat: fallback.lat, lng: fallback.lng });
+          setGpsLocation(`Lat: ${fallback.lat.toFixed(6)}, Long: ${fallback.lng.toFixed(6)}`);
+          setManualLatInput(String(fallback.lat.toFixed(6)));
+          setManualLngInput(String(fallback.lng.toFixed(6)));
+        } else {
+          setGpsLocation('Lat: -6.187214, Long: 106.541290');
+          setGpsCoords({ lat: -6.187214, lng: 106.541290 });
+          setManualLatInput('-6.187214');
+          setManualLngInput('106.541290');
+        }
         setGpsLoading(false);
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
+  };
+
+  const handleCoordinatesChange = (coords: { lat: number; lng: number }) => {
+    const lat = Number(coords.lat.toFixed(6));
+    const lng = Number(coords.lng.toFixed(6));
+    setGpsCoords({ lat, lng });
+    setGpsLocation(`Lat: ${lat.toFixed(6)}, Long: ${lng.toFixed(6)}`);
+    setManualLatInput(String(lat.toFixed(6)));
+    setManualLngInput(String(lng.toFixed(6)));
+  };
+
+  const handleApplyManualCoords = () => {
+    const lat = parseFloat(manualLatInput);
+    const lng = parseFloat(manualLngInput);
+    if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+      handleCoordinatesChange({ lat, lng });
+      setIsManualCoordsEdit(false);
+      showColorfulAlert({
+        title: 'Koordinat Diperbarui 📍',
+        message: `Koordinat berhasil disesuaikan ke: ${lat.toFixed(6)}, ${lng.toFixed(6)}. Peta dan watermark foto telah disinkronkan.`,
+        type: 'info',
+        badge: 'GPS DISINKRONKAN'
+      });
+    } else {
+      showColorfulAlert({
+        title: 'Koordinat Tidak Valid ⚠️',
+        message: 'Masukkan angka Latitude (-90 s/d 90) dan Longitude (-180 s/d 180) yang valid.',
+        type: 'warning',
+        badge: 'FORMAT SALAH'
+      });
+    }
   };
 
   useEffect(() => {
@@ -384,9 +446,24 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
     setCatatan(isAutoNote ? '' : cust.catatan.trim());
     setOcrConfidence(null);
     setOcrSuccessNotice(null);
+    setIsManualCoordsEdit(false);
 
-    // Auto-fetch fresh GPS coordinates
-    fetchCurrentGPS();
+    // If customer already has saved coordinates, initialize with them first
+    if (typeof cust.latitude === 'number' && typeof cust.longitude === 'number' && !isNaN(cust.latitude) && !isNaN(cust.longitude)) {
+      setGpsCoords({ lat: cust.latitude, lng: cust.longitude });
+      setGpsLocation(`Lat: ${cust.latitude.toFixed(6)}, Long: ${cust.longitude.toFixed(6)}`);
+      setManualLatInput(String(cust.latitude.toFixed(6)));
+      setManualLngInput(String(cust.longitude.toFixed(6)));
+    } else {
+      const fallback = getCustomerCoordinates(cust);
+      setGpsCoords({ lat: fallback.lat, lng: fallback.lng });
+      setGpsLocation(`Lat: ${fallback.lat.toFixed(6)}, Long: ${fallback.lng.toFixed(6)}`);
+      setManualLatInput(String(fallback.lat.toFixed(6)));
+      setManualLngInput(String(fallback.lng.toFixed(6)));
+    }
+
+    // Auto-fetch fresh GPS coordinates from device
+    fetchCurrentGPS(cust);
   };
 
   // AI OCR Auto-Recognition Simulation
@@ -500,8 +577,8 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
       lokasiGps: gpsLocation || `Lat: ${gpsCoords.lat.toFixed(6)}, Long: ${gpsCoords.lng.toFixed(6)}`,
       latitude: gpsCoords.lat,
       longitude: gpsCoords.lng,
-      gpsAkurasiMeter: 3.5,
-      altitudeMeter: 26.0,
+      gpsAkurasiMeter: gpsAccuracy || 3.5,
+      altitudeMeter: gpsAltitude || 26.0,
       meterLatitude: gpsCoords.lat,
       meterLongitude: gpsCoords.lng,
       bpmLatitude: Number((gpsCoords.lat + 0.00008).toFixed(6)),
@@ -1609,38 +1686,125 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
             </div>
 
             {/* GPS Live Fetch Banner based on Google Maps standard */}
-            <div className={`p-2.5 rounded-xl border flex items-center justify-between text-xs gap-2.5 ${
+            <div className={`p-3 rounded-2xl border space-y-2.5 text-xs ${
               isFieldDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
             }`}>
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <Navigation className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase block leading-none">
-                    Koordinat GPS (Google Maps):
-                  </span>
-                  <span className="font-mono text-[11px] font-bold text-emerald-600 dark:text-emerald-300 break-words block mt-0.5 leading-tight">
-                    {gpsLoading ? 'Mencari satelit GPS...' : gpsLocation || 'Lat: -6.187214, Long: 106.541290'}
-                  </span>
+              <div className="flex items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500 shrink-0">
+                    <Navigation className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[9.5px] font-black text-slate-400 uppercase tracking-wider block">
+                        Koordinat GPS Asli Lapangan:
+                      </span>
+                      <span className="px-1.5 py-0.2 rounded-full text-[8.5px] font-black uppercase bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
+                        {gpsAccuracy ? `±${gpsAccuracy}m Akurat` : 'GPS Aktif'}
+                      </span>
+                      {gpsAltitude && (
+                        <span className="px-1.5 py-0.2 rounded-full text-[8.5px] font-bold text-slate-500 bg-slate-200 dark:bg-slate-800">
+                          {gpsAltitude}m dpl
+                        </span>
+                      )}
+                    </div>
+                    <span className="font-mono text-xs sm:text-sm font-black text-emerald-600 dark:text-emerald-300 break-words block mt-0.5 leading-tight">
+                      {gpsLoading ? 'Mencari satelit GPS lapangan...' : gpsLocation || `Lat: ${gpsCoords.lat.toFixed(6)}, Long: ${gpsCoords.lng.toFixed(6)}`}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
+                  <a
+                    href={`https://www.google.com/maps?q=${gpsCoords.lat},${gpsCoords.lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2.5 py-1.5 bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-300 hover:bg-blue-100 rounded-xl text-[10px] font-black transition flex items-center gap-1 shrink-0 border border-blue-200 dark:border-blue-800 shadow-2xs"
+                    title="Buka koordinat asli ini di Google Maps"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    <span>Maps ↗</span>
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => fetchCurrentGPS(activeCustomer)}
+                    className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-[10px] font-black rounded-xl flex items-center gap-1 cursor-pointer shrink-0 shadow-xs transition"
+                    title="Segarkan koordinat langsung dari sensor GPS perangkat saat ini"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${gpsLoading ? 'animate-spin' : ''}`} />
+                    <span>Sync GPS</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsManualCoordsEdit(!isManualCoordsEdit)}
+                    className="px-2.5 py-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-[10px] font-bold rounded-xl flex items-center gap-1 cursor-pointer shrink-0 transition"
+                    title="Sesuaikan koordinat Latitude & Longitude manual jika GPS memiliki pergeseran"
+                  >
+                    <Edit3 className="w-3 h-3" />
+                    <span>{isManualCoordsEdit ? 'Tutup' : 'Sesuaikan'}</span>
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
-                <a
-                  href={`https://www.google.com/maps?q=${gpsCoords.lat},${gpsCoords.lng}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-2 py-1 bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-300 hover:bg-blue-100 rounded-lg text-[10px] font-bold transition flex items-center gap-1 shrink-0"
-                >
-                  <span>Maps ↗</span>
-                </a>
-                <button
-                  type="button"
-                  onClick={fetchCurrentGPS}
-                  className="px-2 py-1 bg-slate-200 dark:bg-slate-800 text-[10px] font-bold rounded-lg flex items-center gap-1 cursor-pointer shrink-0"
-                >
-                  <RefreshCw className={`w-3 h-3 ${gpsLoading ? 'animate-spin' : ''}`} />
-                  <span>Sync</span>
-                </button>
-              </div>
+
+              {/* Manual Coordinate Adjustment Form Panel */}
+              {isManualCoordsEdit && (
+                <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-2.5 animate-in fade-in duration-150 shadow-sm">
+                  <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                    <span>Input Presisi Koordinat Geotag (Format Desimal Google Maps):</span>
+                    <button
+                      type="button"
+                      onClick={() => fetchCurrentGPS(activeCustomer)}
+                      className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer flex items-center gap-1"
+                    >
+                      <RefreshCw className="w-2.5 h-2.5" />
+                      <span>Reset ke GPS Perangkat</span>
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-500 uppercase block mb-0.5">Latitude (Lintang):</label>
+                      <input
+                        type="text"
+                        value={manualLatInput}
+                        onChange={(e) => setManualLatInput(e.target.value)}
+                        placeholder="-6.187214"
+                        className="w-full p-2 border rounded-lg text-xs font-mono font-bold dark:bg-slate-950 dark:border-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-500 uppercase block mb-0.5">Longitude (Bujur):</label>
+                      <input
+                        type="text"
+                        value={manualLngInput}
+                        onChange={(e) => setManualLngInput(e.target.value)}
+                        placeholder="106.541290"
+                        className="w-full p-2 border rounded-lg text-xs font-mono font-bold dark:bg-slate-950 dark:border-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[9px] text-slate-400 italic">
+                      💡 Tip: Anda juga dapat menggeser pin MTR langsung di peta lokasi bawah.
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsManualCoordsEdit(false)}
+                        className="px-2.5 py-1 rounded-lg text-xs font-bold text-slate-500 hover:text-slate-700 dark:hover:text-white"
+                      >
+                        Batal
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleApplyManualCoords}
+                        className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-black shadow-xs cursor-pointer"
+                      >
+                        Terapkan ke Peta &amp; Geotag
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Photo Capture & AI Auto Recognition Section */}
@@ -1703,8 +1867,15 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                           customer={{
                             ...activeCustomer,
                             fotoMeter: fotoMeterPreview,
-                            meterWaktuFoto: meterPhotoTime || activeCustomer.meterWaktuFoto
+                            meterWaktuFoto: meterPhotoTime || activeCustomer.meterWaktuFoto,
+                            latitude: gpsCoords.lat,
+                            longitude: gpsCoords.lng,
+                            meterLatitude: gpsCoords.lat,
+                            meterLongitude: gpsCoords.lng,
+                            gpsAkurasiMeter: gpsAccuracy || 3.5,
+                            altitudeMeter: gpsAltitude || 25.0
                           }}
+                          liveCoords={gpsCoords}
                           photoType="meter"
                         />
                       )}
@@ -1789,7 +1960,17 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                         customer={{
                           ...activeCustomer,
                           fotoBPM: fotoBPMPreview,
-                          bpmWaktuFoto: bpmPhotoTime || activeCustomer.bpmWaktuFoto
+                          bpmWaktuFoto: bpmPhotoTime || activeCustomer.bpmWaktuFoto,
+                          latitude: gpsCoords.lat,
+                          longitude: gpsCoords.lng,
+                          bpmLatitude: Number((gpsCoords.lat + 0.00008).toFixed(6)),
+                          bpmLongitude: Number((gpsCoords.lng + 0.00010).toFixed(6)),
+                          gpsAkurasiMeter: gpsAccuracy || 3.5,
+                          altitudeMeter: gpsAltitude || 25.0
+                        }}
+                        liveCoords={{
+                          lat: Number((gpsCoords.lat + 0.00008).toFixed(6)),
+                          lng: Number((gpsCoords.lng + 0.00010).toFixed(6))
                         }}
                         photoType="bpm"
                       />
@@ -1974,7 +2155,14 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
 
             {/* Integrated Realtime Location Map */}
             <div className="space-y-1">
-              <RealtimeLocationMap customer={activeCustomer} height="h-44 sm:h-52" />
+              <RealtimeLocationMap
+                customer={activeCustomer}
+                customCoords={gpsCoords}
+                liveReaderCoords={gpsCoords}
+                interactive={true}
+                onCoordinatesChange={handleCoordinatesChange}
+                height="h-52 sm:h-60"
+              />
             </div>
 
             {/* Field Notes */}
@@ -2096,6 +2284,8 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
           customerId={activeCustomer.id}
           readerName={currentUser.name}
           gpsLocation={gpsLocation || `Lat: ${gpsCoords.lat.toFixed(6)}, Long: ${gpsCoords.lng.toFixed(6)}`}
+          latitude={liveCameraTarget === 'bpm' ? Number((gpsCoords.lat + 0.00008).toFixed(6)) : gpsCoords.lat}
+          longitude={liveCameraTarget === 'bpm' ? Number((gpsCoords.lng + 0.00010).toFixed(6)) : gpsCoords.lng}
           photoType={liveCameraTarget}
         />
       )}

@@ -317,7 +317,7 @@ export const Barcode128Svg: React.FC<{ value: string; className?: string }> = ({
   let currentX = 0;
 
   return (
-    <div className="flex flex-col items-center select-none">
+    <div className="flex flex-col items-center select-none w-full">
       <svg
         viewBox={`0 0 ${totalWidth} 40`}
         preserveAspectRatio="none"
@@ -336,3 +336,86 @@ export const Barcode128Svg: React.FC<{ value: string; className?: string }> = ({
     </div>
   );
 };
+
+/**
+ * Orange checkmark icon as seen in Page 2 Payment Matrix table
+ */
+export const OrangeCheckIcon: React.FC<{ className?: string }> = ({ className = 'w-3.5 h-3.5' }) => (
+  <svg
+    viewBox="0 0 20 20"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className={`inline-block shrink-0 ${className}`}
+  >
+    <path
+      d="M3 10.5 L7.5 15 L17 4.5"
+      stroke="#E86216"
+      strokeWidth="3.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+/**
+ * Three official accreditation logos on Page 1:
+ * TUV NORD ISO 9001 + KAN + Majelis Ulama Indonesia Halal
+ */
+export const AetraCertificationBadges: React.FC<{ className?: string }> = ({ className = '' }) => (
+  <div className={`flex items-center gap-2 select-none ${className}`}>
+    {/* 1. TUV NORD ISO 9001 Logo */}
+    <div className="flex flex-col items-center text-center">
+      <svg width="44" height="44" viewBox="0 0 54 54" fill="none">
+        <circle cx="27" cy="27" r="25" fill="#FFFFFF" stroke="#003580" strokeWidth="2.5" />
+        <path d="M12 28 C12 18 20 12 30 12 C38 12 43 17 43 24" stroke="#0055A5" strokeWidth="3" fill="none" strokeLinecap="round" />
+        <path d="M11 27 C11 36 19 42 27 42 C36 42 42 36 42 28" stroke="#0077C8" strokeWidth="2" fill="none" />
+        <text x="27" y="27" textAnchor="middle" fontSize="6.5" fontWeight="900" fill="#003580" fontFamily="sans-serif">
+          TUV NORD
+        </text>
+        <text x="27" y="34" textAnchor="middle" fontSize="4.5" fontWeight="700" fill="#475569" fontFamily="sans-serif">
+          ISO 9001
+        </text>
+      </svg>
+      <span className="text-[6px] font-bold text-slate-800 leading-none mt-0.5">Certified Company</span>
+      <span className="text-[5.5px] font-mono text-slate-600 leading-none">No. 16 00 C 18046</span>
+    </div>
+
+    {/* Vertical divider */}
+    <div className="w-[1px] h-9 bg-slate-300 mx-0.5" />
+
+    {/* 2. KAN (Komite Akreditasi Nasional) Logo */}
+    <div className="flex flex-col items-center text-center">
+      <div className="flex items-center gap-1">
+        {/* Red V Checkmark */}
+        <svg width="18" height="22" viewBox="0 0 20 24" fill="none">
+          <path d="M2 13 L8 21 L18 3" stroke="#DC2626" strokeWidth="4.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        </svg>
+        <span className="font-sans font-black text-sm text-[#003580] tracking-tighter">KAN</span>
+      </div>
+      <span className="text-[5.5px] font-bold text-slate-800 leading-tight">Komite Akreditasi Nasional</span>
+      <span className="text-[5px] text-slate-500 leading-tight">Lembaga Sertifikasi Sistem Mutu</span>
+      <span className="text-[5px] font-mono text-slate-600 leading-tight">LSSM-016-IDN</span>
+    </div>
+
+    {/* Vertical divider */}
+    <div className="w-[1px] h-9 bg-slate-300 mx-0.5" />
+
+    {/* 3. Majelis Ulama Indonesia Halal Logo */}
+    <div className="flex flex-col items-center text-center">
+      <svg width="40" height="40" viewBox="0 0 54 54" fill="none">
+        <circle cx="27" cy="27" r="25" fill="#FFFFFF" stroke="#007A48" strokeWidth="2" />
+        <circle cx="27" cy="27" r="22" fill="#FFFFFF" stroke="#007A48" strokeWidth="0.8" strokeDasharray="1.5 1.5" />
+        <text x="27" y="14" textAnchor="middle" fontSize="4.2" fontWeight="900" fill="#007A48" fontFamily="sans-serif">
+          MAJELIS ULAMA
+        </text>
+        <text x="27" y="32" textAnchor="middle" fontSize="13" fontWeight="900" fill="#007A48" fontFamily="serif">
+          حلال
+        </text>
+        <text x="27" y="42" textAnchor="middle" fontSize="5" fontWeight="900" fill="#007A48" fontFamily="sans-serif">
+          INDONESIA
+        </text>
+      </svg>
+      <span className="text-[5.5px] font-mono text-slate-600 leading-none mt-0.5">No. 00170092031118</span>
+    </div>
+  </div>
+);

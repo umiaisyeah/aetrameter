@@ -10,6 +10,7 @@ interface PhotoGeotagStampProps {
   onOpenMap?: () => void;
   onClickPreview?: () => void;
   compact?: boolean;
+  liveCoords?: { lat: number; lng: number };
 }
 
 export const PhotoGeotagStamp: React.FC<PhotoGeotagStampProps> = ({
@@ -17,12 +18,34 @@ export const PhotoGeotagStamp: React.FC<PhotoGeotagStampProps> = ({
   photoType,
   className = '',
   onClickPreview,
-  compact = false
+  compact = false,
+  liveCoords
 }) => {
-  const coords = getCustomerCoordinates(customer);
+  const fallbackCoords = getCustomerCoordinates(customer);
 
-  const lat = photoType === 'bpm' && customer.bpmLatitude ? customer.bpmLatitude : coords.lat;
-  const lng = photoType === 'bpm' && customer.bpmLongitude ? customer.bpmLongitude : coords.lng;
+  // Exact real-time field coordinates selection
+  const lat =
+    liveCoords && typeof liveCoords.lat === 'number'
+      ? liveCoords.lat
+      : photoType === 'bpm' && typeof customer.bpmLatitude === 'number'
+      ? customer.bpmLatitude
+      : photoType === 'meter' && typeof customer.meterLatitude === 'number'
+      ? customer.meterLatitude
+      : typeof customer.latitude === 'number'
+      ? customer.latitude
+      : fallbackCoords.lat;
+
+  const lng =
+    liveCoords && typeof liveCoords.lng === 'number'
+      ? liveCoords.lng
+      : photoType === 'bpm' && typeof customer.bpmLongitude === 'number'
+      ? customer.bpmLongitude
+      : photoType === 'meter' && typeof customer.meterLongitude === 'number'
+      ? customer.meterLongitude
+      : typeof customer.longitude === 'number'
+      ? customer.longitude
+      : fallbackCoords.lng;
+
   const rawTimeStr =
     photoType === 'bpm'
       ? customer.bpmWaktuFoto || customer.waktuBaca || '30 Sep 2026 10:15:24 WIB'
@@ -75,12 +98,15 @@ export const PhotoGeotagStamp: React.FC<PhotoGeotagStampProps> = ({
         <div className="flex items-center justify-between gap-1 text-[8px] text-slate-300 font-medium border-t border-white/10 pt-0.5">
           <div className="flex items-center gap-1 min-w-0 truncate font-mono text-[8px] text-cyan-300">
             <MapPin className="w-2.5 h-2.5 text-rose-400 shrink-0" />
-            <span className="truncate">
+            <span className="truncate font-bold">
               {lat.toFixed(6)}, {lng.toFixed(6)}
+            </span>
+            <span className="text-[6.5px] font-mono px-1 py-0.2 rounded bg-emerald-500/25 border border-emerald-400/40 text-emerald-300 uppercase tracking-tight shrink-0 font-extrabold">
+              GPS Asli
             </span>
           </div>
 
-          <div className="text-[7.5px] text-slate-400 truncate max-w-[130px] font-sans">
+          <div className="text-[7.5px] text-slate-300 font-medium truncate max-w-[130px] font-sans">
             {customer.petugasBaca ? `Oleh: ${customer.petugasBaca}` : 'Akun Petugas Lapangan'}
           </div>
         </div>

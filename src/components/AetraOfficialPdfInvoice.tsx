@@ -127,9 +127,9 @@ export const AetraOfficialPdfInvoice: React.FC<AetraOfficialPdfInvoiceProps> = (
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      className="fixed inset-0 z-[999999] flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-2 sm:p-4 md:p-6 overflow-y-auto print:p-0 print:bg-white print:fixed-none"
+      className="fixed inset-0 z-[999999] flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-2 sm:p-4 md:p-6 overflow-y-auto print:p-0 print:bg-white print:static print:inset-auto print:overflow-visible print:block"
     >
-      <div className="bg-slate-100 dark:bg-slate-900 w-full max-w-5xl rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[96vh] my-auto relative z-10 print:max-h-none print:m-0 print:border-none print:shadow-none print:w-full print:rounded-none">
+      <div className="bg-slate-100 dark:bg-slate-900 w-full max-w-5xl rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[96vh] my-auto relative z-10 print:max-h-none print:m-0 print:border-none print:shadow-none print:w-full print:rounded-none print:bg-white print:block">
         {/* Top Control Bar (Hidden on Print) */}
         <div className="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between gap-3 border-b border-slate-800 print:hidden shrink-0 flex-wrap">
           <div className="flex items-center gap-2.5">
@@ -202,7 +202,7 @@ export const AetraOfficialPdfInvoice: React.FC<AetraOfficialPdfInvoiceProps> = (
         </div>
 
         {/* Scrollable Document Body */}
-        <div className="overflow-y-auto p-4 sm:p-6 bg-slate-200 dark:bg-slate-950 flex flex-col items-center gap-6 print:p-0 print:bg-white print:gap-0">
+        <div className="overflow-y-auto p-4 sm:p-6 bg-slate-200 dark:bg-slate-950 flex flex-col items-center gap-6 print:p-0 print:bg-white print:gap-0 print:overflow-visible print:block">
           
           {/* ========================================================================= */}
           {/* PAGE 1: OFFICIAL INVOICE & TAX INVOICE (HALAMAN 1)                         */}
@@ -564,8 +564,18 @@ export const AetraOfficialPdfInvoice: React.FC<AetraOfficialPdfInvoiceProps> = (
               </div>
 
               {/* TEAR-OFF / PAYMENT STUB (SLIP PEMBAYARAN) */}
-              <div className="mt-3 pt-2 border-t-2 border-dashed border-slate-400">
-                <div className="p-2.5 rounded bg-[#E6F0FA]/70 border border-blue-200 grid grid-cols-12 gap-3 text-[8.5px] items-center">
+              <div className="mt-3 pt-1">
+                <div className="flex items-center justify-between text-[7px] text-slate-400 font-mono mb-0.5 select-none">
+                  <span className="flex items-center gap-1 font-bold">
+                    <span>✂</span>
+                    <span>POTONG DI SINI / TEAR HERE</span>
+                  </span>
+                  <span className="uppercase tracking-wider font-extrabold text-[#0055A5]">
+                    LEMBAR PEMBAYARAN (UNTUK BANK / KASIR / TEMPAT PEMBAYARAN)
+                  </span>
+                </div>
+                <div className="border-t-2 border-dashed border-slate-400 pt-1.5">
+                  <div className="p-2.5 rounded bg-[#E6F0FA]/70 border border-blue-200 grid grid-cols-12 gap-3 text-[8.5px] items-center">
                   <div className="col-span-7 space-y-0.5">
                     <div className="grid grid-cols-12">
                       <span className="col-span-4 text-slate-500 font-bold">NAMA</span>
@@ -598,6 +608,7 @@ export const AetraOfficialPdfInvoice: React.FC<AetraOfficialPdfInvoiceProps> = (
                 </div>
               </div>
             </div>
+          </div>
 
             {/* PAGE 1 FOOTER CONTACT BAR */}
             <div className="mt-3 -mx-8 -mb-8 sm:-mx-10 sm:-mb-10 bg-[#0055A5] text-white py-1.5 px-4 text-[7.5px] flex items-center justify-between font-medium tracking-wide flex-wrap">

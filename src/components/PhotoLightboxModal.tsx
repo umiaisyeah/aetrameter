@@ -43,8 +43,23 @@ export const PhotoLightboxModal: React.FC<PhotoLightboxModalProps> = ({
   const isMeter = photoType === 'meter';
   const coords = getCustomerCoordinates(customer);
 
-  const lat = photoType === 'bpm' && customer.bpmLatitude ? customer.bpmLatitude : coords.lat;
-  const lng = photoType === 'bpm' && customer.bpmLongitude ? customer.bpmLongitude : coords.lng;
+  const lat =
+    photoType === 'bpm' && typeof customer.bpmLatitude === 'number'
+      ? customer.bpmLatitude
+      : typeof customer.meterLatitude === 'number'
+      ? customer.meterLatitude
+      : typeof customer.latitude === 'number'
+      ? customer.latitude
+      : coords.lat;
+
+  const lng =
+    photoType === 'bpm' && typeof customer.bpmLongitude === 'number'
+      ? customer.bpmLongitude
+      : typeof customer.meterLongitude === 'number'
+      ? customer.meterLongitude
+      : typeof customer.longitude === 'number'
+      ? customer.longitude
+      : coords.lng;
   const timeStr =
     photoType === 'bpm'
       ? customer.bpmWaktuFoto || customer.waktuBaca || '30 Sep 2026 10:15 WIB'

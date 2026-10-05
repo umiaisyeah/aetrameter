@@ -569,7 +569,9 @@ export default function App() {
   };
 
   const handleImportCustomers = (importedList: IndustryCustomer[]) => {
-    const combinedCustomers = [...importedList, ...customers];
+    const importedIds = new Set(importedList.map((c) => c.id.toUpperCase().trim()));
+    const remainingCustomers = customers.filter((c) => !importedIds.has(c.id.toUpperCase().trim()));
+    const combinedCustomers = [...importedList, ...remainingCustomers];
     setCustomers(combinedCustomers);
     importedList.forEach((c) => upsertSupabaseCustomer(c).catch(() => {}));
 
