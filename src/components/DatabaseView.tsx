@@ -12,7 +12,6 @@ import {
   Users,
   Calendar,
   Layers,
-  FileSpreadsheet,
   Lock,
   AlertTriangle,
   Filter,
@@ -123,56 +122,6 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
       }
     }
     return null;
-  };
-
-  const downloadUnifiedExcelTemplate = () => {
-    const templateData = [
-      {
-        'ID Pelanggan': 'IND-2001',
-        'Nama Perusahaan Industri': 'PT Astra Honda Motor Plant Cikupa',
-        'Cycle': 'Cycle 1',
-        'Kelas': 'Premium',
-        'Stand Lalu (m³)': 45000,
-        'Pembaca Meter': 'Anjarini Sukamto'
-      },
-      {
-        'ID Pelanggan': 'IND-2002',
-        'Nama Perusahaan Industri': 'PT Mayora Indah Divisi Wafer',
-        'Cycle': 'Cycle 2',
-        'Kelas': 'Platinum',
-        'Stand Lalu (m³)': 38200,
-        'Pembaca Meter': 'Anjarini Sukamto'
-      },
-      {
-        'ID Pelanggan': 'IND-2003',
-        'Nama Perusahaan Industri': 'PT Torabika Eka Semesta',
-        'Cycle': 'Cycle 3',
-        'Kelas': 'Gold',
-        'Stand Lalu (m³)': 18400,
-        'Pembaca Meter': 'Anjarini Sukamto'
-      },
-      {
-        'ID Pelanggan': 'IND-2004',
-        'Nama Perusahaan Industri': 'PT Unilever Oleochemical Balaraja',
-        'Cycle': 'Cycle 4',
-        'Kelas': 'Premium',
-        'Stand Lalu (m³)': 28900,
-        'Pembaca Meter': 'Febriadi'
-      },
-      {
-        'ID Pelanggan': 'IND-2005',
-        'Nama Perusahaan Industri': 'PT Gajah Tunggal Tbk Plant 2',
-        'Cycle': 'Cycle 5',
-        'Kelas': 'Silver',
-        'Stand Lalu (m³)': 12500,
-        'Pembaca Meter': 'Febriadi'
-      }
-    ];
-
-    const ws = XLSX.utils.json_to_sheet(templateData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Database Industri & Cycle');
-    XLSX.writeFile(wb, 'Format_Import_Industri_Cycle_SIMBA.xlsx');
   };
 
   const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -587,15 +536,6 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  type="button"
-                  onClick={downloadUnifiedExcelTemplate}
-                  className="bg-[#0055A5] hover:bg-[#003E78] text-white text-xs font-bold px-3.5 py-2.5 rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer"
-                  title="Unduh Format Excel 5 Kolom: ID Pelanggan, Nama Perusahaan Industri, Cycle, Kelas, Pembaca Meter"
-                >
-                  <FileSpreadsheet className="w-4 h-4" />
-                  <span>Unduh Format Excel Gabungan</span>
-                </button>
                 <input
                   type="file"
                   ref={fileInputRef}
