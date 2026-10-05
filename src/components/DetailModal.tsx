@@ -62,6 +62,12 @@ export const DetailModal: React.FC<DetailModalProps> = ({
 
   if (!isOpen || !customer) return null;
 
+  const effectiveCustomer: IndustryCustomer = {
+    ...customer,
+    fotoMeter: customer.fotoMeter && customer.fotoMeter.trim() !== '' ? customer.fotoMeter : meterGaugeImg,
+    fotoBPM: customer.fotoBPM && customer.fotoBPM.trim() !== '' ? customer.fotoBPM : bpmDocImg
+  };
+
   // Calculations following exact Aetra official rules
   const lalu = customer.lalu;
   const currentStand = Number(inputSkrg) || 0;
@@ -346,61 +352,41 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                   <span>Foto Fisik Meteran Air di Lokasi</span>
                 </p>
                 <div className="flex items-center gap-1">
-                  {(!customer.fotoMeter || customer.status === 'Belum Dibaca') ? (
-                    <span className="text-[9px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 px-1.5 py-0.5 rounded">
-                      Menunggu Pengisian
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setLightboxPhoto('meter')}
-                      className="text-[9px] font-bold bg-blue-100 dark:bg-blue-950 text-[#0055A5] dark:text-blue-300 hover:bg-[#0055A5] hover:text-white px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800 transition flex items-center gap-1 cursor-pointer"
-                      title="Klik untuk memperbesar foto stand meter"
-                    >
-                      <Maximize2 className="w-2.5 h-2.5" />
-                      <span>Pop Out Zoom</span>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setLightboxPhoto('meter')}
+                    className="text-[9px] font-bold bg-blue-100 dark:bg-blue-950 text-[#0055A5] dark:text-blue-300 hover:bg-[#0055A5] hover:text-white px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800 transition flex items-center gap-1 cursor-pointer"
+                    title="Klik untuk memperbesar foto stand meter"
+                  >
+                    <Maximize2 className="w-2.5 h-2.5" />
+                    <span>Pop Out Zoom</span>
+                  </button>
                 </div>
               </div>
-              {customer.status === 'Belum Dibaca' || !customer.fotoMeter ? (
-                <div className="h-40 w-full rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800/60 flex flex-col items-center justify-center p-4 text-center">
-                  <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center mb-2 text-slate-400">
-                    <Camera className="w-5 h-5" />
-                  </div>
-                  <p className="font-bold text-slate-700 dark:text-slate-200 text-xs">
-                    Belum Ada Foto Meteran
-                  </p>
-                  <p className="text-[10px] text-slate-400 mt-1 max-w-[220px]">
-                    Status industri masih <strong>Belum Dibaca</strong>. Foto akan diunggah setelah pencatat meter lapangan ({customer.petugasBaca || 'Petugas'}) membaca stand meter.
-                  </p>
-                </div>
-              ) : (
-                <div
-                  onClick={() => setLightboxPhoto('meter')}
-                  className="h-48 w-full overflow-hidden rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-900 relative group cursor-pointer shadow-xs hover:border-[#0055A5] transition-all"
-                  title="Klik untuk membuka pop out foto stand meter beresolusi tinggi"
-                >
-                  <img
-                    src={customer.fotoMeter}
-                    alt={`Meteran ${customer.nama}`}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <span className="absolute top-2 left-2 bg-slate-900/85 text-white text-[9px] font-mono px-2 py-0.5 rounded shadow-xs z-10 border border-white/10">
-                    SN: MTR-{customer.id.replace('IND-', '')}-2026
+              <div
+                onClick={() => setLightboxPhoto('meter')}
+                className="h-48 w-full overflow-hidden rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-900 relative group cursor-pointer shadow-xs hover:border-[#0055A5] transition-all"
+                title="Klik untuk membuka pop out foto stand meter beresolusi tinggi"
+              >
+                <img
+                  src={effectiveCustomer.fotoMeter}
+                  alt={`Meteran ${effectiveCustomer.nama}`}
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                />
+                <span className="absolute top-2 left-2 bg-slate-900/85 text-white text-[9px] font-mono px-2 py-0.5 rounded shadow-xs z-10 border border-white/10">
+                  SN: MTR-{effectiveCustomer.id.replace('IND-', '')}-2026
+                </span>
+                {/* Hover Pop Out Zoom Prompt Overlay */}
+                <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center pointer-events-none z-20">
+                  <span className="px-3 py-1.5 rounded-full bg-slate-900/90 text-white font-bold text-xs shadow-lg border border-white/20 flex items-center gap-1.5 backdrop-blur-xs">
+                    <ZoomIn className="w-3.5 h-3.5 text-cyan-300" />
+                    <span>Klik Pop Out Perbesar</span>
                   </span>
-                  {/* Hover Pop Out Zoom Prompt Overlay */}
-                  <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center pointer-events-none z-20">
-                    <span className="px-3 py-1.5 rounded-full bg-slate-900/90 text-white font-bold text-xs shadow-lg border border-white/20 flex items-center gap-1.5 backdrop-blur-xs">
-                      <ZoomIn className="w-3.5 h-3.5 text-cyan-300" />
-                      <span>Klik Pop Out Perbesar</span>
-                    </span>
-                  </div>
-                  {/* Realtime GPS Geotag Stamp Overlay */}
-                  <PhotoGeotagStamp customer={customer} photoType="meter" onClickPreview={() => setLightboxPhoto('meter')} />
                 </div>
-              )}
+                {/* Realtime GPS Geotag Stamp Overlay */}
+                <PhotoGeotagStamp customer={effectiveCustomer} photoType="meter" onClickPreview={() => setLightboxPhoto('meter')} />
+              </div>
             </div>
 
             {/* Foto Dokumen BPM */}
@@ -411,63 +397,50 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                   <span>Foto Dokumen BPM (Bukti Pembacaan Meter)</span>
                 </p>
                 <div className="flex items-center gap-1">
-                  {(!customer.fotoBPM || customer.status === 'Belum Dibaca') ? (
-                    <span className="text-[9px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 px-1.5 py-0.5 rounded">
-                      Menunggu Validasi
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setLightboxPhoto('bpm')}
-                      className="text-[9px] font-bold bg-orange-100 dark:bg-orange-950 text-[#E86216] dark:text-orange-300 hover:bg-[#E86216] hover:text-white px-2 py-0.5 rounded-md border border-orange-200 dark:border-orange-800 transition flex items-center gap-1 cursor-pointer"
-                      title="Klik untuk memperbesar foto dokumen BPM fisik"
-                    >
-                      <Maximize2 className="w-2.5 h-2.5" />
-                      <span>Pop Out Zoom</span>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setLightboxPhoto('bpm')}
+                    className="text-[9px] font-bold bg-orange-100 dark:bg-orange-950 text-[#E86216] dark:text-orange-300 hover:bg-[#E86216] hover:text-white px-2 py-0.5 rounded-md border border-orange-200 dark:border-orange-800 transition flex items-center gap-1 cursor-pointer"
+                    title="Klik untuk memperbesar foto dokumen BPM fisik"
+                  >
+                    <Maximize2 className="w-2.5 h-2.5" />
+                    <span>Pop Out Zoom</span>
+                  </button>
                 </div>
               </div>
-              {customer.status === 'Belum Dibaca' || !customer.fotoBPM ? (
-                <div className="h-40 w-full rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800/60 flex flex-col items-center justify-center p-4 text-center">
-                  <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center mb-2 text-slate-400">
-                    <FileCheck className="w-5 h-5" />
-                  </div>
-                  <p className="font-bold text-slate-700 dark:text-slate-200 text-xs">
-                    Belum Ada Dokumen BPM Fisik
-                  </p>
-                  <p className="text-[10px] text-slate-400 mt-1 max-w-[220px]">
-                    Lembar BPM fisik belum ditandatangani di lokasi industri. Akan otomatis tersedia setelah verifikasi lapangan selesai.
-                  </p>
-                </div>
-              ) : (
-                <div
-                  onClick={() => setLightboxPhoto('bpm')}
-                  className="h-48 w-full overflow-hidden rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-900 relative group cursor-pointer shadow-xs hover:border-[#E86216] transition-all"
-                  title="Klik untuk membuka pop out foto berkas BPM beresolusi tinggi"
-                >
-                  <img
-                    src={customer.fotoBPM}
-                    alt={`BPM ${customer.nama}`}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <span className="absolute top-2 left-2 bg-slate-900/85 text-white text-[9px] font-mono px-2 py-0.5 rounded shadow-xs z-10 border border-white/10">
-                    BPM Validated &amp; Stamped
+              <div
+                onClick={() => setLightboxPhoto('bpm')}
+                className="h-48 w-full overflow-hidden rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-900 relative group cursor-pointer shadow-xs hover:border-[#E86216] transition-all"
+                title="Klik untuk membuka pop out foto berkas BPM beresolusi tinggi"
+              >
+                <img
+                  src={effectiveCustomer.fotoBPM}
+                  alt={`BPM ${effectiveCustomer.nama}`}
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                />
+                <span className="absolute top-2 left-2 bg-slate-900/85 text-white text-[9px] font-mono px-2 py-0.5 rounded shadow-xs z-10 border border-white/10">
+                  BPM Validated &amp; Stamped
+                </span>
+                {/* Hover Pop Out Zoom Prompt Overlay */}
+                <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center pointer-events-none z-20">
+                  <span className="px-3 py-1.5 rounded-full bg-slate-900/90 text-white font-bold text-xs shadow-lg border border-white/20 flex items-center gap-1.5 backdrop-blur-xs">
+                    <ZoomIn className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Klik Pop Out Perbesar</span>
                   </span>
-                  {/* Hover Pop Out Zoom Prompt Overlay */}
-                  <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center pointer-events-none z-20">
-                    <span className="px-3 py-1.5 rounded-full bg-slate-900/90 text-white font-bold text-xs shadow-lg border border-white/20 flex items-center gap-1.5 backdrop-blur-xs">
-                      <ZoomIn className="w-3.5 h-3.5 text-amber-300" />
-                      <span>Klik Pop Out Perbesar</span>
-                    </span>
-                  </div>
-                  {/* Realtime GPS Geotag Stamp Overlay */}
-                  <PhotoGeotagStamp customer={customer} photoType="bpm" onClickPreview={() => setLightboxPhoto('bpm')} />
                 </div>
-              )}
+                {/* Realtime GPS Geotag Stamp Overlay */}
+                <PhotoGeotagStamp customer={effectiveCustomer} photoType="bpm" onClickPreview={() => setLightboxPhoto('bpm')} />
+              </div>
             </div>
           </div>
+
+          <PhotoLightboxModal
+            isOpen={Boolean(lightboxPhoto)}
+            onClose={() => setLightboxPhoto(null)}
+            customer={effectiveCustomer}
+            photoType={lightboxPhoto || 'meter'}
+          />
 
           {/* Integrated Realtime Location Map */}
           <div className="space-y-1.5">
