@@ -1,7 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { IndustryCustomer, UserProfile } from '../types';
-import { X, AlertTriangle, Info, Mail, Printer, CheckCircle, Camera, FileCheck, MapPin, Radio } from 'lucide-react';
+import {
+  X,
+  AlertTriangle,
+  Info,
+  Mail,
+  Printer,
+  CheckCircle,
+  Camera,
+  FileCheck,
+  MapPin,
+  Radio,
+  Lock,
+  Maximize2,
+  ZoomIn,
+  Sparkles
+} from 'lucide-react';
 import meterGaugeImg from '../assets/images/meter_industrial_gauge_1790243358407.jpg';
 import bpmDocImg from '../assets/images/meter_bpm_document_1790243369057.jpg';
 import { showColorfulAlert } from '../utils/notificationSystem';
@@ -68,6 +83,11 @@ export const DetailModal: React.FC<DetailModalProps> = ({
       : Math.round(lalu * 0.08);
   const isAnomaly = prevUsage > 0 && vol > prevUsage * 1.5;
 
+  const isCustomerVerified =
+    customer.status === 'Verified' ||
+    customer.status === 'Invoiced' ||
+    Boolean(customer.verifiedBy);
+
   const canVerifyReading =
     currentUser.adminType === 'meter_reading' ||
     currentUser.role === 'solihin' ||
@@ -92,6 +112,18 @@ export const DetailModal: React.FC<DetailModalProps> = ({
     ).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} WIB`;
 
     if (canManageBilling) {
+      // STRICT CHECK: Belum diverifikasi oleh Pak Kabul atau Pak Solihin -> TOLAK akses billing & invoicing
+      if (!isCustomerVerified) {
+        showColorfulAlert({
+          title: 'Akses Penagihan Dikunci 🔒',
+          subtitle: 'Wajib Diverifikasi Tim Meter Reading Terlebih Dahulu',
+          message: `Data pembacaan stand meter industri "${customer.nama}" belum diverifikasi oleh Pak Akhmad Solihin atau Pak Kabul Nugroho (Tim Meter Reading). Pak Yaya (Billing & Invoicing) hanya dapat menerbitkan faktur tagihan setelah hasil pembacaan diverifikasi resmi.`,
+          type: 'warning',
+          badge: 'BELUM DIVERIFIKASI'
+        });
+        return;
+      }
+
       // Billing user executes invoice process
       const updated: IndustryCustomer = {
         ...customer,
@@ -304,19 +336,32 @@ export const DetailModal: React.FC<DetailModalProps> = ({
             </div>
           )}
 
-          {/* Photo inspection cards */}
+          {/* Photo inspection cards with Pop-Out zoom preview */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {/* Foto Stand Meteran */}
             <div className="bg-slate-50 dark:bg-slate-700/50 p-3 border border-slate-200 dark:border-slate-600 rounded-xl">
               <div className="flex items-center justify-between mb-1.5">
                 <p className="text-[10px] font-bold text-slate-500 dark:text-slate-300 flex items-center gap-1.5">
                   <Camera className="w-3.5 h-3.5 text-[#0055A5] dark:text-blue-400" />
                   <span>Foto Fisik Meteran Air di Lokasi</span>
                 </p>
-                {(!customer.fotoMeter || customer.status === 'Belum Dibaca') && (
-                  <span className="text-[9px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 px-1.5 py-0.5 rounded">
-                    Menunggu Pengisian
-                  </span>
-                )}
+                <div className="flex items-center gap-1">
+                  {(!customer.fotoMeter || customer.status === 'Belum Dibaca') ? (
+                    <span className="text-[9px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 px-1.5 py-0.5 rounded">
+                      Menunggu Pengisian
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setLightboxPhoto('meter')}
+                      className="text-[9px] font-bold bg-blue-100 dark:bg-blue-950 text-[#0055A5] dark:text-blue-300 hover:bg-[#0055A5] hover:text-white px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800 transition flex items-center gap-1 cursor-pointer"
+                      title="Klik untuk memperbesar foto stand meter"
+                    >
+                      <Maximize2 className="w-2.5 h-2.5" />
+                      <span>Pop Out Zoom</span>
+                    </button>
+                  )}
+                </div>
               </div>
               {customer.status === 'Belum Dibaca' || !customer.fotoMeter ? (
                 <div className="h-40 w-full rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800/60 flex flex-col items-center justify-center p-4 text-center">
@@ -331,7 +376,11 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                   </p>
                 </div>
               ) : (
-                <div className="h-48 w-full overflow-hidden rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-900 relative group">
+                <div
+                  onClick={() => setLightboxPhoto('meter')}
+                  className="h-48 w-full overflow-hidden rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-900 relative group cursor-pointer shadow-xs hover:border-[#0055A5] transition-all"
+                  title="Klik untuk membuka pop out foto stand meter beresolusi tinggi"
+                >
                   <img
                     src={customer.fotoMeter}
                     alt={`Meteran ${customer.nama}`}
@@ -341,23 +390,43 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                   <span className="absolute top-2 left-2 bg-slate-900/85 text-white text-[9px] font-mono px-2 py-0.5 rounded shadow-xs z-10 border border-white/10">
                     SN: MTR-{customer.id.replace('IND-', '')}-2026
                   </span>
+                  {/* Hover Pop Out Zoom Prompt Overlay */}
+                  <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center pointer-events-none z-20">
+                    <span className="px-3 py-1.5 rounded-full bg-slate-900/90 text-white font-bold text-xs shadow-lg border border-white/20 flex items-center gap-1.5 backdrop-blur-xs">
+                      <ZoomIn className="w-3.5 h-3.5 text-cyan-300" />
+                      <span>Klik Pop Out Perbesar</span>
+                    </span>
+                  </div>
                   {/* Realtime GPS Geotag Stamp Overlay */}
                   <PhotoGeotagStamp customer={customer} photoType="meter" />
                 </div>
               )}
             </div>
 
+            {/* Foto Dokumen BPM */}
             <div className="bg-slate-50 dark:bg-slate-700/50 p-3 border border-slate-200 dark:border-slate-600 rounded-xl">
               <div className="flex items-center justify-between mb-1.5">
                 <p className="text-[10px] font-bold text-slate-500 dark:text-slate-300 flex items-center gap-1.5">
                   <FileCheck className="w-3.5 h-3.5 text-[#E86216]" />
                   <span>Foto Dokumen BPM (Bukti Pembacaan Meter)</span>
                 </p>
-                {(!customer.fotoBPM || customer.status === 'Belum Dibaca') && (
-                  <span className="text-[9px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 px-1.5 py-0.5 rounded">
-                    Menunggu Validasi
-                  </span>
-                )}
+                <div className="flex items-center gap-1">
+                  {(!customer.fotoBPM || customer.status === 'Belum Dibaca') ? (
+                    <span className="text-[9px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 px-1.5 py-0.5 rounded">
+                      Menunggu Validasi
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setLightboxPhoto('bpm')}
+                      className="text-[9px] font-bold bg-orange-100 dark:bg-orange-950 text-[#E86216] dark:text-orange-300 hover:bg-[#E86216] hover:text-white px-2 py-0.5 rounded-md border border-orange-200 dark:border-orange-800 transition flex items-center gap-1 cursor-pointer"
+                      title="Klik untuk memperbesar foto dokumen BPM fisik"
+                    >
+                      <Maximize2 className="w-2.5 h-2.5" />
+                      <span>Pop Out Zoom</span>
+                    </button>
+                  )}
+                </div>
               </div>
               {customer.status === 'Belum Dibaca' || !customer.fotoBPM ? (
                 <div className="h-40 w-full rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800/60 flex flex-col items-center justify-center p-4 text-center">
@@ -372,7 +441,11 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                   </p>
                 </div>
               ) : (
-                <div className="h-48 w-full overflow-hidden rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-900 relative group">
+                <div
+                  onClick={() => setLightboxPhoto('bpm')}
+                  className="h-48 w-full overflow-hidden rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-900 relative group cursor-pointer shadow-xs hover:border-[#E86216] transition-all"
+                  title="Klik untuk membuka pop out foto berkas BPM beresolusi tinggi"
+                >
                   <img
                     src={customer.fotoBPM}
                     alt={`BPM ${customer.nama}`}
@@ -382,6 +455,13 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                   <span className="absolute top-2 left-2 bg-slate-900/85 text-white text-[9px] font-mono px-2 py-0.5 rounded shadow-xs z-10 border border-white/10">
                     BPM Validated &amp; Stamped
                   </span>
+                  {/* Hover Pop Out Zoom Prompt Overlay */}
+                  <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center pointer-events-none z-20">
+                    <span className="px-3 py-1.5 rounded-full bg-slate-900/90 text-white font-bold text-xs shadow-lg border border-white/20 flex items-center gap-1.5 backdrop-blur-xs">
+                      <ZoomIn className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Klik Pop Out Perbesar</span>
+                    </span>
+                  </div>
                   {/* Realtime GPS Geotag Stamp Overlay */}
                   <PhotoGeotagStamp customer={customer} photoType="bpm" />
                 </div>
@@ -393,6 +473,26 @@ export const DetailModal: React.FC<DetailModalProps> = ({
           <div className="space-y-1.5">
             <RealtimeLocationMap customer={customer} height="h-64 sm:h-72" />
           </div>
+
+          {/* Warning Banner: Pak Yaya / Tim Billing dikunci bila belum diverifikasi Pak Kabul / Pak Solihin */}
+          {canManageBilling && !isCustomerVerified && (
+            <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-700/80 text-amber-900 dark:text-amber-200 flex items-start gap-3 animate-in fade-in">
+              <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-900/80 text-amber-700 dark:text-amber-300 shrink-0">
+                <Lock className="w-5 h-5" />
+              </div>
+              <div className="text-xs">
+                <p className="font-black text-amber-950 dark:text-amber-200 uppercase tracking-wide flex items-center gap-1.5">
+                  <span>Akses Invoicing &amp; Billing Dikunci</span>
+                  <span className="px-1.5 py-0.2 rounded bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-100 font-mono text-[9px]">
+                    STATUS: {customer.status.toUpperCase()}
+                  </span>
+                </p>
+                <p className="mt-1 text-[11px] text-amber-900 dark:text-amber-300 leading-relaxed">
+                  Data pembacaan stand meter industri ini <strong>belum diverifikasi oleh Pak Akhmad Solihin atau Pak Kabul Nugroho</strong> (Tim Meter Reading). Penerbitan faktur tagihan dan invoicing oleh <strong>Pak Yaya</strong> hanya dapat diproses setelah hasil pembacaan fisik/BPM berstatus <strong>Verified</strong>.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Historical Usage Graph (Sesuai Permintaan: Jangan ditampilkan pada tampilan Billing & Invoicing, tampilkan 3 Periode Terakhir) */}
           {!canManageBilling && (

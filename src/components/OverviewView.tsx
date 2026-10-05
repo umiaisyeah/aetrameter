@@ -723,7 +723,21 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                           {/* Fitur Invoice dihilangkan pada section Verifikasi Reading (khusus ranah tim billing) */}
                           {workflowFilter !== 'Pending Verification' && (
                             <button
-                              onClick={() => setSelectedInvoiceCustomer(item)}
+                              onClick={() => {
+                                const isVerified = item.status === 'Verified' || item.status === 'Invoiced' || Boolean(item.verifiedBy);
+                                const isBillingUser = currentUser.adminType === 'billing' || currentUser.role === 'yaya' || currentUser.role === 'melva_sinaga';
+                                if (isBillingUser && !isVerified) {
+                                  showColorfulAlert({
+                                    title: 'Akses Penagihan Dikunci 🔒',
+                                    subtitle: 'Wajib Diverifikasi Tim Meter Reading Terlebih Dahulu',
+                                    message: `Data pembacaan stand meter industri "${item.nama}" belum diverifikasi oleh Pak Akhmad Solihin atau Pak Kabul Nugroho (Tim Meter Reading). Pak Yaya (Billing & Invoicing) hanya dapat menerbitkan faktur tagihan setelah hasil pembacaan diverifikasi resmi.`,
+                                    type: 'warning',
+                                    badge: 'BELUM DIVERIFIKASI'
+                                  });
+                                  return;
+                                }
+                                setSelectedInvoiceCustomer(item);
+                              }}
                               className="px-2.5 py-1 bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600 hover:text-white rounded-lg text-xs font-bold transition shadow-xs whitespace-nowrap cursor-pointer flex items-center gap-1"
                               title="Cetak Invoice PDF Sesuai Template Resmi PT Aetra"
                             >
