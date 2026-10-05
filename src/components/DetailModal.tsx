@@ -398,7 +398,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                     </span>
                   </div>
                   {/* Realtime GPS Geotag Stamp Overlay */}
-                  <PhotoGeotagStamp customer={customer} photoType="meter" />
+                  <PhotoGeotagStamp customer={customer} photoType="meter" onClickPreview={() => setLightboxPhoto('meter')} />
                 </div>
               )}
             </div>
@@ -463,7 +463,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                     </span>
                   </div>
                   {/* Realtime GPS Geotag Stamp Overlay */}
-                  <PhotoGeotagStamp customer={customer} photoType="bpm" />
+                  <PhotoGeotagStamp customer={customer} photoType="bpm" onClickPreview={() => setLightboxPhoto('bpm')} />
                 </div>
               )}
             </div>

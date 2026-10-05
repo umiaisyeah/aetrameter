@@ -65,7 +65,12 @@ export const PhotoGeotagStamp: React.FC<PhotoGeotagStampProps> = ({
 
   return (
     <div
-      className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/95 via-slate-900/80 to-transparent p-2 pt-4 text-white text-[9px] select-none pointer-events-auto transition-all ${className}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (onClickPreview) onClickPreview();
+      }}
+      className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/95 via-slate-900/80 to-transparent p-2 pt-4 text-white text-[9px] select-none pointer-events-auto cursor-pointer transition-all hover:brightness-110 ${className}`}
+      title="Klik untuk memperbesar foto (Pop Out Zoom)"
     >
       <div className="flex flex-col gap-1 bg-slate-900/90 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-white/20 shadow-md">
         {/* Row 1: Timestamp with Date, Hour, Minute, and Second */}
