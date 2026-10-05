@@ -66,10 +66,13 @@ export const MeterReaderProgressSection: React.FC<MeterReaderProgressSectionProp
         (c) => c.status === 'Verified' || c.status === 'Invoiced'
       ).length;
       const pending = cycleCustomers.filter(
-        (c) => c.status === 'Pending Verification' || c.status === 'Belum Dibaca'
+        (c) => c.status === 'Pending Verification'
+      ).length;
+      const unread = cycleCustomers.filter(
+        (c) => c.status === 'Belum Dibaca'
       ).length;
 
-      const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+      const percentage = total > 0 ? Math.round(((completed + pending) / total) * 100) : 0;
 
       // Determine field reader and category strictly synced: 1 person = 1 role
       const readersForCycle = meterReaders.filter((r) => {
@@ -105,7 +108,7 @@ export const MeterReaderProgressSection: React.FC<MeterReaderProgressSectionProp
       if (total > 0) {
         if (completed === total) {
           statusLabel = 'Selesai';
-        } else if (completed > 0 || cycleCustomers.some((c) => c.status === 'Pending Verification')) {
+        } else if (completed > 0 || pending > 0 || cycleCustomers.some((c) => c.status === 'Pending Verification')) {
           statusLabel = 'Sedang Berjalan';
         } else {
           statusLabel = 'Belum Dimulai';
@@ -139,9 +142,12 @@ export const MeterReaderProgressSection: React.FC<MeterReaderProgressSectionProp
         (c) => c.status === 'Verified' || c.status === 'Invoiced'
       ).length;
       const totalPending = assignedCusts.filter(
-        (c) => c.status === 'Pending Verification' || c.status === 'Belum Dibaca'
+        (c) => c.status === 'Pending Verification'
       ).length;
-      const overallPercent = totalIndustri > 0 ? Math.round((totalCompleted / totalIndustri) * 100) : 0;
+      const totalUnread = assignedCusts.filter(
+        (c) => c.status === 'Belum Dibaca'
+      ).length;
+      const overallPercent = totalIndustri > 0 ? Math.round(((totalCompleted + totalPending) / totalIndustri) * 100) : 0;
 
       return {
         reader,
@@ -149,6 +155,7 @@ export const MeterReaderProgressSection: React.FC<MeterReaderProgressSectionProp
         totalIndustri,
         totalCompleted,
         totalPending,
+        totalUnread,
         overallPercent
       };
     });
