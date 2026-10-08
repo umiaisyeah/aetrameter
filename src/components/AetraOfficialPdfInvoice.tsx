@@ -220,7 +220,7 @@ export const AetraOfficialPdfInvoice: React.FC<AetraOfficialPdfInvoiceProps> = (
                 <div className="flex-1 p-2.5 sm:p-3 flex items-center justify-between border-r-2 border-[#0055A5] gap-3">
                   {/* Logo Pemda Kabupaten Tangerang */}
                   <div className="shrink-0 flex items-center justify-center pl-1">
-                    <KabupatenTangerangLogo className="h-16 w-auto" size={60} />
+                    <KabupatenTangerangLogo size={52} />
                   </div>
 
                   {/* Company Info (Centered) */}

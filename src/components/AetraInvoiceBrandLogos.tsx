@@ -1,166 +1,175 @@
 import React from 'react';
+import kabTangerangLogoImg from '../assets/images/kab_tangerang_logo_1791436260288.jpg';
 
 /**
  * Official Lambang Pemerintah Kabupaten Tangerang
- * With castle battlements crown, shield emblem, gold star, keris, red fortress, river waves, padi-kapas, and official text
+ * Rendered using authentic official emblem image asset as requested by user, with fallback SVG
  */
-export const KabupatenTangerangLogo: React.FC<{ className?: string; size?: number }> = ({
+export const KabupatenTangerangLogo: React.FC<{
+  className?: string;
+  size?: number;
+  showText?: boolean;
+}> = ({
   className = 'h-16 w-auto',
-  size = 64
-}) => (
-  <svg
-    width={size}
-    height={size * 1.25}
-    viewBox="0 0 100 126"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    className={`shrink-0 select-none ${className}`}
-  >
-    {/* Castle / Benteng Crown with 5 battlements (Mahkota Benteng) */}
-    <g id="crown">
-      <path
-        d="M18 9 H82 V19 H74 V14 H61 V19 H53 V14 H45 V19 H33 V14 H25 V19 H18 Z"
-        fill="#D4AF37"
-        stroke="#8A6D3B"
-        strokeWidth="1.2"
-      />
-      <rect x="20.5" y="11" width="4" height="4.5" fill="#C0392B" rx="0.5" />
-      <rect x="34.5" y="11" width="5.5" height="4.5" fill="#C0392B" rx="0.5" />
-      <rect x="47.5" y="11" width="5" height="4.5" fill="#C0392B" rx="0.5" />
-      <rect x="60" y="11" width="5.5" height="4.5" fill="#C0392B" rx="0.5" />
-      <rect x="73.5" y="11" width="4" height="4.5" fill="#C0392B" rx="0.5" />
-    </g>
+  size = 56,
+  showText = true,
+}) => {
+  const [imgError, setImgError] = React.useState(false);
 
-    {/* Shield Outer Gold Rim */}
-    <path
-      d="M50 18 L85 28 C85 68 70 95 50 104 C30 95 15 68 15 28 Z"
-      fill="#005A36"
-      stroke="#D4AF37"
-      strokeWidth="2.8"
-    />
-    {/* Inner Shield Emerald Green Field */}
-    <path
-      d="M50 21.5 L81 30.5 C81 65 67.5 90 50 98.5 C32.5 90 19 65 19 30.5 Z"
-      fill="#007A48"
-    />
-    {/* Inner Center Sky Blue Field */}
-    <path
-      d="M50 25.5 L76 33.5 C76 62.5 64.5 84 50 92 C35.5 84 24 62.5 24 33.5 Z"
-      fill="#EBF5FB"
-    />
+  return (
+    <div className={`flex flex-col items-center justify-center text-center select-none ${className}`}>
+      {!imgError ? (
+        <img
+          src={kabTangerangLogoImg}
+          alt="Lambang Resmi Pemerintah Kabupaten Tangerang"
+          className="object-contain filter drop-shadow-sm"
+          style={{ height: `${size}px`, width: 'auto', maxHeight: '100%' }}
+          referrerPolicy="no-referrer"
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        /* SVG fallback if image cannot be rendered */
+        <svg
+          width={size}
+          height={size * 1.25}
+          viewBox="0 0 100 126"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          className="shrink-0 select-none"
+        >
+          {/* Castle / Benteng Crown with 5 battlements (Mahkota Benteng) */}
+          <g id="crown">
+            <path
+              d="M18 9 H82 V19 H74 V14 H61 V19 H53 V14 H45 V19 H33 V14 H25 V19 H18 Z"
+              fill="#D4AF37"
+              stroke="#8A6D3B"
+              strokeWidth="1.2"
+            />
+            <rect x="20.5" y="11" width="4" height="4.5" fill="#C0392B" rx="0.5" />
+            <rect x="34.5" y="11" width="5.5" height="4.5" fill="#C0392B" rx="0.5" />
+            <rect x="47.5" y="11" width="5" height="4.5" fill="#C0392B" rx="0.5" />
+            <rect x="60" y="11" width="5.5" height="4.5" fill="#C0392B" rx="0.5" />
+            <rect x="73.5" y="11" width="4" height="4.5" fill="#C0392B" rx="0.5" />
+          </g>
 
-    {/* Padi (Left curve - 17 butir padi emas) */}
-    <g id="padi" stroke="#B7950B" strokeWidth="0.4" fill="#F4D03F">
-      <ellipse cx="23" cy="38" rx="2" ry="1.2" transform="rotate(-30 23 38)" />
-      <ellipse cx="21" cy="45" rx="2.2" ry="1.3" transform="rotate(-15 21 45)" />
-      <ellipse cx="20.5" cy="53" rx="2.2" ry="1.3" transform="rotate(0 20.5 53)" />
-      <ellipse cx="21" cy="61" rx="2.2" ry="1.3" transform="rotate(15 21 61)" />
-      <ellipse cx="23" cy="69" rx="2.2" ry="1.3" transform="rotate(30 23 69)" />
-      <ellipse cx="26" cy="76" rx="2.2" ry="1.3" transform="rotate(45 26 76)" />
-      <ellipse cx="30" cy="83" rx="2.2" ry="1.3" transform="rotate(60 30 83)" />
-      <path d="M22 36 Q19 58 32 85" stroke="#B7950B" strokeWidth="0.8" fill="none" />
-    </g>
+          {/* Shield Outer Gold Rim */}
+          <path
+            d="M50 18 L85 28 C85 68 70 95 50 104 C30 95 15 68 15 28 Z"
+            fill="#005A36"
+            stroke="#D4AF37"
+            strokeWidth="2.8"
+          />
+          {/* Inner Shield Emerald Green Field */}
+          <path
+            d="M50 21.5 L81 30.5 C81 65 67.5 90 50 98.5 C32.5 90 19 65 19 30.5 Z"
+            fill="#007A48"
+          />
+          {/* Inner Center Sky Blue Field */}
+          <path
+            d="M50 25.5 L76 33.5 C76 62.5 64.5 84 50 92 C35.5 84 24 62.5 24 33.5 Z"
+            fill="#EBF5FB"
+          />
 
-    {/* Kapas (Right curve - 8 kuntum bunga kapas) */}
-    <g id="kapas">
-      <circle cx="78" cy="40" r="2.2" fill="#FFFFFF" stroke="#005A36" strokeWidth="0.6" />
-      <circle cx="79.5" cy="49" r="2.4" fill="#FFFFFF" stroke="#005A36" strokeWidth="0.6" />
-      <circle cx="79.5" cy="58" r="2.4" fill="#FFFFFF" stroke="#005A36" strokeWidth="0.6" />
-      <circle cx="78" cy="67" r="2.4" fill="#FFFFFF" stroke="#005A36" strokeWidth="0.6" />
-      <circle cx="74" cy="75" r="2.4" fill="#FFFFFF" stroke="#005A36" strokeWidth="0.6" />
-      <circle cx="68" cy="83" r="2.4" fill="#FFFFFF" stroke="#005A36" strokeWidth="0.6" />
-      <path d="M78 38 Q81 58 66 85" stroke="#005A36" strokeWidth="0.8" fill="none" />
-    </g>
+          {/* Padi (Left curve - 17 butir padi emas) */}
+          <g id="padi" stroke="#B7950B" strokeWidth="0.4" fill="#F4D03F">
+            <ellipse cx="23" cy="38" rx="2" ry="1.2" transform="rotate(-30 23 38)" />
+            <ellipse cx="21" cy="45" rx="2.2" ry="1.3" transform="rotate(-15 21 45)" />
+            <ellipse cx="20.5" cy="53" rx="2.2" ry="1.3" transform="rotate(0 20.5 53)" />
+            <ellipse cx="21" cy="61" rx="2.2" ry="1.3" transform="rotate(15 21 61)" />
+            <ellipse cx="23" cy="69" rx="2.2" ry="1.3" transform="rotate(30 23 69)" />
+            <ellipse cx="26" cy="76" rx="2.2" ry="1.3" transform="rotate(45 26 76)" />
+            <ellipse cx="30" cy="83" rx="2.2" ry="1.3" transform="rotate(60 30 83)" />
+            <path d="M22 36 Q19 58 32 85" stroke="#B7950B" strokeWidth="0.8" fill="none" />
+          </g>
 
-    {/* Benteng / Fortress Red Wall */}
-    <g id="benteng">
-      <path
-        d="M32 58 H68 V76 C68 81 60 84 50 84 C40 84 32 81 32 76 Z"
-        fill="#C0392B"
-        stroke="#922B21"
-        strokeWidth="0.8"
-      />
-      {/* 3 Merlons on wall */}
-      <rect x="35" y="53" width="6" height="5.5" fill="#C0392B" stroke="#922B21" strokeWidth="0.6" />
-      <rect x="47" y="53" width="6" height="5.5" fill="#C0392B" stroke="#922B21" strokeWidth="0.6" />
-      <rect x="59" y="53" width="6" height="5.5" fill="#C0392B" stroke="#922B21" strokeWidth="0.6" />
-      {/* Gateway arch */}
-      <path d="M44.5 72 Q50 67 55.5 72 V82 H44.5 Z" fill="#F4D03F" stroke="#B7950B" strokeWidth="0.6" />
-    </g>
+          {/* Kapas (Right curve - 8 kuntum bunga kapas) */}
+          <g id="kapas">
+            <circle cx="78" cy="40" r="2.2" fill="#FFFFFF" stroke="#005A36" strokeWidth="0.6" />
+            <circle cx="79.5" cy="49" r="2.4" fill="#FFFFFF" stroke="#005A36" strokeWidth="0.6" />
+            <circle cx="79.5" cy="58" r="2.4" fill="#FFFFFF" stroke="#005A36" strokeWidth="0.6" />
+            <circle cx="78" cy="67" r="2.4" fill="#FFFFFF" stroke="#005A36" strokeWidth="0.6" />
+            <circle cx="74" cy="75" r="2.4" fill="#FFFFFF" stroke="#005A36" strokeWidth="0.6" />
+            <circle cx="68" cy="83" r="2.4" fill="#FFFFFF" stroke="#005A36" strokeWidth="0.6" />
+            <path d="M78 38 Q81 58 66 85" stroke="#005A36" strokeWidth="0.8" fill="none" />
+          </g>
 
-    {/* Sungai Cisadane River Waves (3 blue and white wavy lines) */}
-    <g id="sungai_cisadane">
-      <path d="M35 77 Q42 75 50 77 T65 77" stroke="#0055A5" strokeWidth="1.2" fill="none" />
-      <path d="M36 79 Q43 77 50 79 T64 79" stroke="#FFFFFF" strokeWidth="1" fill="none" />
-      <path d="M38 81 Q44 79 50 81 T62 81" stroke="#0055A5" strokeWidth="1" fill="none" />
-    </g>
+          {/* Benteng / Fortress Red Wall */}
+          <g id="benteng">
+            <path
+              d="M32 58 H68 V76 C68 81 60 84 50 84 C40 84 32 81 32 76 Z"
+              fill="#C0392B"
+              stroke="#922B21"
+              strokeWidth="0.8"
+            />
+            {/* 3 Merlons on wall */}
+            <rect x="35" y="53" width="6" height="5.5" fill="#C0392B" stroke="#922B21" strokeWidth="0.6" />
+            <rect x="47" y="53" width="6" height="5.5" fill="#C0392B" stroke="#922B21" strokeWidth="0.6" />
+            <rect x="59" y="53" width="6" height="5.5" fill="#C0392B" stroke="#922B21" strokeWidth="0.6" />
+            {/* Gateway arch */}
+            <path d="M44.5 72 Q50 67 55.5 72 V82 H44.5 Z" fill="#F4D03F" stroke="#B7950B" strokeWidth="0.6" />
+          </g>
 
-    {/* Upright Keris Pusaka */}
-    <g id="keris">
-      <path
-        d="M50 36 Q47.5 43 51 49 Q48 55 51 61 L49 63 H51 L50 36 Z"
-        fill="#D4AF37"
-        stroke="#9A7D0A"
-        strokeWidth="0.9"
-      />
-      <rect x="48" y="47" width="4" height="2" fill="#C0392B" stroke="#9A7D0A" strokeWidth="0.5" />
-    </g>
+          {/* Sungai Cisadane River Waves (3 blue and white wavy lines) */}
+          <g id="sungai_cisadane">
+            <path d="M35 77 Q42 75 50 77 T65 77" stroke="#0055A5" strokeWidth="1.2" fill="none" />
+            <path d="M36 79 Q43 77 50 79 T64 79" stroke="#FFFFFF" strokeWidth="1" fill="none" />
+            <path d="M38 81 Q44 79 50 81 T62 81" stroke="#0055A5" strokeWidth="1" fill="none" />
+          </g>
 
-    {/* Golden 5-Pointed Star (Bintang Keemasan) */}
-    <polygon
-      points="50,27 52.6,34 60,34 54,38.5 56.5,45.5 50,41.5 43.5,45.5 46,38.5 40,34 47.4,34"
-      fill="#F4D03F"
-      stroke="#B7950B"
-      strokeWidth="0.9"
-    />
+          {/* Upright Keris Pusaka */}
+          <g id="keris">
+            <path
+              d="M50 36 Q47.5 43 51 49 Q48 55 51 61 L49 63 H51 L50 36 Z"
+              fill="#D4AF37"
+              stroke="#9A7D0A"
+              strokeWidth="0.9"
+            />
+            <rect x="48" y="47" width="4" height="2" fill="#C0392B" stroke="#9A7D0A" strokeWidth="0.5" />
+          </g>
 
-    {/* Ribbon Banner */}
-    <path
-      d="M17 87 Q50 96 83 87 L84.5 93 Q50 101.5 15.5 93 Z"
-      fill="#F4D03F"
-      stroke="#B7950B"
-      strokeWidth="1.1"
-    />
-    <text
-      x="50"
-      y="92"
-      textAnchor="middle"
-      fontSize="5.2"
-      fontWeight="900"
-      fontFamily="'Segoe UI', Roboto, Arial, sans-serif"
-      fill="#004D20"
-      letterSpacing="0.6"
-    >
-      KABUPATEN TANGERANG
-    </text>
+          {/* Golden 5-Pointed Star (Bintang Keemasan) */}
+          <polygon
+            points="50,27 52.6,34 60,34 54,38.5 56.5,45.5 50,41.5 43.5,45.5 46,38.5 40,34 47.4,34"
+            fill="#F4D03F"
+            stroke="#B7950B"
+            strokeWidth="0.9"
+          />
 
-    {/* Official Government Text Under Emblem */}
-    <text
-      x="50"
-      y="112"
-      textAnchor="middle"
-      fontSize="6.8"
-      fontWeight="900"
-      fontFamily="'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
-      fill="#0F172A"
-      letterSpacing="0.6"
-    >
-      PEMERINTAH
-    </text>
-    <text
-      x="50"
-      y="121"
-      textAnchor="middle"
-      fontSize="5.8"
-      fontWeight="900"
-      fontFamily="'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
-      fill="#0F172A"
-      letterSpacing="0.3"
-    >
-      KABUPATEN TANGERANG
-    </text>
-  </svg>
-);
+          {/* Ribbon Banner */}
+          <path
+            d="M17 87 Q50 96 83 87 L84.5 93 Q50 101.5 15.5 93 Z"
+            fill="#F4D03F"
+            stroke="#B7950B"
+            strokeWidth="1.1"
+          />
+          <text
+            x="50"
+            y="92"
+            textAnchor="middle"
+            fontSize="5.2"
+            fontWeight="900"
+            fontFamily="'Segoe UI', Roboto, Arial, sans-serif"
+            fill="#004D20"
+            letterSpacing="0.6"
+          >
+            KABUPATEN TANGERANG
+          </text>
+        </svg>
+      )}
+
+      {showText && (
+        <div className="mt-0.5 flex flex-col items-center justify-center leading-tight">
+          <span className="text-[6.5px] font-black tracking-tight text-slate-800 uppercase">
+            PEMERINTAH
+          </span>
+          <span className="text-[5.5px] font-black tracking-tighter text-slate-700 uppercase">
+            KABUPATEN TANGERANG
+          </span>
+        </div>
+      )}
+    </div>
+  );
+};
 
 /**
  * Official PT Aetra Air Tangerang Corporate Brand Logo
