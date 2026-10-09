@@ -29,7 +29,8 @@ import {
   Search,
   Trash2,
   RefreshCw,
-  UserCheck
+  UserCheck,
+  Server
 } from 'lucide-react';
 import { CycleProgressChart } from './CycleProgressChart';
 import { MeterReaderProgressSection } from './MeterReaderProgressSection';
@@ -38,6 +39,7 @@ import { OfficialAetraInvoiceModal } from './OfficialAetraInvoiceModal';
 import { SectionProgressHub } from './SectionProgressHub';
 import { WorkflowStatusBadge } from './WorkflowStatusBadge';
 import { ExportDropdownButton } from './ExportDropdownButton';
+import { CcnbSyncModal } from './CcnbSyncModal';
 import { showColorfulAlert } from '../utils/notificationSystem';
 
 interface OverviewViewProps {
@@ -56,6 +58,7 @@ interface OverviewViewProps {
   onBatchUpdateStatus: (ids: string[], newStatus: WorkflowStatus, note?: string) => void;
   onDeleteCustomer?: (id: string) => void;
   onDeleteBatchCustomers?: (ids: string[]) => void;
+  onInputCcnb?: (customerIds: string[], batchNo: string, note?: string) => void;
   currentUser: UserProfile;
   onSyncNow?: () => void;
   isSyncing?: boolean;
@@ -110,6 +113,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   onBatchUpdateStatus,
   onDeleteCustomer,
   onDeleteBatchCustomers,
+  onInputCcnb,
   currentUser,
   onSyncNow,
   isSyncing = false
@@ -138,11 +142,28 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
   const [selectedInvoiceCustomer, setSelectedInvoiceCustomer] = useState<IndustryCustomer | null>(null);
 
+  // Sub-filter for Section Billing & Invoicing:
+  // Sesuai Permintaan User: Baru hasil pembacaan yang sudah terinput CCnB yang pindah ke section billing & invoicing!
+  const [billingCcnbTab, setBillingCcnbTab] = useState<'ready_billing' | 'pending_ccnb'>('ready_billing');
+  const [ccnbModalTarget, setCcnbModalTarget] = useState<IndustryCustomer[] | null>(null);
+
   // Filtered rows for the table including industry progress search & chronological reading sort
   const filteredCustomers = useMemo(() => {
     const list = customers.filter((c) => {
-      // 1. Workflow filter
-      if (workflowFilter !== 'ALL' && c.status !== workflowFilter) return false;
+      // 1. Workflow filter dengan penegakan aturan CCnB
+      if (workflowFilter === 'Verified') {
+        if (billingCcnbTab === 'ready_billing') {
+          // Hanya yang SUDAH terinput CCnB (atau status Invoiced) yang pindah ke section billing!
+          const isReady = (c.status === 'Verified' && Boolean(c.isInputCCnB)) || c.status === 'Invoiced';
+          if (!isReady) return false;
+        } else if (billingCcnbTab === 'pending_ccnb') {
+          // Antrean hasil pembacaan yang sudah diverifikasi tapi BELUM terinput CCnB
+          const isPending = c.status === 'Verified' && !c.isInputCCnB;
+          if (!isPending) return false;
+        }
+      } else if (workflowFilter !== 'ALL' && c.status !== workflowFilter) {
+        return false;
+      }
 
       // 2. Search query filter for industry progress
       if (industrySearchQuery.trim()) {
@@ -181,7 +202,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       }
       return 0;
     });
-  }, [customers, workflowFilter, industrySearchQuery]);
+  }, [customers, workflowFilter, industrySearchQuery, billingCcnbTab]);
 
   // Check if current user has meter reading verification authority
   const canVerifyReading =
@@ -206,15 +227,32 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const handleExecuteSelectedRowBatch = (targetStatus: WorkflowStatus) => {
     if (selectedRowIds.length === 0) return;
 
-    if (targetStatus === 'Verified' && !canVerifyReading) {
-      showColorfulAlert({
-        title: 'Akses Dibatasi ⚠️',
-        subtitle: 'Otoritas Khusus Tim Meter Reading',
-        message: `Akun Anda (${currentUser.name}) tidak memiliki hak untuk memverifikasi stand meter. Wewenang verifikasi stand meter lapangan hanya dimiliki oleh Tim Meter Reading (Akhmad Solihin, Kabul Nugroho, Tri Kartono).`,
-        type: 'warning',
-        badge: 'HAK AKSES KHUSUS'
-      });
-      return;
+    if (targetStatus === 'Verified') {
+      if (!canVerifyReading) {
+        showColorfulAlert({
+          title: 'Akses Dibatasi ⚠️',
+          subtitle: 'Otoritas Khusus Tim Meter Reading',
+          message: `Akun Anda (${currentUser.name}) tidak memiliki hak untuk memverifikasi stand meter. Wewenang verifikasi stand meter lapangan hanya dimiliki oleh Tim Meter Reading (Akhmad Solihin, Kabul Nugroho, Tri Kartono).`,
+          type: 'warning',
+          badge: 'HAK AKSES KHUSUS'
+        });
+        return;
+      }
+
+      // STRICT CHECK (PERMINTAAN USER): Angka foto stand meter dan angka foto BPM harus sama agar bisa diverifikasi!
+      const mismatchCusts = customers.filter(
+        (c) => selectedRowIds.includes(c.id) && c.reconciliationStatus === 'Mismatch'
+      );
+      if (mismatchCusts.length > 0) {
+        showColorfulAlert({
+          title: 'Verifikasi Massal Ditolak! ❌',
+          subtitle: 'Rekonsiliasi Stand Meter & Dokumen BPM Tidak Cocok',
+          message: `Terdapat ${mismatchCusts.length} industri terpilih (${mismatchCusts[0].nama}) yang angka di foto stand meter dan angka BPM-nya berbeda! Sesuai SOP, kedua angka wajib sama persis agar bisa diverifikasi. Silakan buka Detail untuk menyamakan angka rekonsiliasi terlebih dahulu.`,
+          type: 'error',
+          badge: 'REKONSILIASI GAGAL'
+        });
+        return;
+      }
     }
 
     const note =
@@ -344,37 +382,106 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         </div>
       )}
 
-      {/* KONDISIONAL: SECTION BILLING & INVOICING (workflowFilter === 'Verified') - TANPA MATRIKS CYCLE LAPANGAN */}
+      {/* KONDISIONAL: SECTION BILLING & INVOICING (workflowFilter === 'Verified') - DENGAN FILTER CCnB INPUT */}
       {workflowFilter === 'Verified' && (
-        <div className="bg-gradient-to-r from-emerald-900 via-[#0055A5] to-[#003E78] text-white rounded-2xl p-5 shadow-sm border border-emerald-700/60 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm border border-white/20">
-              <Receipt className="w-6 h-6 text-emerald-300" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-lg font-black text-white">Modul Billing &amp; Invoicing Unit Industri</h2>
-                <span className="bg-emerald-500 text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
-                  Otoritas Pak Yaya
-                </span>
+        <div className="space-y-3">
+          <div className="bg-gradient-to-r from-emerald-900 via-[#0055A5] to-[#003E78] text-white rounded-2xl p-5 shadow-sm border border-emerald-700/60 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm border border-white/20">
+                <Receipt className="w-6 h-6 text-emerald-300" />
               </div>
-              <p className="text-xs text-emerald-100 mt-1 max-w-2xl leading-relaxed">
-                Menampilkan seluruh pelanggan industri berstatus <strong>'Verified'</strong> yang telah selesai dibaca dan divalidasi, siap untuk diterbitkan faktur / invoice resmi dan cetak rekap tagihan.
-              </p>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-lg font-black text-white">Modul Billing &amp; Invoicing Unit Industri</h2>
+                  <span className="bg-emerald-500 text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
+                    Otoritas Pak Yaya
+                  </span>
+                </div>
+                <p className="text-xs text-emerald-100 mt-1 max-w-2xl leading-relaxed">
+                  Sesuai alur resmi: Menampilkan seluruh pelanggan industri berstatus <strong>'Verified'</strong> yang <strong>telah resmi terinput ke sistem CCnB</strong>, siap untuk diterbitkan faktur / invoice resmi dan cetak rekap tagihan air.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <ExportDropdownButton
+                customers={filteredCustomers}
+                section="billing"
+                label="Unduh Rekap Billing"
+                className="z-20"
+              />
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <ExportDropdownButton
-              customers={filteredCustomers}
-              section="billing"
-              label="Unduh Rekap Billing"
-              className="z-20"
-            />
+
+          {/* Sub-tab: Terinput CCnB vs Antrean Menunggu Input CCnB */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white dark:bg-slate-800 p-2 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xs">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+              <button
+                type="button"
+                onClick={() => setBillingCcnbTab('ready_billing')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+                  billingCcnbTab === 'ready_billing'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                }`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Terinput CCnB &amp; Siap Faktur</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-black ${
+                  billingCcnbTab === 'ready_billing'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                }`}>
+                  {fullDataset.filter((c) => (c.status === 'Verified' && Boolean(c.isInputCCnB)) || c.status === 'Invoiced').length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setBillingCcnbTab('pending_ccnb')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+                  billingCcnbTab === 'pending_ccnb'
+                    ? 'bg-[#0055A5] text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                }`}
+              >
+                <Server className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Antrean Menunggu Input CCnB</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-black ${
+                  billingCcnbTab === 'pending_ccnb'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-blue-100 text-[#0055A5] dark:bg-blue-950 dark:text-blue-300'
+                }`}>
+                  {fullDataset.filter((c) => c.status === 'Verified' && !c.isInputCCnB).length}
+                </span>
+              </button>
+            </div>
+
+            {billingCcnbTab === 'pending_ccnb' && fullDataset.some((c) => c.status === 'Verified' && !c.isInputCCnB) && (
+              <button
+                type="button"
+                onClick={() => {
+                  const pendingList = fullDataset.filter((c) => c.status === 'Verified' && !c.isInputCCnB);
+                  setCcnbModalTarget(pendingList);
+                }}
+                className="px-3 py-1.5 bg-gradient-to-r from-[#0055A5] to-blue-600 hover:from-[#003E78] text-white rounded-xl text-xs font-black shadow-xs flex items-center gap-1.5 cursor-pointer whitespace-nowrap self-start sm:self-auto"
+              >
+                <Server className="w-3.5 h-3.5 text-cyan-300" />
+                <span>Input Semua ke CCnB Sekarang 🚀</span>
+              </button>
+            )}
           </div>
         </div>
       )}
 
       {/* SECTION PROGRESS: TAMPIL KHUSUS DI MASING-MASING SECTION */}
+      {workflowFilter === 'ALL' && (
+        <SectionProgressHub
+          customers={fullDataset}
+          onFilterStatus={onWorkflowFilterChange}
+          variant="dual"
+        />
+      )}
+
       {workflowFilter === 'Pending Verification' && (
         <SectionProgressHub
           customers={fullDataset}
@@ -491,6 +598,20 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 <span>Tandai Terpilih sbg 'Verified'</span>
               </button>
 
+              {/* Tombol Check & Batch Input ke CCnB (Pindah ke Billing) */}
+              <button
+                type="button"
+                onClick={() => {
+                  const targetList = customers.filter((c) => selectedRowIds.includes(c.id));
+                  setCcnbModalTarget(targetList);
+                }}
+                className="px-3 py-1 bg-gradient-to-r from-[#0055A5] to-blue-600 hover:from-[#003E78] hover:to-blue-700 text-white font-bold rounded-lg transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                title="Check & Input seluruh industri terpilih ke sistem CCnB agar berpindah ke billing"
+              >
+                <Server className="w-3.5 h-3.5 text-cyan-300" />
+                <span>Input CCnB ({selectedRowIds.length})</span>
+              </button>
+
               <button
                 onClick={() => handleExecuteSelectedRowBatch('Pending Verification')}
                 className="px-3 py-1 bg-[#E86216] hover:bg-orange-600 text-white font-bold rounded-lg transition shadow-xs flex items-center gap-1.5 cursor-pointer"
@@ -553,6 +674,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     <th className="p-3.5 text-right">Total Tagihan (Rp)</th>
                   </>
                 )}
+                <th className="p-3.5 whitespace-nowrap">Rekognisi &amp; Rekonsiliasi</th>
+                <th className="p-3.5 whitespace-nowrap">Status CCnB</th>
                 <th className="p-3.5">Status Alur Kerja &amp; Catatan</th>
                 <th className="p-3.5 text-center">Aksi Operasional</th>
               </tr>
@@ -560,7 +683,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700 font-medium">
               {filteredCustomers.length === 0 ? (
                 <tr>
-                  <td colSpan={workflowFilter === 'Pending Verification' ? 9 : 12} className="p-8 text-center text-slate-400">
+                  <td colSpan={workflowFilter === 'Pending Verification' ? 11 : 14} className="p-8 text-center text-slate-400">
                     Tidak ada data industri yang sesuai dengan kriteria filter atau pencarian.
                   </td>
                 </tr>
@@ -703,6 +826,55 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                           </td>
                         </>
                       )}
+                      {/* Kolom Hasil Rekognisi AI OCR & Rekonsiliasi Komparatif */}
+                      <td className="p-3.5 whitespace-nowrap">
+                        {item.status === 'Belum Dibaca' ? (
+                          <span className="text-slate-400 italic font-mono text-[11px]">—</span>
+                        ) : item.reconciliationStatus === 'Mismatch' ? (
+                          <div className="space-y-0.5">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/70 text-rose-700 dark:text-rose-300 font-extrabold text-[10px] border border-rose-300 dark:border-rose-800">
+                              <AlertTriangle className="w-3 h-3 text-rose-600" />
+                              <span>Mismatch (Beda Angka)</span>
+                            </span>
+                            <p className="text-[9px] font-mono text-slate-500">
+                              Meter: {item.meterStandOcr || item.skrg} ≠ BPM: {item.bpmStandOcr || (item.skrg + 20)}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-0.5">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 font-extrabold text-[10px] border border-emerald-300 dark:border-emerald-800">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              <span>Cocok (100% Match)</span>
+                            </span>
+                            <p className="text-[9px] font-mono text-slate-500">
+                              Stand &amp; BPM: {(item.meterStandOcr || item.skrg).toLocaleString('id-ID')} m³
+                            </p>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Kolom Status Integrasi Sistem CCnB */}
+                      <td className="p-3.5 whitespace-nowrap">
+                        {item.status !== 'Verified' && item.status !== 'Invoiced' ? (
+                          <span className="text-slate-400 font-mono text-[10px]">Belum Verifikasi</span>
+                        ) : item.isInputCCnB ? (
+                          <div className="space-y-0.5">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 font-extrabold text-[10px] border border-emerald-300 dark:border-emerald-800">
+                              <Server className="w-3 h-3 text-emerald-600" />
+                              <span>Terinput CCnB</span>
+                            </span>
+                            <p className="text-[9px] font-mono text-slate-500 truncate max-w-[120px]" title={item.ccnbBatchNo}>
+                              {item.ccnbBatchNo || 'CCNB-2026-SEP'}
+                            </p>
+                          </div>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 font-extrabold text-[10px] border border-amber-300 dark:border-amber-800">
+                            <Clock className="w-3 h-3 text-amber-600" />
+                            <span>Menunggu CCnB</span>
+                          </span>
+                        )}
+                      </td>
+
                       <td className="p-3.5">
                         <WorkflowStatusBadge
                           status={item.status}
@@ -713,15 +885,29 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                         />
                       </td>
                       <td className="p-3.5 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
+                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
                           <button
                             onClick={() => onOpenDetail(item)}
                             className="px-2.5 py-1 bg-[#E6F0FA] dark:bg-blue-950 text-[#0055A5] dark:text-blue-300 hover:bg-[#0055A5] hover:text-white rounded-lg text-xs font-bold transition shadow-xs whitespace-nowrap cursor-pointer"
                           >
                             🔍 Detail
                           </button>
-                          {/* Fitur Invoice dihilangkan pada section Verifikasi Reading (khusus ranah tim billing) */}
-                          {workflowFilter !== 'Pending Verification' && (
+
+                          {/* Tombol Check Input CCnB: Tampil untuk yang sudah Verified tapi belum masuk CCnB */}
+                          {item.status === 'Verified' && !item.isInputCCnB && (
+                            <button
+                              type="button"
+                              onClick={() => setCcnbModalTarget([item])}
+                              className="px-2.5 py-1 bg-gradient-to-r from-[#0055A5] to-blue-600 hover:from-[#003E78] text-white rounded-lg text-xs font-bold transition shadow-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                              title="Check & Input hasil pembacaan ke core CCnB agar berpindah ke billing"
+                            >
+                              <Server className="w-3 h-3 text-cyan-300" />
+                              <span>Input CCnB</span>
+                            </button>
+                          )}
+
+                          {/* Fitur Invoice HANYA untuk hasil pembacaan yang SUDAH terinput ke CCnB (atau Invoiced) */}
+                          {workflowFilter !== 'Pending Verification' && item.isInputCCnB && (
                             <button
                               onClick={() => {
                                 const isVerified = item.status === 'Verified' || item.status === 'Invoiced' || Boolean(item.verifiedBy);
@@ -730,7 +916,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                                   showColorfulAlert({
                                     title: 'Akses Penagihan Dikunci 🔒',
                                     subtitle: 'Wajib Diverifikasi Tim Meter Reading Terlebih Dahulu',
-                                    message: `Data pembacaan stand meter industri "${item.nama}" belum diverifikasi oleh Pak Akhmad Solihin atau Pak Kabul Nugroho (Tim Meter Reading). Pak Yaya (Billing & Invoicing) hanya dapat menerbitkan faktur tagihan setelah hasil pembacaan diverifikasi resmi.`,
+                                    message: `Data pembacaan stand meter industri "${item.nama}" belum diverifikasi oleh Tim Meter Reading.`,
                                     type: 'warning',
                                     badge: 'BELUM DIVERIFIKASI'
                                   });
@@ -745,17 +931,33 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                               <span>Invoice</span>
                             </button>
                           )}
+
+                          {/* Tombol Verifikasi Pembacaan Langsung (Mengecek Syarat Rekonsiliasi Harus Sama) */}
                           {item.status !== 'Verified' && item.status !== 'Invoiced' && (
                             <button
-                              onClick={() =>
+                              onClick={() => {
+                                if (item.reconciliationStatus === 'Mismatch') {
+                                  showColorfulAlert({
+                                    title: 'Verifikasi Ditolak! ❌',
+                                    subtitle: 'Foto Stand Meter & BPM Tidak Cocok',
+                                    message: `Angka pada foto stand meter dan angka meter bulan ini di foto BPM ${item.nama} HARUS SAMA agar bisa diverifikasi! Silakan buka Detail untuk menyamakan angka rekonsiliasi.`,
+                                    type: 'error',
+                                    badge: 'REKONSILIASI GAGAL'
+                                  });
+                                  return;
+                                }
                                 onBatchUpdateStatus(
                                   [item.id],
                                   'Verified',
                                   `Verifikasi meter individual ${item.nama}`
-                                )
-                              }
-                              title="Tandai Verified"
-                              className="p-1 bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600 hover:text-white rounded-lg transition cursor-pointer"
+                                );
+                              }}
+                              title={item.reconciliationStatus === 'Mismatch' ? 'Verifikasi Ditolak: Foto Stand & BPM Beda Angka' : 'Tandai Verified'}
+                              className={`p-1 rounded-lg transition cursor-pointer ${
+                                item.reconciliationStatus === 'Mismatch'
+                                  ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 hover:bg-rose-200'
+                                  : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600 hover:text-white'
+                              }`}
                             >
                               <CheckCircle className="w-3.5 h-3.5" />
                             </button>
@@ -867,6 +1069,23 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         <OfficialAetraInvoiceModal
           customer={selectedInvoiceCustomer}
           onClose={() => setSelectedInvoiceCustomer(null)}
+        />
+      )}
+
+      {/* MODAL INPUT & SINKRONISASI SISTEM CORE CCnB */}
+      {ccnbModalTarget && (
+        <CcnbSyncModal
+          isOpen={Boolean(ccnbModalTarget)}
+          onClose={() => setCcnbModalTarget(null)}
+          customers={ccnbModalTarget}
+          currentUser={currentUser}
+          onConfirmInputCcnb={(ids, batchNo, note) => {
+            if (onInputCcnb) {
+              onInputCcnb(ids, batchNo, note);
+            }
+            setSelectedRowIds([]);
+            setCcnbModalTarget(null);
+          }}
         />
       )}
     </div>

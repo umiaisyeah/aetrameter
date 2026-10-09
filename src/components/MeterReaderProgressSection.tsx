@@ -72,7 +72,8 @@ export const MeterReaderProgressSection: React.FC<MeterReaderProgressSectionProp
         (c) => c.status === 'Belum Dibaca'
       ).length;
 
-      const percentage = total > 0 ? Math.round(((completed + pending) / total) * 100) : 0;
+      const rawPct = total > 0 ? ((completed + pending) / total) * 100 : 0;
+      const percentage = rawPct === 0 ? 0 : (rawPct < 1 ? Number(rawPct.toFixed(1)) : Math.round(rawPct));
 
       // Determine field reader and category strictly synced: 1 person = 1 role
       const readersForCycle = meterReaders.filter((r) => {
@@ -147,7 +148,8 @@ export const MeterReaderProgressSection: React.FC<MeterReaderProgressSectionProp
       const totalUnread = assignedCusts.filter(
         (c) => c.status === 'Belum Dibaca'
       ).length;
-      const overallPercent = totalIndustri > 0 ? Math.round(((totalCompleted + totalPending) / totalIndustri) * 100) : 0;
+      const rawOverall = totalIndustri > 0 ? ((totalCompleted + totalPending) / totalIndustri) * 100 : 0;
+      const overallPercent = rawOverall === 0 ? 0 : (rawOverall < 1 ? Number(rawOverall.toFixed(1)) : Math.round(rawOverall));
 
       return {
         reader,

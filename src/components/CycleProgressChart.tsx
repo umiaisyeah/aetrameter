@@ -87,7 +87,8 @@ export const CycleProgressChart: React.FC<CycleProgressChartProps> = ({
       const pending = cycleCusts.filter(
         (c) => c.status === 'Pending Verification' || c.status === 'Belum Dibaca'
       ).length;
-      const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+      const rawPct = total > 0 ? (completed / total) * 100 : 0;
+      const percentage = rawPct === 0 ? 0 : (rawPct < 1 ? Number(rawPct.toFixed(1)) : Math.round(rawPct));
       const totalVolume = cycleCusts.reduce((acc, curr) => acc + Math.max(0, curr.skrg - curr.lalu), 0);
 
       // Contractor counts

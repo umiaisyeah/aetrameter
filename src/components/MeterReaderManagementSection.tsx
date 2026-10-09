@@ -736,7 +736,12 @@ export const MeterReaderManagementSection: React.FC<MeterReaderManagementSection
                     </span>
                     <span className="font-bold text-slate-700 dark:text-slate-200">
                       {completedCount} / {assignedCusts.length} Industri Selesai (
-                      {assignedCusts.length > 0 ? Math.round((completedCount / assignedCusts.length) * 100) : 0}%)
+                      {assignedCusts.length > 0
+                        ? (() => {
+                            const raw = (completedCount / assignedCusts.length) * 100;
+                            return raw === 0 ? '0' : raw < 1 ? raw.toFixed(1) : (raw % 1 === 0 ? raw.toFixed(0) : raw.toFixed(1));
+                          })()
+                        : '0'}%)
                     </span>
                   </div>
 

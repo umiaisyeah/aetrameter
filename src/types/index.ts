@@ -123,7 +123,27 @@ export interface IndustryCustomer {
   keteranganPergeseran?: string;
   hariHOriginal?: number;
   hariHPergeseran?: number;
+
+  // Fitur Rekognisi & Rekonsiliasi (Foto Stand Meter vs Foto BPM)
+  meterStandOcr?: number;
+  bpmStandOcr?: number;
+  reconciliationStatus?: 'Matched' | 'Mismatch' | 'Pending';
+  reconciliationAccuracy?: number;
+  reconciliationNote?: string;
+  reconciledAt?: string;
+  reconciledBy?: string;
+
+  // Fitur Integrasi CCnB (Customer Care and Billing)
+  isInputCCnB?: boolean;
+  ccnbStatus?: 'Belum Input' | 'Pending Sync' | 'Inputted';
+  ccnbBatchNo?: string;
+  ccnbInputtedAt?: string;
+  ccnbInputtedBy?: string;
+  ccnbAccountId?: string;
 }
+
+export type ReconciliationStatus = 'Matched' | 'Mismatch' | 'Pending';
+export type CcnbStatus = 'Belum Input' | 'Pending Sync' | 'Inputted';
 
 export interface AuditLog {
   id: string;

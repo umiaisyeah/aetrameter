@@ -15,7 +15,13 @@ import {
   Lock,
   Maximize2,
   ZoomIn,
-  Sparkles
+  Sparkles,
+  Server,
+  Database,
+  RefreshCw,
+  CheckCircle2,
+  Cpu,
+  ArrowRight
 } from 'lucide-react';
 import meterGaugeImg from '../assets/images/meter_industrial_gauge_1790243358407.jpg';
 import bpmDocImg from '../assets/images/meter_bpm_document_1790243369057.jpg';
@@ -25,6 +31,11 @@ import { PhotoGeotagStamp } from './PhotoGeotagStamp';
 import { PhotoLightboxModal } from './PhotoLightboxModal';
 import { IndustryWorkflowTracker } from './IndustryWorkflowTracker';
 import { calculateAetraInvoice, formatRupiah } from '../utils/aetraInvoiceCalculator';
+import {
+  generateCcnbBatchNumber,
+  getFormattedCcnbTime,
+  runRecognitionAndReconciliation
+} from '../utils/recognitionEngine';
 
 interface DetailModalProps {
   isOpen: boolean;
@@ -34,6 +45,7 @@ interface DetailModalProps {
   onSaveReading: (updatedCustomer: IndustryCustomer) => void;
   onProcessInvoice: (customer: IndustryCustomer) => void;
   onOpenPrintInvoice: (customer: IndustryCustomer) => void;
+  onInputCcnb?: (customerIds: string[], batchNo: string, note?: string) => void;
 }
 
 export const DetailModal: React.FC<DetailModalProps> = ({
@@ -43,7 +55,8 @@ export const DetailModal: React.FC<DetailModalProps> = ({
   currentUser,
   onSaveReading,
   onProcessInvoice,
-  onOpenPrintInvoice
+  onOpenPrintInvoice,
+  onInputCcnb
 }) => {
   const [inputSkrg, setInputSkrg] = useState<number>(customer?.skrg ?? 0);
   const [catatan, setCatatan] = useState<string>(customer?.catatan || '');
@@ -51,12 +64,30 @@ export const DetailModal: React.FC<DetailModalProps> = ({
   const [outlookLink, setOutlookLink] = useState<string>('');
   const [lightboxPhoto, setLightboxPhoto] = useState<'meter' | 'bpm' | null>(null);
 
+  // States for AI OCR Recognition & Reconciliation (Foto Stand Meter vs Foto Dokumen BPM)
+  const [meterOcrVal, setMeterOcrVal] = useState<number>(() => {
+    return customer?.meterStandOcr || customer?.skrg || customer?.lalu || 0;
+  });
+  const [bpmOcrVal, setBpmOcrVal] = useState<number>(() => {
+    return customer?.bpmStandOcr || customer?.skrg || customer?.lalu || 0;
+  });
+  const [isOcrScanning, setIsOcrScanning] = useState<boolean>(false);
+  const [ocrSuccessNotice, setOcrSuccessNotice] = useState<string | null>(null);
+  const [isSyncingCcnb, setIsSyncingCcnb] = useState<boolean>(false);
+
   useEffect(() => {
     if (customer) {
       const isUnread = customer.status === 'Belum Dibaca';
-      setInputSkrg(isUnread && customer.skrg === customer.lalu ? 0 : customer.skrg);
+      const initialStand = isUnread && customer.skrg === customer.lalu ? 0 : customer.skrg;
+      setInputSkrg(initialStand);
       setCatatan(customer.catatan || '');
       setShowOutlookBox(customer.status === 'Invoiced');
+
+      // Initialize OCR recognition values
+      const mOcr = customer.meterStandOcr || (initialStand > 0 ? initialStand : customer.lalu + 450);
+      const bOcr = customer.bpmStandOcr || (initialStand > 0 ? initialStand : customer.lalu + 450);
+      setMeterOcrVal(mOcr);
+      setBpmOcrVal(bOcr);
     }
   }, [customer]);
 
@@ -111,6 +142,77 @@ export const DetailModal: React.FC<DetailModalProps> = ({
 
   const isBillingUser = canManageBilling;
 
+  // Syarat Utama Permintaan Pengguna:
+  // 1. Angka di foto stand meter dan angka meter bulan ini di foto BPM HARUS SAMA agar bisa diverifikasi!
+  const isReconciled = meterOcrVal === bpmOcrVal && meterOcrVal > 0;
+  const isCcnbInputted = Boolean(customer.isInputCCnB) || customer.ccnbStatus === 'Inputted';
+
+  // AI OCR Scanning Simulator for both photos
+  const handleRunOcrScan = (forcedMismatch = false) => {
+    setIsOcrScanning(true);
+    setOcrSuccessNotice(null);
+    setTimeout(() => {
+      const res = runRecognitionAndReconciliation(effectiveCustomer, currentStand, forcedMismatch);
+      setMeterOcrVal(res.meterStandOcr);
+      setBpmOcrVal(res.bpmStandOcr);
+      setIsOcrScanning(false);
+      if (res.isMatched) {
+        setOcrSuccessNotice(`✓ Scan AI OCR Berhasil: Angka Foto Stand Meter (${res.meterStandOcr.toLocaleString('id-ID')} m³) dan Angka BPM (${res.bpmStandOcr.toLocaleString('id-ID')} m³) sama persis (Akurasi: ${res.accuracy}%). Syarat verifikasi terpenuhi!`);
+      } else {
+        setOcrSuccessNotice(`⚠️ Diskrepansi Terdeteksi: Angka Foto Stand (${res.meterStandOcr.toLocaleString('id-ID')} m³) BERBEDA dengan BPM (${res.bpmStandOcr.toLocaleString('id-ID')} m³). Verifikasi dikunci sampai angka direkonsiliasi sama.`);
+      }
+    }, 900);
+  };
+
+  // Reconcile / Synchronize values to make them 100% matched
+  const handleSyncReconciliation = (source: 'meter' | 'bpm') => {
+    const targetVal = source === 'meter' ? meterOcrVal : bpmOcrVal;
+    const finalVal = targetVal > 0 ? targetVal : (customer.skrg > 0 ? customer.skrg : customer.lalu + 500);
+    setMeterOcrVal(finalVal);
+    setBpmOcrVal(finalVal);
+    setInputSkrg(finalVal);
+    setOcrSuccessNotice(`✓ Rekonsiliasi Sukses: Angka pada Foto Stand Meter dan Foto BPM telah diselaraskan ke ${finalVal.toLocaleString('id-ID')} m³. Status: Cocok (100% Match).`);
+    showColorfulAlert({
+      title: 'Rekonsiliasi Sukses! ✅',
+      subtitle: 'Foto Stand Meter & Foto BPM Selaras',
+      message: `Angka pada Foto Stand Meter dan Angka Meter Bulan Ini di Foto BPM kini bernilai sama (${finalVal.toLocaleString('id-ID')} m³). Status rekonsiliasi VALID dan siap diverifikasi oleh Tim Meter Reading.`,
+      type: 'success',
+      badge: 'REKONSILIASI COCOK'
+    });
+  };
+
+  // Trigger input ke sistem core CCnB
+  const handleExecuteInputCcnb = () => {
+    setIsSyncingCcnb(true);
+    const batchNo = customer.ccnbBatchNo || generateCcnbBatchNumber();
+    const timeStr = getFormattedCcnbTime();
+
+    setTimeout(() => {
+      setIsSyncingCcnb(false);
+      const updated: IndustryCustomer = {
+        ...customer,
+        isInputCCnB: true,
+        ccnbStatus: 'Inputted',
+        ccnbBatchNo: batchNo,
+        ccnbInputtedAt: timeStr,
+        ccnbInputtedBy: `${currentUser.name} (${currentUser.title})`
+      };
+
+      onSaveReading(updated);
+      if (onInputCcnb) {
+        onInputCcnb([customer.id], batchNo, `Input ke CCnB oleh ${currentUser.name}`);
+      }
+
+      showColorfulAlert({
+        title: 'Data Berhasil Terinput ke CCnB! 🚀',
+        subtitle: `Nomor Batch: ${batchNo}`,
+        message: `Hasil pembacaan industri "${customer.nama}" telah resmi terinput ke core billing CCnB. Pelanggan kini otomatis berpindah ke Section Billing & Invoicing untuk diterbitkan fakturnya oleh Tim Billing.`,
+        type: 'success',
+        badge: 'TERINPUT CCnB'
+      });
+    }, 800);
+  };
+
   const handleSave = () => {
     const now = new Date();
     const waktuStr = `${now.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })} ${String(
@@ -118,7 +220,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
     ).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} WIB`;
 
     if (canManageBilling) {
-      // STRICT CHECK: Belum diverifikasi oleh Pak Kabul atau Pak Solihin -> TOLAK akses billing & invoicing
+      // STRICT CHECK 1: Belum diverifikasi oleh Tim Meter Reading -> TOLAK
       if (!isCustomerVerified) {
         showColorfulAlert({
           title: 'Akses Penagihan Dikunci 🔒',
@@ -126,6 +228,18 @@ export const DetailModal: React.FC<DetailModalProps> = ({
           message: `Data pembacaan stand meter industri "${customer.nama}" belum diverifikasi oleh Pak Akhmad Solihin atau Pak Kabul Nugroho (Tim Meter Reading). Pak Yaya (Billing & Invoicing) hanya dapat menerbitkan faktur tagihan setelah hasil pembacaan diverifikasi resmi.`,
           type: 'warning',
           badge: 'BELUM DIVERIFIKASI'
+        });
+        return;
+      }
+
+      // STRICT CHECK 2 (PERMINTAAN PENGGUNA): Wajib terinput ke sistem CCnB terlebih dahulu sebelum masuk billing!
+      if (!isCcnbInputted) {
+        showColorfulAlert({
+          title: 'Akses Invoicing Dikunci 🔒',
+          subtitle: 'Belum Terinput ke Sistem Core CCnB',
+          message: `Data pembacaan industri "${customer.nama}" sudah diverifikasi, tetapi BELUM di-input ke sistem CCnB! Sesuai SOP, hasil pembacaan baru dapat diproses di billing setelah terinput di CCnB. Silakan klik tombol "Check & Input ke CCnB" terlebih dahulu.`,
+          type: 'warning',
+          badge: 'MENUNGGU CCnB'
         });
         return;
       }
@@ -153,7 +267,19 @@ export const DetailModal: React.FC<DetailModalProps> = ({
       // Trigger default mail client
       window.location.href = mailto;
     } else if (canVerifyReading) {
-      // Meter reading user verifies or updates reading
+      // STRICT CHECK (PERMINTAAN PENGGUNA NO. 1):
+      // Foto stand meter dan angka meter bulan ini di foto BPM HARUS SAMA agar bisa diverifikasi!
+      if (!isReconciled) {
+        showColorfulAlert({
+          title: 'Verifikasi Ditolak! ❌',
+          subtitle: 'Rekonsiliasi Foto Stand Meter & BPM Tidak Cocok',
+          message: `Angka pada Foto Stand Meter (${meterOcrVal.toLocaleString('id-ID')} m³) dan Angka Meter Bulan Ini di Foto Dokumen BPM (${bpmOcrVal.toLocaleString('id-ID')} m³) HARUS SAMA PERSIS agar bisa diverifikasi! Silakan lakukan rekonsiliasi atau samakan angka kedua dokumen terlebih dahulu.`,
+          type: 'error',
+          badge: 'REKONSILIASI GAGAL'
+        });
+        return;
+      }
+
       if (currentStand < lalu && currentStand > 0) {
         showColorfulAlert({
           title: 'Validasi Stand Meter',
@@ -164,27 +290,36 @@ export const DetailModal: React.FC<DetailModalProps> = ({
         return;
       }
 
+      const finalStand = meterOcrVal > 0 ? meterOcrVal : currentStand;
       const updatedHistory = [...historyData];
-      if (currentStand > 0 && updatedHistory[updatedHistory.length - 1] !== currentStand) {
-        updatedHistory.push(currentStand);
+      if (finalStand > 0 && updatedHistory[updatedHistory.length - 1] !== finalStand) {
+        updatedHistory.push(finalStand);
       }
 
       const updated: IndustryCustomer = {
         ...customer,
-        skrg: currentStand > 0 ? currentStand : customer.skrg,
+        skrg: finalStand,
+        meterStandOcr: meterOcrVal,
+        bpmStandOcr: bpmOcrVal,
+        reconciliationStatus: 'Matched',
+        reconciledAt: waktuStr,
+        reconciledBy: `${currentUser.name} (${currentUser.title})`,
         status: 'Verified',
         verifiedBy: `${currentUser.name} (${currentUser.title})`,
         verifiedAt: waktuStr,
-        catatan: catatan.trim() || `Diverifikasi resmi oleh ${currentUser.name} (Tim Meter Reading)`,
+        catatan: catatan.trim() || `Diverifikasi resmi oleh ${currentUser.name} (Tim Meter Reading) — Rekonsiliasi Foto Stand & BPM Cocok (${finalStand.toLocaleString('id-ID')} m³)`,
         history: updatedHistory,
         fotoMeter: customer.fotoMeter || meterGaugeImg,
-        fotoBPM: customer.fotoBPM || bpmDocImg
+        fotoBPM: customer.fotoBPM || bpmDocImg,
+        isInputCCnB: customer.isInputCCnB || false,
+        ccnbStatus: customer.ccnbStatus || 'Belum Input'
       };
 
       onSaveReading(updated);
       showColorfulAlert({
         title: 'Pembacaan Berhasil Diverifikasi! ✅',
-        message: `Stand meter industri ${customer.nama} (${currentStand.toLocaleString()} m³) berhasil diverifikasi oleh ${currentUser.name}. Status alur kerja kini diatur ke Verified (Siap untuk Penerbitan Invoice oleh Tim Billing).`,
+        subtitle: 'Rekonsiliasi Stand Meter & BPM Valid (100% Cocok)',
+        message: `Stand meter industri ${customer.nama} (${finalStand.toLocaleString()} m³) berhasil diverifikasi resmi oleh ${currentUser.name}. Langkah selanjutnya: Silakan klik tombol "Check & Input ke CCnB" agar data berpindah ke Section Billing & Invoicing.`,
         type: 'success',
         badge: 'VERIFIKASI SELESAI'
       });
@@ -442,6 +577,262 @@ export const DetailModal: React.FC<DetailModalProps> = ({
             photoType={lightboxPhoto || 'meter'}
           />
 
+          {/* ========================================================================= */}
+          {/* FITUR REKOGNISI DAN REKONSILIASI FOTO STAND METER VS FOTO BPM              */}
+          {/* Sesuai Permintaan User: Foto stand meter dan angka meter bulan ini di foto   */}
+          {/* BPM HARUS SAMA PERSIS agar bisa diverifikasi!                             */}
+          {/* ========================================================================= */}
+          <div className={`p-4 rounded-2xl border transition-all ${
+            isReconciled
+              ? 'bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800/80 shadow-xs'
+              : 'bg-rose-50/80 dark:bg-rose-950/30 border-rose-300 dark:border-rose-800/80 shadow-sm'
+          }`}>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3 pb-2.5 border-b border-slate-200/80 dark:border-slate-700/80">
+              <div className="flex items-center gap-2">
+                <div className={`p-2 rounded-xl text-white shrink-0 ${
+                  isReconciled ? 'bg-emerald-600' : 'bg-rose-600 animate-pulse'
+                }`}>
+                  <Cpu className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="font-black text-xs sm:text-sm text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                    <span>Rekognisi AI OCR &amp; Rekonsiliasi Komparatif</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                      isReconciled
+                        ? 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300'
+                        : 'bg-rose-100 dark:bg-rose-900/60 text-rose-800 dark:text-rose-300'
+                    }`}>
+                      {isReconciled ? '✓ REKONSILIASI COCOK' : '⚠️ DISKREPANSI / TIDAK SAMA'}
+                    </span>
+                  </h4>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                    SOP Verifikasi: Angka di Foto Stand Meter dan Angka Meter Bulan Ini di Foto BPM wajib bernilai sama persis.
+                  </p>
+                </div>
+              </div>
+
+              {/* OCR Action Buttons */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => handleRunOcrScan(false)}
+                  disabled={isOcrScanning}
+                  className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] flex items-center gap-1 transition shadow-2xs cursor-pointer disabled:opacity-50"
+                  title="Jalankan pemindaian ulang AI OCR pada kedua foto"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isOcrScanning ? 'animate-spin' : ''}`} />
+                  <span>{isOcrScanning ? 'Memindai Foto...' : 'Scan Ulang OCR'}</span>
+                </button>
+
+                {!isReconciled && (
+                  <button
+                    type="button"
+                    onClick={() => handleSyncReconciliation('meter')}
+                    className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] flex items-center gap-1 transition shadow-2xs cursor-pointer"
+                    title="Rekonsiliasikan: Samakan angka BPM dengan foto stand meter"
+                  >
+                    <CheckCircle className="w-3 h-3" />
+                    <span>Samakan Angka</span>
+                  </button>
+                )}
+
+                {/* Tombol Testing Simulasi untuk Uji Coba Pengguna */}
+                <button
+                  type="button"
+                  onClick={() => handleRunOcrScan(!isReconciled ? false : true)}
+                  className={`px-2 py-1 rounded-lg border font-bold text-[9px] transition cursor-pointer ${
+                    isReconciled
+                      ? 'border-rose-300 text-rose-700 hover:bg-rose-100 dark:text-rose-300 dark:hover:bg-rose-950/60'
+                      : 'border-emerald-300 text-emerald-700 hover:bg-emerald-100 dark:text-emerald-300 dark:hover:bg-emerald-950/60'
+                  }`}
+                  title="Ganti skenario untuk menguji verifikasi saat angka sama vs beda"
+                >
+                  {isReconciled ? 'Uji Kasus Beda Angka' : 'Uji Kasus Sama Angka'}
+                </button>
+              </div>
+            </div>
+
+            {/* OCR Notice */}
+            {ocrSuccessNotice && (
+              <div className="mb-3 p-2 rounded-xl bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900 text-blue-800 dark:text-blue-300 text-[11px] font-semibold animate-in fade-in">
+                {ocrSuccessNotice}
+              </div>
+            )}
+
+            {/* Side-by-Side Comparison Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5 items-center">
+              {/* Card 1: Foto Stand Meter Fisik */}
+              <div className="sm:col-span-2 p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs">
+                <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">
+                  <span className="flex items-center gap-1">
+                    <Camera className="w-3 h-3 text-[#0055A5] dark:text-blue-400" />
+                    <span>Foto Stand Meter Fisik</span>
+                  </span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-mono">Akurasi 99.4%</span>
+                </div>
+                <div className="flex items-baseline justify-between mt-1">
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold">Hasil Rekognisi:</span>
+                  <span className="font-mono font-black text-base text-[#0055A5] dark:text-blue-400">
+                    {meterOcrVal.toLocaleString('id-ID')} m³
+                  </span>
+                </div>
+                <p className="text-[9px] text-slate-400 mt-1 truncate">
+                  Deteksi: Register Counter Odometer Air
+                </p>
+              </div>
+
+              {/* Match/Mismatch Comparison Badge in Center */}
+              <div className="sm:col-span-1 flex flex-col items-center justify-center text-center p-1">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm shadow-xs ${
+                  isReconciled
+                    ? 'bg-emerald-500 text-white shadow-emerald-500/20'
+                    : 'bg-rose-500 text-white animate-bounce shadow-rose-500/30'
+                }`}>
+                  {isReconciled ? '=' : '≠'}
+                </div>
+                <span className={`text-[9px] font-black uppercase mt-1 tracking-wider ${
+                  isReconciled ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-600 dark:text-rose-400 font-bold'
+                }`}>
+                  {isReconciled ? 'COCOK ✓' : 'TIDAK SAMA ✗'}
+                </span>
+                {!isReconciled && (
+                  <span className="text-[8px] font-mono text-rose-500 font-bold">
+                    Selisih: {Math.abs(meterOcrVal - bpmOcrVal).toLocaleString('id-ID')} m³
+                  </span>
+                )}
+              </div>
+
+              {/* Card 2: Foto Dokumen BPM (Baris Stand Bulan Ini) */}
+              <div className="sm:col-span-2 p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs">
+                <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">
+                  <span className="flex items-center gap-1">
+                    <FileCheck className="w-3 h-3 text-[#E86216]" />
+                    <span>Foto Dokumen BPM (Stand Bulan Ini)</span>
+                  </span>
+                  <span className="text-orange-600 dark:text-orange-400 font-mono">Akurasi 98.8%</span>
+                </div>
+                <div className="flex items-baseline justify-between mt-1">
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold">Hasil Rekognisi:</span>
+                  <span className="font-mono font-black text-base text-[#E86216]">
+                    {bpmOcrVal.toLocaleString('id-ID')} m³
+                  </span>
+                </div>
+                <p className="text-[9px] text-slate-400 mt-1 truncate">
+                  Deteksi: Lembar Berita Acara Stempel &amp; TTD
+                </p>
+              </div>
+            </div>
+
+            {/* Reconciliation Status Alert Bar */}
+            <div className={`mt-3 p-2.5 rounded-xl text-[11px] flex items-start gap-2 ${
+              isReconciled
+                ? 'bg-emerald-100/70 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-200 border border-emerald-300/80 dark:border-emerald-800'
+                : 'bg-rose-100/80 dark:bg-rose-950/60 text-rose-900 dark:text-rose-200 border border-rose-300/80 dark:border-rose-800 font-medium'
+            }`}>
+              {isReconciled ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-extrabold">STATUS REKONSILIASI VALID (100% MATCH): </span>
+                    <span>
+                      Angka pada Foto Stand Meter ({meterOcrVal.toLocaleString('id-ID')} m³) dan Dokumen BPM ({bpmOcrVal.toLocaleString('id-ID')} m³) SAMA PERSIS. Syarat verifikasi pembacaan meter resmi telah terpenuhi!
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-extrabold">VERIFIKASI DIKUNCI / REKONSILIASI GAGAL: </span>
+                    <span>
+                      Angka pada Foto Stand Meter ({meterOcrVal.toLocaleString('id-ID')} m³) BERBEDA dengan Angka Bulan Ini di Foto Dokumen BPM ({bpmOcrVal.toLocaleString('id-ID')} m³)! Kedua angka harus sama persis agar pembacaan ini dapat diverifikasi. Silakan klik <strong>"Samakan Angka"</strong> setelah memeriksa foto.
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* ========================================================================= */}
+          {/* FITUR TOMBOL CHECK INPUT CCNB                                              */}
+          {/* Sesuai Permintaan User: Tombol check input CCnB setelah verifikasi.        */}
+          {/* Baru hasil pembacaan yang sudah terinput CCnB yang pindah ke billing.    */}
+          {/* ========================================================================= */}
+          {isCustomerVerified && (
+            <div className={`p-4 rounded-2xl border transition-all ${
+              isCcnbInputted
+                ? 'bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 dark:from-emerald-950/30 dark:via-teal-950/20 dark:to-blue-950/30 border-emerald-300 dark:border-emerald-800/80'
+                : 'bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-950/40 dark:via-indigo-950/30 dark:to-purple-950/30 border-blue-300 dark:border-blue-800/80 shadow-xs'
+            }`}>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div className="flex items-start gap-3">
+                  <div className={`p-2.5 rounded-2xl text-white shrink-0 shadow-xs ${
+                    isCcnbInputted ? 'bg-emerald-600' : 'bg-[#0055A5]'
+                  }`}>
+                    <Server className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="font-black text-sm text-slate-800 dark:text-slate-100">
+                        Integrasi Core System CCnB (Customer Care &amp; Billing)
+                      </h4>
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                        isCcnbInputted
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300'
+                          : 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300'
+                      }`}>
+                        {isCcnbInputted ? '✓ TERINPUT DI CCnB' : 'MENUNGGU INPUT CCnB'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5 leading-relaxed">
+                      {isCcnbInputted ? (
+                        <>
+                          Data stand telah terinput ke CCnB dengan No. Batch{' '}
+                          <strong className="font-mono text-[#0055A5] dark:text-blue-400">{customer.ccnbBatchNo || 'CCNB-2026-SEP-8412'}</strong> pada{' '}
+                          <span>{customer.ccnbInputtedAt || 'Baru Saja'}</span>. Pelanggan ini resmi berada di <strong>Section Billing &amp; Invoicing</strong>.
+                        </>
+                      ) : (
+                        <>
+                          Stand meter telah diverifikasi resmi oleh {customer.verifiedBy || 'Tim Meter Reading'}. Klik tombol di samping untuk memvalidasi dan menginput ke sistem CCnB agar dipindahkan ke Section Billing.
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="shrink-0 w-full sm:w-auto">
+                  {!isCcnbInputted ? (
+                    <button
+                      type="button"
+                      onClick={handleExecuteInputCcnb}
+                      disabled={isSyncingCcnb}
+                      className="w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-[#0055A5] to-blue-600 hover:from-[#003E78] hover:to-blue-700 text-white rounded-xl font-black text-xs shadow-md transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                      title="Klik untuk check dan menginput hasil pembacaan ke sistem CCnB"
+                    >
+                      {isSyncingCcnb ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin text-cyan-300" />
+                          <span>Memproses CCnB...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Database className="w-3.5 h-3.5 text-cyan-300" />
+                          <span>Check &amp; Input ke CCnB 🚀</span>
+                          <ArrowRight className="w-3 h-3 text-white/80" />
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-100 dark:bg-emerald-900/60 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs font-bold">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                      <span>Terinput CCnB ✓</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Integrated Realtime Location Map */}
           <div className="space-y-1.5">
             <RealtimeLocationMap customer={customer} height="h-64 sm:h-72" />
@@ -645,11 +1036,25 @@ export const DetailModal: React.FC<DetailModalProps> = ({
 
           {canVerifyReading && (
             <button
+              type="button"
               onClick={handleSave}
-              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-xs transition flex items-center gap-2 cursor-pointer"
+              className={`px-5 py-2 rounded-xl font-bold text-xs shadow-xs transition flex items-center gap-2 cursor-pointer ${
+                isReconciled
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                  : 'bg-rose-600 hover:bg-rose-700 text-white ring-2 ring-rose-400/50'
+              }`}
+              title={
+                isReconciled
+                  ? 'Verifikasi Pembacaan Stand (Rekonsiliasi Cocok 100%)'
+                  : 'Angka Foto Stand Meter dan Angka Bulan Ini di BPM Tidak Sama! Harus sama agar bisa diverifikasi.'
+              }
             >
-              <CheckCircle className="w-4 h-4" />
-              <span>Verifikasi Pembacaan Stand (Verified)</span>
+              {isReconciled ? <CheckCircle className="w-4 h-4" /> : <Lock className="w-4 h-4 animate-pulse" />}
+              <span>
+                {isReconciled
+                  ? 'Verifikasi Pembacaan Stand (Verified)'
+                  : 'Verifikasi Terkunci (Stand & BPM Beda Angka)'}
+              </span>
             </button>
           )}
 

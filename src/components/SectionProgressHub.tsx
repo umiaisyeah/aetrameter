@@ -21,6 +21,28 @@ interface SectionProgressHubProps {
   variant?: 'dual' | 'verification_only' | 'billing_only' | 'compact';
 }
 
+// Helper akurat untuk menghitung persentase progress tanpa pembulatan nol yang keliru
+export const formatProgressPercent = (count: number, denom: number): {
+  pctStr: string;   // Contoh: '0.4%' atau '100%' atau '0%'
+  numStr: string;   // Contoh: '0.4' atau '100' atau '0'
+  barWidth: number; // Minimal 1.5% agar progress bar memiliki indikator visual saat count > 0
+} => {
+  if (denom <= 0 || count <= 0) {
+    return { pctStr: '0%', numStr: '0', barWidth: 0 };
+  }
+  const raw = (count / denom) * 100;
+  if (raw >= 100) {
+    return { pctStr: '100%', numStr: '100', barWidth: 100 };
+  }
+  // Format dengan 1 desimal jika di bawah 1% atau bukan bilangan bulat
+  const formatted = raw < 1 || raw % 1 !== 0 ? raw.toFixed(1) : String(Math.round(raw));
+  return {
+    pctStr: `${formatted}%`,
+    numStr: formatted,
+    barWidth: Math.max(1.5, Math.min(100, raw))
+  };
+};
+
 export const SectionProgressHub: React.FC<SectionProgressHubProps> = ({
   customers,
   onFilterStatus,
@@ -34,14 +56,15 @@ export const SectionProgressHub: React.FC<SectionProgressHubProps> = ({
   const verifiedCount = customers.filter((c) => c.status === 'Verified').length;
   const invoicedCount = customers.filter((c) => c.status === 'Invoiced').length;
 
-  // Done verification includes both Verified & Invoiced
+  // SINKRONISASI VERIFIKASI: Total yang selesai diverifikasi (Verified + Invoiced)
   const totalVerifiedAndInvoiced = verifiedCount + invoicedCount;
-  const verificationPercent = total > 0 ? Math.round((totalVerifiedAndInvoiced / total) * 100) : 0;
+  const verificationStat = formatProgressPercent(totalVerifiedAndInvoiced, total);
 
-  // Billing metrics
-  const actionableForBilling = totalVerifiedAndInvoiced;
-  const billingPercent = actionableForBilling > 0 ? Math.round((invoicedCount / actionableForBilling) * 100) : 0;
-  const overallBillingPercent = total > 0 ? Math.round((invoicedCount / total) * 100) : 0;
+  // SINKRONISASI INVOICING: Sesuai dengan data yang SUDAH DIVERIFIKASI!
+  // Target penagihan/invoicing dihitung dari total data yang sudah diverifikasi resmi oleh Tim Meter Reading
+  const billingTarget = totalVerifiedAndInvoiced;
+  const billingStatFromVerified = formatProgressPercent(invoicedCount, billingTarget);
+  const overallBillingStat = formatProgressPercent(invoicedCount, total);
 
   // Financial & volume totals
   const totalVolumeM3 = customers.reduce((acc, c) => {
@@ -100,7 +123,7 @@ export const SectionProgressHub: React.FC<SectionProgressHubProps> = ({
                 <div className="text-right shrink-0">
                   <span className="text-[10px] uppercase font-bold text-emerald-300 block">Capaian</span>
                   <span className="text-2xl font-black font-mono text-emerald-300 tracking-tight">
-                    {verificationPercent}%
+                    {verificationStat.pctStr}
                   </span>
                 </div>
               </div>
@@ -110,13 +133,13 @@ export const SectionProgressHub: React.FC<SectionProgressHubProps> = ({
                 <div className="flex justify-between items-center text-xs font-bold text-emerald-100">
                   <span>Tingkat Verifikasi Selesai:</span>
                   <span className="font-mono text-white">
-                    {totalVerifiedAndInvoiced} / {total} Industri ({verificationPercent}%)
+                    {totalVerifiedAndInvoiced} / {total} Industri ({verificationStat.pctStr})
                   </span>
                 </div>
                 <div className="w-full h-3 bg-black/40 backdrop-blur-sm rounded-full overflow-hidden p-0.5 border border-emerald-400/30">
                   <div
                     className="h-full bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-300 rounded-full transition-all duration-700 ease-out shadow-xs"
-                    style={{ width: `${verificationPercent}%` }}
+                    style={{ width: `${verificationStat.barWidth}%` }}
                   />
                 </div>
               </div>
@@ -149,7 +172,7 @@ export const SectionProgressHub: React.FC<SectionProgressHubProps> = ({
                   title="Klik untuk filter industri Verified"
                 >
                   <span className="text-[10px] font-bold text-emerald-200 block">Terverifikasi</span>
-                  <span className="font-mono font-black text-emerald-300 text-base">{verifiedCount}</span>
+                  <span className="font-mono font-black text-emerald-300 text-base">{totalVerifiedAndInvoiced}</span>
                   <span className="text-[9px] text-emerald-200/70 block mt-0.5">Siap Billing</span>
                 </div>
               </div>
@@ -187,7 +210,7 @@ export const SectionProgressHub: React.FC<SectionProgressHubProps> = ({
                 <div className="text-right shrink-0">
                   <span className="text-[10px] uppercase font-bold text-purple-300 block">Invoiced</span>
                   <span className="text-2xl font-black font-mono text-amber-300 tracking-tight">
-                    {billingPercent}%
+                    {billingStatFromVerified.pctStr}
                   </span>
                 </div>
               </div>
@@ -197,13 +220,13 @@ export const SectionProgressHub: React.FC<SectionProgressHubProps> = ({
                 <div className="flex justify-between items-center text-xs font-bold text-purple-100">
                   <span>Status Faktur &amp; Invoice Resmi Terbit:</span>
                   <span className="font-mono text-white">
-                    {invoicedCount} / {actionableForBilling} Industri Terverifikasi ({billingPercent}%)
+                    {invoicedCount} / {billingTarget} Industri Terverifikasi ({billingStatFromVerified.pctStr})
                   </span>
                 </div>
                 <div className="w-full h-3 bg-black/40 backdrop-blur-sm rounded-full overflow-hidden p-0.5 border border-purple-400/30">
                   <div
                     className="h-full bg-gradient-to-r from-[#E86216] via-purple-400 to-amber-300 rounded-full transition-all duration-700 ease-out shadow-xs"
-                    style={{ width: `${billingPercent}%` }}
+                    style={{ width: `${billingStatFromVerified.barWidth}%` }}
                   />
                 </div>
               </div>
@@ -231,9 +254,9 @@ export const SectionProgressHub: React.FC<SectionProgressHubProps> = ({
                 </div>
 
                 <div className="p-2.5 rounded-2xl bg-orange-500/20 backdrop-blur-md border border-orange-400/30">
-                  <span className="text-[10px] font-bold text-orange-200 block">e-Materai (&gt;5Jt)</span>
-                  <span className="font-mono font-black text-orange-300 text-base">{countMaterai}</span>
-                  <span className="text-[9px] text-orange-200/70 block mt-0.5">Otomatis Rp10K</span>
+                  <span className="text-[10px] font-bold text-orange-200 block">Target Terverif</span>
+                  <span className="font-mono font-black text-orange-300 text-base">{billingTarget}</span>
+                  <span className="text-[9px] text-orange-200/70 block mt-0.5">Sesuai Verifikasi</span>
                 </div>
               </div>
             </div>
@@ -271,7 +294,7 @@ export const SectionProgressHub: React.FC<SectionProgressHubProps> = ({
                 <div className="text-right">
                   <span className="text-xs font-bold text-emerald-300 block uppercase">Pencapaian Verifikasi</span>
                   <span className="text-3xl font-black font-mono text-emerald-300">
-                    {verificationPercent}%
+                    {verificationStat.pctStr}
                   </span>
                 </div>
               </div>
@@ -282,13 +305,13 @@ export const SectionProgressHub: React.FC<SectionProgressHubProps> = ({
               <div className="flex justify-between items-center text-xs font-bold text-emerald-100">
                 <span>Total Verifikasi Selesai:</span>
                 <span className="font-mono text-emerald-300 font-extrabold text-sm">
-                  {totalVerifiedAndInvoiced} dari {total} Industri Selesai Diverifikasi
+                  {totalVerifiedAndInvoiced} dari {total} Industri Selesai Diverifikasi ({verificationStat.pctStr})
                 </span>
               </div>
               <div className="w-full h-3.5 bg-black/40 backdrop-blur-sm rounded-full overflow-hidden p-0.5 border border-emerald-400/30">
                 <div
                   className="h-full bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-300 rounded-full transition-all duration-700 ease-out shadow-xs"
-                  style={{ width: `${verificationPercent}%` }}
+                  style={{ width: `${verificationStat.barWidth}%` }}
                 />
               </div>
             </div>
@@ -353,7 +376,10 @@ export const SectionProgressHub: React.FC<SectionProgressHubProps> = ({
                 <div className="text-right">
                   <span className="text-xs font-bold text-purple-300 block uppercase">Progress Invoicing</span>
                   <span className="text-3xl font-black font-mono text-amber-300">
-                    {billingPercent}%
+                    {billingStatFromVerified.pctStr}
+                  </span>
+                  <span className="text-[10px] text-purple-200/80 block font-medium">
+                    dari {billingTarget} terverifikasi ({overallBillingStat.pctStr} total)
                   </span>
                 </div>
               </div>
@@ -364,13 +390,13 @@ export const SectionProgressHub: React.FC<SectionProgressHubProps> = ({
               <div className="flex justify-between items-center text-xs font-bold text-purple-100">
                 <span>Penerbitan Invoice dari Data Terverifikasi:</span>
                 <span className="font-mono text-amber-300 font-extrabold text-sm">
-                  {invoicedCount} dari {actionableForBilling} Industri Telah Diterbitkan Faktur
+                  {invoicedCount} dari {billingTarget} Industri Terverifikasi Telah Diterbitkan Faktur ({billingStatFromVerified.pctStr})
                 </span>
               </div>
               <div className="w-full h-3.5 bg-black/40 backdrop-blur-sm rounded-full overflow-hidden p-0.5 border border-purple-400/30">
                 <div
                   className="h-full bg-gradient-to-r from-[#E86216] via-purple-400 to-amber-300 rounded-full transition-all duration-700 ease-out shadow-xs"
-                  style={{ width: `${billingPercent}%` }}
+                  style={{ width: `${billingStatFromVerified.barWidth}%` }}
                 />
               </div>
             </div>
@@ -390,11 +416,9 @@ export const SectionProgressHub: React.FC<SectionProgressHubProps> = ({
               </div>
 
               <div className="p-3 bg-blue-500/20 rounded-2xl border border-blue-400/30">
-                <span className="text-[11px] font-bold text-blue-200 block">Volume Air Terbilling</span>
-                <span className="font-mono font-black text-blue-300 text-lg mt-1 block">
-                  {invoicedVolumeM3.toLocaleString()} m³
-                </span>
-                <span className="text-[10px] text-blue-200/70">Dari {totalVolumeM3.toLocaleString()} m³</span>
+                <span className="text-[11px] font-bold text-blue-200 block">Total Sudah Terverifikasi</span>
+                <span className="font-mono font-black text-blue-300 text-xl mt-1 block">{billingTarget}</span>
+                <span className="text-[10px] text-blue-200/70">Target Penagihan Aktif</span>
               </div>
 
               <div className="p-3 bg-orange-500/20 rounded-2xl border border-orange-400/30">

@@ -41,6 +41,7 @@ import {
   subscribeToFieldReaderUpdates
 } from './services/supabaseService';
 import { fetchCloudState, pushCloudState, pushCustomerReading, pushStatusUpdate, subscribeToCloudEvents } from './services/cloudSyncService';
+import { getFormattedCcnbTime } from './utils/recognitionEngine';
 
 export default function App() {
   // Show Welcome Screen with SIMBA description first upon opening app link
@@ -70,11 +71,20 @@ export default function App() {
                   .replace(/Ahmad Fauzi|Bambang Sutrisno|Rudi Hartono|Dani Permana|Budi Santoso|Dewi Lestari|PT Hideco|Kontraktor \(PT Hideco\)/gi, '')
                   .trim()
               : '';
+            const seedMatch = INITIAL_CUSTOMERS.find((ic) => ic.id === c.id);
             return {
               ...c,
               // Stand kini tidak terisi jika berstatus Belum Dibaca
               skrg: isUnread && c.skrg === c.lalu ? 0 : c.skrg,
-              catatan: cleanCatatan
+              catatan: cleanCatatan,
+              meterStandOcr: c.meterStandOcr ?? seedMatch?.meterStandOcr,
+              bpmStandOcr: c.bpmStandOcr ?? seedMatch?.bpmStandOcr,
+              reconciliationStatus: c.reconciliationStatus ?? seedMatch?.reconciliationStatus,
+              isInputCCnB: c.isInputCCnB ?? (c.status === 'Invoiced' ? true : seedMatch?.isInputCCnB ?? false),
+              ccnbStatus: c.ccnbStatus ?? (c.isInputCCnB || c.status === 'Invoiced' ? 'Inputted' : seedMatch?.ccnbStatus ?? 'Belum Input'),
+              ccnbBatchNo: c.ccnbBatchNo ?? seedMatch?.ccnbBatchNo,
+              ccnbInputtedAt: c.ccnbInputtedAt ?? seedMatch?.ccnbInputtedAt,
+              ccnbInputtedBy: c.ccnbInputtedBy ?? seedMatch?.ccnbInputtedBy
             };
           });
         }
@@ -562,6 +572,64 @@ export default function App() {
     setSelectedCustomerForDetail(invoicedCust);
   };
 
+  // Handler untuk menginput hasil pembacaan terverifikasi ke sistem core CCnB
+  // Sesuai Permintaan User: Baru setelah terinput ke CCnB data berpindah ke Section Billing & Invoicing!
+  const handleInputCcnb = (customerIds: string[], batchNo: string, note?: string) => {
+    const timeStr = getFormattedCcnbTime();
+    let nextCusts: IndustryCustomer[] = [];
+    const idSet = new Set(customerIds);
+
+    setCustomers((prev) => {
+      nextCusts = prev.map((c) => {
+        if (idSet.has(c.id)) {
+          return {
+            ...c,
+            isInputCCnB: true,
+            ccnbStatus: 'Inputted',
+            ccnbBatchNo: batchNo,
+            ccnbInputtedAt: timeStr,
+            ccnbInputtedBy: `${currentUser?.name || 'Tim Meter Reading'} (${currentUser?.title || 'System'})`
+          };
+        }
+        return c;
+      });
+      try {
+        localStorage.setItem('aetra_industri_data', JSON.stringify(nextCusts));
+        localStorage.setItem('aetra_customers_official', JSON.stringify(nextCusts));
+      } catch {}
+      return nextCusts;
+    });
+
+    const now = new Date();
+    const timeFormatted = `${now.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'][now.getMonth()]} ${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+    const ccnbLog: AuditLog = {
+      id: `log-${Date.now()}`,
+      time: timeFormatted,
+      user: currentUser?.name || 'Tim Meter Reading',
+      role: currentUser?.title || 'Tim Meter Reading',
+      desc: note || `Input ${customerIds.length} industri ke sistem core CCnB (Batch ${batchNo}). Data resmi berpindah ke Section Billing & Invoicing.`,
+      type: 'update'
+    };
+
+    setAuditLogs((prev) => [ccnbLog, ...prev]);
+
+    showToast({
+      title: 'Data Berhasil Terinput ke CCnB! 🚀',
+      message: `${customerIds.length} industri (Batch ${batchNo}) telah terinput ke sistem CCnB dan resmi dipindahkan ke Section Billing & Invoicing.`,
+      type: 'success'
+    });
+
+    try {
+      const bc = new BroadcastChannel('aetra_simba_online_sync');
+      bc.postMessage({
+        type: 'STATE_UPDATE',
+        action: 'CCNB_INPUTTED',
+        customers: nextCusts
+      });
+      bc.close();
+    } catch {}
+  };
+
   const handleAddCustomer = (newCustomer: IndustryCustomer) => {
     setCustomers((prev) => [newCustomer, ...prev]);
     upsertSupabaseCustomer(newCustomer).catch(() => {});
@@ -1005,11 +1073,6 @@ export default function App() {
           onSaveReading={handleSaveReading}
           onLogout={handleLogout}
           onSyncNow={handleSyncNow}
-          onSwitchToAdmin={() => {
-            const adminUser = USER_PROFILES.yaya;
-            setCurrentUser(adminUser);
-            logActivity(`Beralih dari mode pembaca meter ke Dashboard Admin (${adminUser.name})`);
-          }}
         />
         {isLoginModalOpen && (
           <ModalLogin
@@ -1119,6 +1182,7 @@ export default function App() {
               onBatchUpdateStatus={handleBatchUpdateStatus}
               onDeleteCustomer={handleDeleteCustomer}
               onDeleteBatchCustomers={handleDeleteBatchCustomers}
+              onInputCcnb={handleInputCcnb}
               currentUser={currentUser}
               onSyncNow={handleSyncNow}
               isSyncing={isSyncingLive}
@@ -1194,6 +1258,7 @@ export default function App() {
           onClose={() => setSelectedCustomerForDetail(null)}
           onSaveReading={handleSaveReading}
           onProcessInvoice={handleProcessInvoice}
+          onInputCcnb={handleInputCcnb}
           onOpenPrintInvoice={(cust) => {
             setSelectedCustomerForDetail(null);
             setSelectedCustomerForInvoice(cust);

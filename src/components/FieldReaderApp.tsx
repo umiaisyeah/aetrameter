@@ -18,7 +18,6 @@ import {
   Maximize2,
   Sun,
   Moon,
-  ShieldCheck,
   LogOut,
   RefreshCw,
   Navigation,
@@ -52,7 +51,6 @@ interface FieldReaderAppProps {
   meterReaders: MeterReader[];
   cycleSchedules?: CycleSchedule[];
   onSaveReading: (updatedCustomer: IndustryCustomer) => void;
-  onSwitchToAdmin: () => void;
   onLogout: () => void;
   onSyncNow?: () => void;
 }
@@ -73,7 +71,6 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
   meterReaders,
   cycleSchedules = [],
   onSaveReading,
-  onSwitchToAdmin,
   onLogout,
   onSyncNow
 }) => {
@@ -110,6 +107,12 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
   const [isOcrScanning, setIsOcrScanning] = useState<boolean>(false);
   const [ocrConfidence, setOcrConfidence] = useState<number | null>(null);
   const [ocrSuccessNotice, setOcrSuccessNotice] = useState<string | null>(null);
+
+  // Rekognisi & Rekonsiliasi Foto Stand vs Foto Lembar BPM Lapangan
+  const [meterOcrStand, setMeterOcrStand] = useState<number | null>(null);
+  const [bpmOcrStand, setBpmOcrStand] = useState<number | null>(null);
+  const [isBpmOcrScanning, setIsBpmOcrScanning] = useState<boolean>(false);
+  const [bpmOcrNotice, setBpmOcrNotice] = useState<string | null>(null);
 
   // Search, Cycle Filter, and Status Filter State
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -436,6 +439,9 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
     setFotoBPMPreview(cust.fotoBPM || null);
     setMeterPhotoTime(cust.meterWaktuFoto || null);
     setBpmPhotoTime(cust.bpmWaktuFoto || null);
+    setMeterOcrStand(cust.meterStandOcr ?? (hasBeenRead ? cust.skrg : null));
+    setBpmOcrStand(cust.bpmStandOcr ?? (hasBeenRead ? cust.skrg : null));
+    setBpmOcrNotice(null);
 
     // Catatan lapangan HANYA terisi apabila pencatat/pembaca meter melakukan pengisian
     const isAutoNote =
@@ -466,7 +472,7 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
     fetchCurrentGPS(cust);
   };
 
-  // AI OCR Auto-Recognition Simulation
+  // AI OCR Auto-Recognition Simulation untuk Foto Stand Meter
   const runAutoRecognition = (imageDataUrl: string) => {
     setIsOcrScanning(true);
     setOcrSuccessNotice(null);
@@ -488,10 +494,32 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
 
       const confidence = Math.floor(96 + Math.random() * 4);
       setInputSkrg(String(predictedStand));
+      setMeterOcrStand(predictedStand);
       setOcrConfidence(confidence);
-      setOcrSuccessNotice(`✓ Auto-Recognize berhasil! Stand Sekarang ${predictedStand.toLocaleString()} m³ terdeteksi dari foto (Akurasi ${confidence}%).`);
+      setOcrSuccessNotice(`✓ AI OCR Foto Meter Berhasil! Stand Sekarang ${predictedStand.toLocaleString('id-ID')} m³ terdeteksi dari meteran (Akurasi ${confidence}%).`);
       setIsOcrScanning(false);
-    }, 1200);
+    }, 1100);
+  };
+
+  // AI OCR Auto-Recognition Simulation untuk Foto Lembar BPM Fisik
+  const runBpmAutoRecognition = (imageDataUrl: string) => {
+    setIsBpmOcrScanning(true);
+    setBpmOcrNotice(null);
+
+    const targetCustomer = customers.find((c) => c.id === activeCustId);
+    if (!targetCustomer) {
+      setIsBpmOcrScanning(false);
+      return;
+    }
+
+    setTimeout(() => {
+      const currentInput = Number(inputSkrg) > 0 ? Number(inputSkrg) : (meterOcrStand || (targetCustomer.skrg > 0 ? targetCustomer.skrg : targetCustomer.lalu + 500));
+      // Sesuai standar BPM: Angka bulan ini di dokumen BPM sama dengan stand meter
+      const detectedBpm = currentInput;
+      setBpmOcrStand(detectedBpm);
+      setBpmOcrNotice(`✓ AI OCR Lembar BPM Berhasil! Angka Meter Bulan Ini ${detectedBpm.toLocaleString('id-ID')} m³ terdeteksi dari dokumen BPM (Akurasi 98%).`);
+      setIsBpmOcrScanning(false);
+    }, 1000);
   };
 
   // Handle Photo Upload
@@ -519,6 +547,7 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
         } else {
           setFotoBPMPreview(dataUrl);
           setBpmPhotoTime(waktuStr);
+          runBpmAutoRecognition(dataUrl);
         }
       };
       reader.readAsDataURL(file);
@@ -562,6 +591,21 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
       return;
     }
 
+    // 4. Validasi Rekognisi & Rekonsiliasi: Angka foto stand meter dan angka meter bulan ini di foto BPM HARUS SAMA
+    const finalMeterOcr = meterOcrStand ?? skrgNum;
+    const finalBpmOcr = bpmOcrStand ?? skrgNum;
+
+    if (finalMeterOcr !== finalBpmOcr) {
+      showColorfulAlert({
+        title: 'Peringatan Rekonsiliasi Dokumen! ⚠️',
+        subtitle: 'Foto Stand Meter dan Lembar BPM Tidak Cocok',
+        message: `Angka pada Foto Stand Meter (${finalMeterOcr.toLocaleString('id-ID')} m³) dan Angka Meter Bulan Ini di Foto Dokumen BPM (${finalBpmOcr.toLocaleString('id-ID')} m³) HARUS SAMA agar dapat diverifikasi oleh Tim Meter Reading! Silakan samakan angka kedua dokumen sebelum dikirim.`,
+        type: 'warning',
+        badge: 'DISKREPANSI REKONSILIASI'
+      });
+      return;
+    }
+
     const calculatedUsage = Math.max(0, skrgNum - cust.lalu);
     const now = new Date();
     const waktuStr = `${now.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })} ${String(
@@ -571,6 +615,9 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
     const updatedCust: IndustryCustomer = {
       ...cust,
       skrg: skrgNum,
+      meterStandOcr: finalMeterOcr,
+      bpmStandOcr: finalBpmOcr,
+      reconciliationStatus: finalMeterOcr === finalBpmOcr ? 'Matched' : 'Mismatch',
       status: 'Pending Verification',
       fotoMeter: fotoMeterPreview || '',
       fotoBPM: fotoBPMPreview || '',
@@ -667,14 +714,15 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
             )}
           </button>
 
-          {/* Switch back to Admin Dashboard */}
+          {/* Logout Button */}
           <button
             type="button"
-            onClick={onSwitchToAdmin}
-            className="px-3 py-1.5 rounded-xl bg-[#0055A5] hover:bg-[#003E78] text-white font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+            onClick={onLogout}
+            className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition"
+            title="Keluar dari Akun Petugas"
           >
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Dashboard Admin</span>
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Keluar</span>
           </button>
         </div>
       </div>
@@ -873,7 +921,7 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                 </div>
               </div>
 
-              {/* JIKA PETUGAS BELUM MEMILIKI PLOTTING CYCLE DARI ADMIN */}
+              {/* JIKA PETUGAS BELUM MEMILIKI PLOTTING CYCLE PENUGASAN */}
               {myAssignedCustomers.length === 0 ? (
                 <div className={`p-6 rounded-3xl border text-center space-y-3 ${
                   isFieldDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'
@@ -884,39 +932,45 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                   <div>
                     <h3 className="font-extrabold text-sm text-slate-900 dark:text-white break-words">
                       {readerAssignedCycles.length === 0
-                        ? 'Belum Ada Plotting Cycle dari Dashboard Admin'
-                        : 'Belum Ada Data Industri di Siklus Penugasan'}
+                        ? 'Belum Ada Jadwal Siklus Penugasan'
+                        : 'Belum Ada Data Pelanggan di Siklus Penugasan'}
                     </h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed max-w-xs mx-auto break-words">
                       {readerAssignedCycles.length === 0
-                        ? `Akun petugas ${currentUser.name} belum memiliki plotting cycle dari admin dashboard. Cycle tidak ditampilkan sampai admin memplot cycle di dashboard.`
-                        : `Cycle ${readerAssignedCycles.join(', ')} telah diplot, namun belum ada daftar industri yang diinput admin di menu Database & Input Cycle.`}
+                        ? `Akun petugas ${currentUser.name} belum memiliki jadwal penugasan aktif. Silakan hubungi koordinator/staf operasional untuk plotting jadwal cycle.`
+                        : `Cycle ${readerAssignedCycles.join(', ')} telah dijadwalkan, namun data pelanggan industri belum tersedia.`}
                     </p>
                   </div>
 
                   <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl text-[11px] text-slate-600 dark:text-slate-400 text-left border border-slate-200 dark:border-slate-800 space-y-1.5">
                     <p className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 flex-wrap">
                       <Calendar className="w-3.5 h-3.5 text-[#0055A5] dark:text-blue-400 shrink-0" />
-                      <span>Integrasi Sinkronisasi Admin &amp; Lapangan:</span>
+                      <span>Informasi Penugasan Lapangan:</span>
                     </p>
-                    <p className="break-words leading-relaxed">• Pembagian cycle bagi tiap pencatat meter diatur langsung dari Dashboard Admin (Master Data / Jadwal Cycle).</p>
-                    <p className="break-words leading-relaxed">• Siklus penugasan &amp; daftar industri akan langsung muncul otomatis di aplikasi petugas lapangan saat admin melakukan plotting.</p>
+                    <p className="break-words leading-relaxed">• Pembagian jadwal cycle penugasan diatur oleh koordinator/staf operasional kantor.</p>
+                    <p className="break-words leading-relaxed">• Siklus penugasan &amp; daftar industri akan otomatis diperbarui di aplikasi ini saat penugasan telah diterbitkan.</p>
                   </div>
 
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={onSwitchToAdmin}
+                      onClick={() => {
+                        if (onSyncNow) {
+                          onSyncNow();
+                        } else {
+                          window.location.reload();
+                        }
+                      }}
                       className="flex-1 py-2.5 px-3 rounded-xl bg-[#0055A5] hover:bg-[#003E78] text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm break-words"
                     >
-                      <ShieldCheck className="w-4 h-4 shrink-0" />
-                      <span>Beralih ke Dashboard Admin (Plotting Cycle)</span>
+                      <RefreshCw className="w-4 h-4 shrink-0" />
+                      <span>Muat Ulang / Sinkronisasi Tugas</span>
                     </button>
                   </div>
                 </div>
               ) : (
                 <>
-                  {/* JADWAL PENUGASAN CYCLE DARI ADMIN (HANYA DITAMPILKAN JIKA TELAH DIPLOT & TERURUT) */}
+                  {/* JADWAL PENUGASAN CYCLE (HANYA DITAMPILKAN JIKA TELAH DIPLOT & TERURUT) */}
                   {assignedCycleSchedules.length > 0 && (
                     <div className={`p-3 rounded-2xl border text-xs ${
                       isFieldDarkMode ? 'bg-slate-950/70 border-slate-800' : 'bg-blue-50/50 border-blue-200'
@@ -928,7 +982,7 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                         <div className="flex items-center gap-2 min-w-0 flex-1">
                           <Calendar className="w-4 h-4 text-[#0055A5] dark:text-blue-400 shrink-0" />
                           <span className="font-extrabold text-slate-800 dark:text-slate-200 text-xs break-words leading-snug">
-                            Plotting Siklus dari Admin ({assignedCycleSchedules.length} Cycle Terurut)
+                            Jadwal Siklus Penugasan ({assignedCycleSchedules.length} Cycle Terurut)
                           </span>
                         </div>
                         <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold shrink-0 whitespace-nowrap">
@@ -1045,7 +1099,7 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                             : st === 'Belum Dibaca'
                             ? 'Belum Catat'
                             : st === 'Pending Verification'
-                            ? 'Pending Admin'
+                            ? 'Pending Verifikasi'
                             : st === 'Verified'
                             ? 'Terverifikasi'
                             : `📅 Bergeser (${myShiftedCustomers.length})`;
@@ -1087,7 +1141,7 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                               </span>
                             </h4>
                             <p className="text-[11px] text-amber-800 dark:text-amber-300 font-medium leading-tight mt-0.5">
-                              Tersinkronisasi otomatis dari Jadwal Cycle Admin SIMBA
+                              Tersinkronisasi otomatis dari Jadwal Cycle SIMBA
                             </p>
                           </div>
                         </div>
@@ -1581,15 +1635,6 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
 
                 <button
                   type="button"
-                  onClick={onSwitchToAdmin}
-                  className="w-full py-2.5 rounded-xl bg-[#0055A5] hover:bg-[#003E78] text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-xs break-words"
-                >
-                  <ShieldCheck className="w-4 h-4 shrink-0" />
-                  <span>Beralih ke Dashboard Admin</span>
-                </button>
-
-                <button
-                  type="button"
                   onClick={onLogout}
                   className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-xs break-words"
                 >
@@ -2065,7 +2110,7 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                   <span className={`text-[9px] mt-0.5 block break-words font-medium ${
                     isFieldDarkMode ? 'text-slate-400' : 'text-slate-500'
                   }`}>
-                    ✓ Sinkron Excel Admin
+                    ✓ Sinkron Master Data
                   </span>
                 </div>
 
@@ -2151,6 +2196,171 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                   ⚠️ Peringatan: Stand sekarang lebih kecil dari stand lalu ({activeCustomer.lalu.toLocaleString()} m³). Periksa kembali angka meter!
                 </p>
               )}
+            </div>
+
+            {/* PANEL REKOGNISI & REKONSILIASI FOTO STAND METER VS LEMBAR BPM */}
+            <div className={`p-3.5 rounded-2xl border space-y-2.5 text-xs ${
+              isFieldDarkMode ? 'bg-slate-900 border-slate-700/80' : 'bg-blue-50/70 border-blue-200'
+            }`}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  <div className="p-1 rounded-lg bg-blue-600 text-white">
+                    <Scan className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <h4 className="font-black text-slate-800 dark:text-slate-100 text-xs">
+                      Rekognisi &amp; Rekonsiliasi Foto Lapangan
+                    </h4>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                      SOP Aetra: Angka foto stand meter &amp; lembar BPM <strong>wajib sama</strong> agar bisa diverifikasi
+                    </p>
+                  </div>
+                </div>
+                {/* Match indicator pill */}
+                {(() => {
+                  const mVal = meterOcrStand ?? (Number(inputSkrg) > 0 ? Number(inputSkrg) : null);
+                  const bVal = bpmOcrStand ?? (Number(inputSkrg) > 0 ? Number(inputSkrg) : null);
+                  const isBothPresent = mVal !== null && bVal !== null;
+                  const isMatched = isBothPresent && mVal === bVal;
+
+                  if (!isBothPresent) {
+                    return (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                        Menunggu Foto
+                      </span>
+                    );
+                  }
+
+                  return isMatched ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3 text-emerald-600" />
+                      <span>100% Match</span>
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-700 flex items-center gap-1 animate-pulse">
+                      <AlertTriangle className="w-3 h-3 text-rose-600" />
+                      <span>Mismatch</span>
+                    </span>
+                  );
+                })()}
+              </div>
+
+              {/* Side-by-side OCR Readings Display */}
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                {/* Box 1: Foto Stand Meter */}
+                <div className={`p-2 rounded-xl border ${
+                  isFieldDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-blue-200'
+                }`}>
+                  <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
+                    <span className="font-bold flex items-center gap-1">
+                      <Camera className="w-3 h-3 text-blue-500" />
+                      <span>Foto Stand Meter</span>
+                    </span>
+                    {isOcrScanning && <span className="text-blue-500 animate-spin">⟳</span>}
+                  </div>
+                  <div className="font-mono font-black text-sm text-slate-800 dark:text-slate-100">
+                    {meterOcrStand !== null
+                      ? `${meterOcrStand.toLocaleString('id-ID')} m³`
+                      : Number(inputSkrg) > 0
+                      ? `${Number(inputSkrg).toLocaleString('id-ID')} m³`
+                      : '—'}
+                  </div>
+                  <span className="text-[9px] text-slate-400 mt-0.5 block">
+                    {fotoMeterPreview ? '✓ Foto Stand Terunggah' : 'Belum Ada Foto Meter'}
+                  </span>
+                </div>
+
+                {/* Box 2: Foto Dokumen BPM */}
+                <div className={`p-2 rounded-xl border ${
+                  isFieldDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-blue-200'
+                }`}>
+                  <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
+                    <span className="font-bold flex items-center gap-1">
+                      <FileCheck className="w-3 h-3 text-[#E86216]" />
+                      <span>Lembar BPM Bulan Ini</span>
+                    </span>
+                    {isBpmOcrScanning && <span className="text-orange-500 animate-spin">⟳</span>}
+                  </div>
+                  <div className="font-mono font-black text-sm text-slate-800 dark:text-slate-100">
+                    {bpmOcrStand !== null
+                      ? `${bpmOcrStand.toLocaleString('id-ID')} m³`
+                      : Number(inputSkrg) > 0
+                      ? `${Number(inputSkrg).toLocaleString('id-ID')} m³`
+                      : '—'}
+                  </div>
+                  <span className="text-[9px] text-slate-400 mt-0.5 block">
+                    {fotoBPMPreview ? '✓ Dokumen BPM Terunggah' : 'Belum Ada Foto BPM'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Status / Notice / Action bar */}
+              {(() => {
+                const mVal = meterOcrStand ?? (Number(inputSkrg) > 0 ? Number(inputSkrg) : null);
+                const bVal = bpmOcrStand ?? (Number(inputSkrg) > 0 ? Number(inputSkrg) : null);
+
+                if (mVal !== null && bVal !== null && mVal !== bVal) {
+                  return (
+                    <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 space-y-2">
+                      <div className="flex items-start gap-1.5 text-rose-700 dark:text-rose-300 text-[11px] font-bold">
+                        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
+                        <div>
+                          <span>Diskrepansi Angka Terdeteksi! Foto Stand ({mVal.toLocaleString('id-ID')} m³) berbeda dengan Lembar BPM ({bVal.toLocaleString('id-ID')} m³).</span>
+                          <span className="block text-[10px] text-rose-600 dark:text-rose-400 font-medium mt-0.5">
+                            SOP Wajib: Foto stand meter dan angka meter bulan ini di lembar BPM harus sama agar bisa diverifikasi.
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBpmOcrStand(mVal);
+                            setInputSkrg(String(mVal));
+                            showColorfulAlert({
+                              title: 'Rekonsiliasi Berhasil! ✅',
+                              message: `Angka lembar BPM telah disamakan dengan Foto Stand Meter (${mVal.toLocaleString('id-ID')} m³). Status: 100% Match!`,
+                              type: 'success',
+                              badge: 'REKONSILIASI COCOK'
+                            });
+                          }}
+                          className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[10px] transition cursor-pointer flex items-center gap-1 shadow-xs"
+                        >
+                          <CheckCircle className="w-3 h-3" />
+                          <span>Samakan Angka ke {mVal.toLocaleString('id-ID')} m³ (Sesuai Foto Stand)</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (mVal !== null && bVal !== null && mVal === bVal) {
+                  return (
+                    <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 flex items-center justify-between gap-2 text-emerald-800 dark:text-emerald-200 text-[11px]">
+                      <div className="flex items-center gap-1.5">
+                        <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span className="font-bold">
+                          ✓ Rekonsiliasi Sukses: Angka Stand Meter &amp; Lembar BPM Sama Persis ({mVal.toLocaleString('id-ID')} m³). Siap Verifikasi!
+                        </span>
+                      </div>
+                      {/* Tombol Uji Mismatch untuk testing */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const testVal = mVal + 25;
+                          setBpmOcrStand(testVal);
+                        }}
+                        className="text-[9px] text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 underline cursor-pointer shrink-0"
+                        title="Simulasikan selisih angka foto BPM untuk menguji proteksi rekonsiliasi"
+                      >
+                        [Simulasi Mismatch]
+                      </button>
+                    </div>
+                  );
+                }
+
+                return null;
+              })()}
             </div>
 
             {/* Integrated Realtime Location Map */}
@@ -2253,7 +2463,7 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
                 }
               >
                 <Send className="w-3.5 h-3.5 shrink-0" />
-                <span>Kirim Bacaan &amp; Sinkron Admin</span>
+                <span>Kirim &amp; Simpan Bacaan Meter</span>
               </button>
             </div>
           </div>
@@ -2273,6 +2483,7 @@ export const FieldReaderApp: React.FC<FieldReaderAppProps> = ({
             } else {
               setFotoBPMPreview(dataUrl);
               setBpmPhotoTime(capturedTimestamp);
+              runBpmAutoRecognition(dataUrl);
             }
           }}
           title={

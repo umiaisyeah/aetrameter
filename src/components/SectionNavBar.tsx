@@ -1,6 +1,7 @@
 import React from 'react';
 import { Database, Calendar, CheckCircle2, Receipt, History, TrendingUp, Sparkles } from 'lucide-react';
 import { IndustryCustomer, UserProfile } from '../types';
+import { formatProgressPercent } from './SectionProgressHub';
 
 interface SectionNavBarProps {
   activeTab: string;
@@ -24,9 +25,14 @@ export const SectionNavBar: React.FC<SectionNavBarProps> = ({
   const verifiedCount = customers.filter((c) => c.status === 'Verified').length;
   const invoicedCount = customers.filter((c) => c.status === 'Invoiced').length;
 
+  // Sesuai aturan: Pelanggan yang pindah ke Billing & Invoicing adalah yang SUDAH terinput CCnB (atau Invoiced)
+  const readyForBillingCount = customers.filter((c) => (c.status === 'Verified' && Boolean(c.isInputCCnB)) || c.status === 'Invoiced').length;
+  const pendingCcnbCount = customers.filter((c) => c.status === 'Verified' && !c.isInputCCnB).length;
+
   const totalVerifiedAndInvoiced = verifiedCount + invoicedCount;
-  const verificationRate = totalCustomers > 0 ? Math.round((totalVerifiedAndInvoiced / totalCustomers) * 100) : 0;
-  const billingRate = totalVerifiedAndInvoiced > 0 ? Math.round((invoicedCount / totalVerifiedAndInvoiced) * 100) : 0;
+  const verificationStat = formatProgressPercent(totalVerifiedAndInvoiced, totalCustomers);
+  const billingTarget = totalVerifiedAndInvoiced;
+  const billingStat = formatProgressPercent(invoicedCount, billingTarget > 0 ? billingTarget : totalCustomers);
 
   const sections = [
     {
@@ -53,8 +59,8 @@ export const SectionNavBar: React.FC<SectionNavBarProps> = ({
       icon: CheckCircle2,
       targetTab: 'monitoring',
       statusFilter: 'Pending Verification',
-      badge: pendingCount,
-      badgeColor: pendingCount > 0 ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200 animate-pulse' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+      badge: pendingCount + pendingCcnbCount,
+      badgeColor: (pendingCount + pendingCcnbCount) > 0 ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200 animate-pulse' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
     },
     {
       id: 'verified',
@@ -63,8 +69,8 @@ export const SectionNavBar: React.FC<SectionNavBarProps> = ({
       icon: Receipt,
       targetTab: 'monitoring',
       statusFilter: 'Verified',
-      badge: verifiedCount,
-      badgeColor: 'bg-purple-100 text-purple-800 dark:bg-purple-900/60 dark:text-purple-200'
+      badge: readyForBillingCount,
+      badgeColor: readyForBillingCount > 0 ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/60 dark:text-purple-200' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
     },
     {
       id: 'audit',
@@ -150,11 +156,11 @@ export const SectionNavBar: React.FC<SectionNavBarProps> = ({
               <div className="w-20 sm:w-28 h-2.5 bg-emerald-200/80 dark:bg-emerald-900 rounded-full overflow-hidden p-0.5 border border-emerald-300/40">
                 <div
                   className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-500"
-                  style={{ width: `${verificationRate}%` }}
+                  style={{ width: `${verificationStat.barWidth}%` }}
                 />
               </div>
               <span className="font-mono font-black text-xs text-emerald-700 dark:text-emerald-300">
-                {verificationRate}%
+                {verificationStat.pctStr}
               </span>
             </div>
           )}
@@ -172,11 +178,11 @@ export const SectionNavBar: React.FC<SectionNavBarProps> = ({
               <div className="w-20 sm:w-28 h-2.5 bg-purple-200/80 dark:bg-purple-900 rounded-full overflow-hidden p-0.5 border border-purple-300/40">
                 <div
                   className="h-full bg-gradient-to-r from-[#E86216] via-purple-500 to-indigo-400 rounded-full transition-all duration-500"
-                  style={{ width: `${billingRate}%` }}
+                  style={{ width: `${billingStat.barWidth}%` }}
                 />
               </div>
               <span className="font-mono font-black text-xs text-purple-700 dark:text-purple-300">
-                {billingRate}%
+                {billingStat.pctStr}
               </span>
             </div>
           )}
