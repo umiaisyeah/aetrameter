@@ -241,7 +241,7 @@ export const AetraOfficialPdfInvoice: React.FC<AetraOfficialPdfInvoiceProps> = (
 
                   {/* Logo Aetra Tangerang */}
                   <div className="shrink-0 flex items-center justify-center pr-1">
-                    <AetraOfficialLogo height={44} />
+                    <AetraOfficialLogo height={46} />
                   </div>
                 </div>
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import kabTangerangLogoImg from '../assets/images/kab_tangerang_logo_1791436260288.jpg';
+import aetraOfficialLogoImg from '../assets/images/aetra_official_logo_1791525727261.jpg';
 
 /**
  * Official Lambang Pemerintah Kabupaten Tangerang
@@ -173,91 +174,109 @@ export const KabupatenTangerangLogo: React.FC<{
 
 /**
  * Official PT Aetra Air Tangerang Corporate Brand Logo
- * "aetra" wordmark + "tangerang" subtitle + iconic swirling droplet sun-water vortex petals
+ * Rendered using authentic brand logo asset matching the official invoice, with SVG fallback
  */
 export const AetraOfficialLogo: React.FC<{ className?: string; height?: number }> = ({
   className = 'h-11 w-auto',
   height = 44
-}) => (
-  <svg
-    height={height}
-    viewBox="0 0 178 48"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    className={`shrink-0 select-none ${className}`}
-  >
-    {/* Wordmark "aetra" & "tangerang" */}
-    <text
-      x="2"
-      y="27"
-      fontFamily="'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, Arial, sans-serif"
-      fontSize="30"
-      fontWeight="800"
-      fill="#0055A5"
-      letterSpacing="-0.8"
-    >
-      aetra
-    </text>
-    <text
-      x="3.5"
-      y="39.5"
-      fontFamily="'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, Arial, sans-serif"
-      fontSize="9.8"
-      fontWeight="700"
-      fill="#0055A5"
-      letterSpacing="3.5"
-    >
-      tangerang
-    </text>
+}) => {
+  const [imgError, setImgError] = React.useState(false);
 
-    {/* Authentic Swirling Sun & Water Droplet Vortex (8 radiating curved petals) */}
-    <g transform="translate(112, 1)">
-      {/* Center core pip */}
-      <circle cx="23" cy="23" r="4.8" fill="#E86216" />
+  return (
+    <div className={`shrink-0 flex items-center justify-center select-none ${className}`}>
+      {!imgError ? (
+        <img
+          src={aetraOfficialLogoImg}
+          alt="Official PT Aetra Air Tangerang Logo"
+          className="object-contain filter drop-shadow-sm"
+          style={{ height: `${height}px`, width: 'auto', maxHeight: '100%' }}
+          referrerPolicy="no-referrer"
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        /* Fallback SVG */
+        <svg
+          height={height}
+          viewBox="0 0 178 48"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          className="shrink-0 select-none"
+        >
+          {/* Wordmark "aetra" & "air tangerang" */}
+          <text
+            x="2"
+            y="27"
+            fontFamily="'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, Arial, sans-serif"
+            fontSize="30"
+            fontWeight="800"
+            fill="#0055A5"
+            letterSpacing="-0.8"
+          >
+            aetra
+          </text>
+          <text
+            x="3.5"
+            y="39.5"
+            fontFamily="'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, Arial, sans-serif"
+            fontSize="9.8"
+            fontWeight="700"
+            fill="#0055A5"
+            letterSpacing="3.5"
+          >
+            air tangerang
+          </text>
 
-      {/* Petal 1: Top (Cyan #00A3E0) */}
-      <path
-        d="M23 7 C23 2.5 27.5 1 31.5 4 C35 6.8 33 12 28.5 13.5 C25 14.5 23 11 23 7 Z"
-        fill="#00A3E0"
-      />
-      {/* Petal 2: Top-Right (Sky Blue #0077C8) */}
-      <path
-        d="M33 11 C37 8 41.5 10 42 14.5 C42.5 18.5 38 21 34 19 C31 17.5 30 14 33 11 Z"
-        fill="#0077C8"
-      />
-      {/* Petal 3: Right (Royal Blue #0055A5) */}
-      <path
-        d="M37 22 C41.5 22 43.5 26.5 40.5 30 C37.5 33 32 31 31 26.5 C30.5 23 33.5 22 37 22 Z"
-        fill="#0055A5"
-      />
-      {/* Petal 4: Bottom-Right (Deep Navy #003882) */}
-      <path
-        d="M34 32 C37 36 35 40.5 30.5 41.5 C26.5 42.5 23.5 38 26 34.5 C27.5 31.5 31.5 30 34 32 Z"
-        fill="#FFA000"
-      />
-      {/* Petal 5: Bottom (Tangerine Orange #E86216) */}
-      <path
-        d="M23 39 C23 43.5 18.5 45 14.5 42 C11 39.2 13 34 17.5 32.5 C21 31.5 23 35 23 39 Z"
-        fill="#E86216"
-      />
-      {/* Petal 6: Bottom-Left (Amber #FF9E1B) */}
-      <path
-        d="M13 35 C9 38 4.5 36 4 31.5 C3.5 27.5 8 25 12 27 C15 28.5 16 32 13 35 Z"
-        fill="#F37021"
-      />
-      {/* Petal 7: Left (Golden Yellow #FFC107) */}
-      <path
-        d="M9 24 C4.5 24 2.5 19.5 5.5 16 C8.5 13 14 15 15 19.5 C15.5 23 12.5 24 9 24 Z"
-        fill="#FFC107"
-      />
-      {/* Petal 8: Top-Left (Vibrant Teal/Cyan #00A3E0) */}
-      <path
-        d="M12 14 C9 10 11 5.5 15.5 4.5 C19.5 3.5 22.5 8 20 11.5 C18.5 14.5 14.5 16 12 14 Z"
-        fill="#00A3E0"
-      />
-    </g>
-  </svg>
-);
+          {/* Authentic Swirling Sun & Water Droplet Vortex (8 radiating curved petals) */}
+          <g transform="translate(112, 1)">
+            {/* Center core pip */}
+            <circle cx="23" cy="23" r="4.8" fill="#E86216" />
+
+            {/* Petal 1: Top (Cyan #00A3E0) */}
+            <path
+              d="M23 7 C23 2.5 27.5 1 31.5 4 C35 6.8 33 12 28.5 13.5 C25 14.5 23 11 23 7 Z"
+              fill="#00A3E0"
+            />
+            {/* Petal 2: Top-Right (Sky Blue #0077C8) */}
+            <path
+              d="M33 11 C37 8 41.5 10 42 14.5 C42.5 18.5 38 21 34 19 C31 17.5 30 14 33 11 Z"
+              fill="#0077C8"
+            />
+            {/* Petal 3: Right (Royal Blue #0055A5) */}
+            <path
+              d="M37 22 C41.5 22 43.5 26.5 40.5 30 C37.5 33 32 31 31 26.5 C30.5 23 33.5 22 37 22 Z"
+              fill="#0055A5"
+            />
+            {/* Petal 4: Bottom-Right (Deep Navy #003882) */}
+            <path
+              d="M34 32 C37 36 35 40.5 30.5 41.5 C26.5 42.5 23.5 38 26 34.5 C27.5 31.5 31.5 30 34 32 Z"
+              fill="#FFA000"
+            />
+            {/* Petal 5: Bottom (Tangerine Orange #E86216) */}
+            <path
+              d="M23 39 C23 43.5 18.5 45 14.5 42 C11 39.2 13 34 17.5 32.5 C21 31.5 23 35 23 39 Z"
+              fill="#E86216"
+            />
+            {/* Petal 6: Bottom-Left (Amber #FF9E1B) */}
+            <path
+              d="M13 35 C9 38 4.5 36 4 31.5 C3.5 27.5 8 25 12 27 C15 28.5 16 32 13 35 Z"
+              fill="#F37021"
+            />
+            {/* Petal 7: Left (Golden Yellow #FFC107) */}
+            <path
+              d="M9 24 C4.5 24 2.5 19.5 5.5 16 C8.5 13 14 15 15 19.5 C15.5 23 12.5 24 9 24 Z"
+              fill="#FFC107"
+            />
+            {/* Petal 8: Top-Left (Vibrant Teal/Cyan #00A3E0) */}
+            <path
+              d="M12 14 C9 10 11 5.5 15.5 4.5 C19.5 3.5 22.5 8 20 11.5 C18.5 14.5 14.5 16 12 14 Z"
+              fill="#00A3E0"
+            />
+          </g>
+        </svg>
+      )}
+    </div>
+  );
+};
 
 /**
  * TÜV NORD ISO 9001:2015 Certification Badge
