@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { IndustryCustomer, CustomerClass, MeterReader, CycleSchedule, UserProfile } from '../types';
 import {
@@ -25,6 +25,7 @@ import { ImportCycleScheduleModal } from './ImportCycleScheduleModal';
 import { WorkflowStatusBadge } from './WorkflowStatusBadge';
 import { showColorfulAlert, showToast } from '../utils/notificationSystem';
 import { getReaderCategory } from '../utils/readerAssignmentHelper';
+import { MONTH_NAMES_ID, normalizeMonthName, generateCycleSchedulesForMonth } from '../utils/excelDateHelper';
 
 interface DatabaseViewProps {
   customers: IndustryCustomer[];
@@ -40,6 +41,8 @@ interface DatabaseViewProps {
   onImportCycleSchedules: (schedules: CycleSchedule[]) => void;
   onUpdateCycleSchedule: (schedule: CycleSchedule) => void;
   currentUser?: UserProfile;
+  selectedBulan?: string;
+  onBulanChange?: (bulan: string) => void;
 }
 
 export const DatabaseView: React.FC<DatabaseViewProps> = ({
@@ -55,11 +58,25 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   onDeleteMeterReader,
   onImportCycleSchedules,
   onUpdateCycleSchedule,
-  currentUser
+  currentUser,
+  selectedBulan,
+  onBulanChange
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeSubTab, setActiveSubTab] = useState<'customers' | 'readers' | 'schedules'>('customers');
   const [isImportScheduleModalOpen, setIsImportScheduleModalOpen] = useState<boolean>(false);
+
+  // Month state for upload & cycle synchronization (defaults to running month / selectedBulan)
+  const [uploadMonth, setUploadMonth] = useState<string>(() => {
+    if (selectedBulan && selectedBulan !== 'ALL') return selectedBulan;
+    return `${MONTH_NAMES_ID[new Date().getMonth()]} 2026`;
+  });
+
+  useEffect(() => {
+    if (selectedBulan && selectedBulan !== 'ALL') {
+      setUploadMonth(selectedBulan);
+    }
+  }, [selectedBulan]);
 
   // Check RBAC: Only Tim Meter Reading and Admin Key Account can import database & cycle schedules
   const canImportDatabase =
@@ -147,6 +164,16 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
           return;
         }
 
+        let detectedMonthFromExcel = '';
+        for (const sName of workbook.SheetNames) {
+          const norm = normalizeMonthName(sName);
+          if (norm) {
+            detectedMonthFromExcel = norm;
+            break;
+          }
+        }
+        const effectiveMonth = detectedMonthFromExcel || uploadMonth || 'Oktober 2026';
+
         const imported: IndustryCustomer[] = rows.map((item, index) => {
           // 1. ID Pelanggan
           const idPel =
@@ -228,7 +255,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
             lalu: laluVal,
             skrg: 0,
             status: 'Belum Dibaca' as const,
-            bulan: 'September 2026',
+            bulan: effectiveMonth,
             catatan: '',
             history: [Math.max(0, laluVal - 600), Math.max(0, laluVal - 300), laluVal],
             fotoMeter: '',
@@ -237,18 +264,25 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
         });
 
         onImportCustomers(imported);
+
+        // SINKRONISASI OTOMATIS TANGGAL JADWAL CYCLE DENGAN BULAN UNGGAH DATA (DIMULAI TANGGAL 6)
+        const syncedCycleSchedules = generateCycleSchedulesForMonth(effectiveMonth, imported, meterReaders);
+        onImportCycleSchedules(syncedCycleSchedules);
+        onBulanChange?.(effectiveMonth);
+        setUploadMonth(effectiveMonth);
+
         showColorfulAlert({
           title: 'Import Data Industri Berhasil! 🎉',
-          subtitle: 'Sinkronisasi Database Industri & Penugasan Petugas Lapangan',
-          message: `Berhasil mengimpor ${imported.length} data industri gabungan (ID Pelanggan, Nama Perusahaan Industri, Cycle, Kelas, Pembaca Meter) ke dalam sistem SIMBA. Status alur kerja diatur ke Belum Dibaca (siap dicatat petugas lapangan).`,
+          subtitle: `Sinkronisasi Database Industri & Siklus ${effectiveMonth}`,
+          message: `Berhasil mengimpor ${imported.length} data industri untuk periode ${effectiveMonth}. Tanggal jadwal 15 cycle telah otomatis disinkronkan ke bulan ${effectiveMonth} dimulai dari tanggal 6.`,
           type: 'success',
-          badge: 'EXCEL IMPORT SUKSES',
+          badge: 'SINKRONISASI SUKSES',
           count: imported.length,
-          tags: ['ID Pelanggan', 'Nama Perusahaan', 'Cycle 1 - 15', 'Kelas Pelanggan', 'Petugas Baca'],
+          tags: ['ID Pelanggan', 'Nama Perusahaan', 'Cycle 1 - 15', `Bulan: ${effectiveMonth}`, 'Mulai Tgl 6'],
           details: [
-            `${imported.length} data industri berhasil diintegrasikan ke basis data`,
-            'Otomatis terhubung ke jadwal pergeseran cycle dan pembaca meter lapangan',
-            'Semua data siap diverifikasi dalam siklus pembacaan berjalan'
+            `${imported.length} data industri berhasil diintegrasikan pada bulan ${effectiveMonth}`,
+            `Jadwal cycle 1-15 otomatis disinkronkan ke kalender ${effectiveMonth} (mulai tgl 6)`,
+            'Semua data siap dicatat oleh petugas lapangan'
           ],
           confirmText: 'Lihat Daftar Industri',
           autoCloseMs: 8000
@@ -300,7 +334,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
       lalu: standLaluNum,
       skrg: 0,
       status: 'Belum Dibaca',
-      bulan: 'September 2026',
+      bulan: uploadMonth,
       catatan: '',
       history: [Math.max(0, standLaluNum - 500), Math.max(0, standLaluNum - 200), standLaluNum],
       fotoMeter: '',
@@ -308,13 +342,19 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
     };
 
     onAddCustomer(newCustomer);
+
+    // Otomatis sinkronkan jadwal cycle ke bulan upload jika belum tersinkron
+    const syncedSchedules = generateCycleSchedulesForMonth(uploadMonth, [newCustomer, ...customers], meterReaders);
+    onImportCycleSchedules(syncedSchedules);
+    onBulanChange?.(uploadMonth);
+
     setNewId('');
     setNewName('');
     setNewEmail('');
     setNewStandLalu('10000');
     showColorfulAlert({
       title: 'Industri Berhasil Didaftarkan! ✨',
-      message: `Akun industri ${newCustomer.nama} (${newCustomer.id}) telah berhasil disimpan ke database ${newCustomer.cycle} dengan status Belum Dibaca.`,
+      message: `Akun industri ${newCustomer.nama} (${newCustomer.id}) telah berhasil disimpan ke database ${newCustomer.cycle} untuk periode ${uploadMonth} dengan status Belum Dibaca.`,
       type: 'success',
       badge: 'REGISTRASI BERHASIL'
     });
@@ -523,6 +563,58 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
       {/* Sub-tab 1: Customers Database */}
       {activeSubTab === 'customers' && (
         <div className="space-y-6">
+          {/* SINKRONISASI BULAN UNGGAH DATA & INPUT CYCLE */}
+          <div className="bg-gradient-to-r from-[#002244] via-[#00478f] to-indigo-900 text-white p-4 rounded-2xl border border-cyan-400/30 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-white/10 text-cyan-300 border border-white/20 shrink-0">
+                <Calendar className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-extrabold text-sm text-white">
+                    Bulan Unggah Data &amp; Sinkronisasi Siklus Cycle
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-400/25 text-emerald-200 border border-emerald-400/30">
+                    SINKRON OTOMATIS
+                  </span>
+                </div>
+                <p className="text-xs text-cyan-100/80 mt-0.5">
+                  Data industri yang diunggah dan seluruh tanggal cycle 1-15 otomatis mengikuti bulan ini (plotting dimulai tanggal 6).
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5 self-end sm:self-auto shrink-0 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/20">
+              <span className="text-xs font-bold text-cyan-100">Periode Bulan:</span>
+              <select
+                value={uploadMonth}
+                onChange={(e) => {
+                  const newM = e.target.value;
+                  setUploadMonth(newM);
+                  onBulanChange?.(newM);
+                  const synced = generateCycleSchedulesForMonth(newM, customers, meterReaders);
+                  onImportCycleSchedules(synced);
+                  showToast({
+                    title: `🗓️ Jadwal Cycle Disinkronkan ke ${newM}`,
+                    message: `Plotting 15 cycle otomatis dimulai tanggal 6 ${newM}.`,
+                    type: 'success'
+                  });
+                }}
+                className="bg-white text-slate-900 font-extrabold text-xs px-3 py-1.5 rounded-lg border border-white shadow-xs focus:ring-2 focus:ring-[#0055A5] cursor-pointer"
+              >
+                {MONTH_NAMES_ID.map((m) => {
+                  const fullM = `${m} 2026`;
+                  const isCurrent = m === MONTH_NAMES_ID[new Date().getMonth()];
+                  return (
+                    <option key={m} value={fullM}>
+                      {fullM} {isCurrent ? '⭐ (Bulan Berjalan)' : ''}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          </div>
+
           {/* Top Banner / Form Card */}
           <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-slate-100 dark:border-slate-700 pb-4">
@@ -910,6 +1002,11 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
           cycleSchedules={cycleSchedules}
           customers={customers}
           meterReaders={meterReaders}
+          currentUploadMonth={uploadMonth}
+          onMonthChange={(m) => {
+            setUploadMonth(m);
+            onBulanChange?.(m);
+          }}
           onOpenImportModal={() => {
             if (!canImportDatabase) {
               showColorfulAlert({

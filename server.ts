@@ -246,13 +246,58 @@ async function startServer() {
     });
   });
 
+  // Fast health check endpoints for container and reverse proxy probes
+  app.get(['/health', '/api/health'], (req, res) => {
+    res.status(200).json({ status: 'ok', time: new Date().toISOString() });
+  });
+
   const isProduction = process.env.NODE_ENV === 'production';
+  let viteInstance: any = null;
+
   if (!isProduction) {
-    const vite = await createViteServer({
+    const vitePromise = createViteServer({
       server: { middlewareMode: true },
       appType: 'spa'
+    }).then((vite) => {
+      viteInstance = vite;
+      console.log('Vite dev server middleware loaded');
+      return vite;
+    }).catch((err) => {
+      console.error('Failed to initialize Vite server:', err);
     });
-    app.use(vite.middlewares);
+
+    app.use(async (req, res, next) => {
+      if (req.path.startsWith('/api') || req.path === '/health') {
+        return next();
+      }
+      if (!viteInstance) {
+        await vitePromise;
+      }
+      if (viteInstance) {
+        return viteInstance.middlewares(req, res, next);
+      }
+      next();
+    });
+
+    // SPA fallback: render transformed index.html for navigation requests
+    app.use('*', async (req, res, next) => {
+      if (req.originalUrl.startsWith('/api') || req.originalUrl === '/health') {
+        return next();
+      }
+      try {
+        if (!viteInstance) {
+          await vitePromise;
+        }
+        if (viteInstance) {
+          let template = fs.readFileSync(path.resolve(__dirname, 'index.html'), 'utf-8');
+          template = await viteInstance.transformIndexHtml(req.originalUrl, template);
+          return res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+        }
+        res.sendFile(path.resolve(__dirname, 'index.html'));
+      } catch (e) {
+        next(e);
+      }
+    });
   } else {
     app.use(express.static(path.resolve(__dirname, 'dist')));
     app.get('*', (req, res) => {
@@ -260,9 +305,37 @@ async function startServer() {
     });
   }
 
-  const port = Number(process.env.PORT || 3000);
-  app.listen(port, '0.0.0.0', () => {
-    console.log(`Aetra Simba-In Server running on http://0.0.0.0:${port}`);
+  // Parse command line arguments for port and host
+  const args = process.argv.slice(2);
+  let port = Number(process.env.PORT || 3000);
+  const portIdx = args.indexOf('--port');
+  if (portIdx !== -1 && args[portIdx + 1]) {
+    const parsed = parseInt(args[portIdx + 1], 10);
+    if (!isNaN(parsed)) port = parsed;
+  }
+
+  let host = '0.0.0.0';
+  const hostIdx = args.indexOf('--host');
+  if (hostIdx !== -1 && args[hostIdx + 1]) {
+    host = args[hostIdx + 1];
+  }
+
+  const server = app.listen(port, host, () => {
+    console.log(`Aetra Simba-In Server running on http://${host}:${port}`);
+  });
+
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM received, closing HTTP server');
+    server.close(() => {
+      process.exit(0);
+    });
+  });
+
+  process.on('SIGINT', () => {
+    console.log('SIGINT received, closing HTTP server');
+    server.close(() => {
+      process.exit(0);
+    });
   });
 }
 

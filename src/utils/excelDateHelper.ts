@@ -176,9 +176,9 @@ export function parseYearlyCycleExcel(workbook: XLSX.WorkBook): CycleSchedule[] 
         allParsed.push({
           cycle: cycleStr,
           bulan: String(bulan),
-          hariH: 7 + ((cycleNum - 1) % 15),
-          tanggalMulai: formatExcelDate(rawMulai) || `${String(cycleNum + 6).padStart(2, '0')} Sep 2026`,
-          tanggalSelesai: formatExcelDate(rawSelesai) || `${String(cycleNum + 7).padStart(2, '0')} Sep 2026`,
+          hariH: 6 + ((cycleNum - 1) % 15),
+          tanggalMulai: formatExcelDate(rawMulai) || `${String(cycleNum + 5).padStart(2, '0')} ${String(bulan).slice(0, 3)} 2026`,
+          tanggalSelesai: formatExcelDate(rawSelesai) || `${String(cycleNum + 6).padStart(2, '0')} ${String(bulan).slice(0, 3)} 2026`,
           petugasUtama: String(row['Petugas Pembaca Meter'] || row['Petugas Lapangan'] || petugasUtama),
           kategoriPetugas: (row['Kategori'] as ReaderCategory) || kategoriPetugas,
           catatan: String(row['Catatan'] || `Jadwal ${cycleStr}`)
@@ -190,7 +190,7 @@ export function parseYearlyCycleExcel(workbook: XLSX.WorkBook): CycleSchedule[] 
   return allParsed;
 }
 
-function normalizeMonthName(str: string): string {
+export function normalizeMonthName(str: string): string {
   if (!str) return '';
   const s = str.toLowerCase();
   if (s.includes('jan')) return 'Januari 2026';
@@ -206,6 +206,95 @@ function normalizeMonthName(str: string): string {
   if (s.includes('nov')) return 'November 2026';
   if (s.includes('des') || s.includes('dec')) return 'Desember 2026';
   return '';
+}
+
+/**
+ * Generate 15 official cycle schedules for a specific month starting strictly on tanggal 6!
+ */
+export function generateCycleSchedulesForMonth(
+  targetMonthStr: string,
+  existingCustomers: any[] = [],
+  existingReaders: any[] = []
+): CycleSchedule[] {
+  const normMonth = normalizeMonthName(targetMonthStr) || targetMonthStr || 'Oktober 2026';
+  let monthIdx = 9; // Default Oktober
+  for (let idx = 0; idx < MONTH_NAMES_ID.length; idx++) {
+    if (normMonth.toLowerCase().includes(MONTH_NAMES_ID[idx].toLowerCase())) {
+      monthIdx = idx;
+      break;
+    }
+  }
+
+  const year = 2026;
+  const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+  const shortMonth = MONTH_NAMES_ID[monthIdx].slice(0, 3);
+
+  // Get working days (Mon-Fri) starting from day 6
+  const workingDaysFrom6: number[] = [];
+  for (let d = 6; d <= daysInMonth; d++) {
+    const dt = new Date(year, monthIdx, d);
+    const dayOfWeek = dt.getDay();
+    if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+      workingDaysFrom6.push(d);
+    }
+  }
+
+  return Array.from({ length: 15 }, (_, i) => {
+    const cycleNum = i + 1;
+    const cycleName = `Cycle ${cycleNum}`;
+
+    let hariH: number;
+    if (workingDaysFrom6.length >= 15) {
+      hariH = workingDaysFrom6[i] || (6 + i);
+    } else {
+      // Fallback: sequential starting from day 6, skipping Sundays
+      let cur = 6;
+      for (let s = 0; s < i; s++) {
+        cur++;
+        const dCheck = new Date(year, monthIdx, cur);
+        if (dCheck.getDay() === 0) cur++;
+      }
+      hariH = Math.min(daysInMonth, cur);
+    }
+
+    const praBaca = Math.max(1, hariH - 1);
+    const verif = Math.min(daysInMonth, hariH + 1);
+    const billing = Math.min(daysInMonth, hariH + 2);
+
+    // Determine reader
+    let petugasUtama = 'Belum Ditugaskan';
+    let kategoriPetugas: ReaderCategory | undefined = undefined;
+
+    const custForCycle = existingCustomers.find(
+      (c) => c.cycle?.toLowerCase() === cycleName.toLowerCase() && c.petugasBaca
+    );
+    if (custForCycle && custForCycle.petugasBaca) {
+      petugasUtama = custForCycle.petugasBaca;
+      kategoriPetugas = custForCycle.kategoriPetugas;
+    } else {
+      const r = existingReaders.find((reader: any) =>
+        reader.assignedCycles?.some((ac: string) => ac.toLowerCase() === cycleName.toLowerCase())
+      );
+      if (r) {
+        petugasUtama = r.nama;
+        kategoriPetugas = r.kategori;
+      }
+    }
+
+    return {
+      cycle: cycleName,
+      bulan: normMonth,
+      hariH,
+      tglPraBaca: praBaca,
+      tglVerifikasi: verif,
+      tglBilling: billing,
+      tanggalMulai: `${String(hariH).padStart(2, '0')} ${shortMonth} ${year}`,
+      tanggalSelesai: `${String(verif).padStart(2, '0')} ${shortMonth} ${year}`,
+      petugasUtama,
+      kategoriPetugas,
+      catatan: `Jadwal Matriks ${normMonth} (Hari H: Tgl ${hariH})`
+    };
+  });
 }
 
 /**
@@ -249,17 +338,18 @@ export function downloadYearlyCycleScheduleTemplate() {
     }
     rows.push(daysRow);
 
-    // Default cycle start day offset
-    // For September 2026: Cycle 1 starts on day 7, skipping Sundays (6, 13, 20, 27)
-    let currentDay = 7;
+    // Default cycle start day offset: Starts on tanggal 6!
+    let currentDay = 6;
     for (let c = 1; c <= 15; c++) {
       const cycleRow = Array(32).fill('');
       cycleRow[0] = `Cycle ${c}`;
 
-      // Check if currentDay is Sunday, if so skip
-      const date = new Date(2026, monthIdx, currentDay);
-      if (date.getDay() === 0) {
-        currentDay++;
+      if (c > 1) {
+        // Skip Sunday for subsequent days
+        const date = new Date(2026, monthIdx, currentDay);
+        if (date.getDay() === 0) {
+          currentDay++;
+        }
       }
 
       if (currentDay <= daysInMonth) {

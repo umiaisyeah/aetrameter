@@ -17,6 +17,16 @@ import {
   X
 } from 'lucide-react';
 
+const OFFICIAL_READER_PASSWORDS: Record<string, string> = {
+  'febriadi': 'FEBRI123',
+  'harsindi': 'SINDI123',
+  'wahyu hidayat': 'WAHYU123',
+  'yugo apriadi': 'YUGO123',
+  'kevin gideon': 'KEVIN123',
+  'bambang pamungkas': 'BAMBANG123',
+  'anjarini sukamto': 'ANJAR123'
+};
+
 interface ModalLoginProps {
   isOpen: boolean;
   onLogin: (user: UserProfile) => void;
@@ -108,10 +118,13 @@ export const ModalLogin: React.FC<ModalLoginProps> = ({
         return;
       }
 
-      const expectedPassword = (selectedReader.password || 'ANJAR123').toUpperCase();
+      const normalizedReaderName = selectedReader.nama.toLowerCase().trim();
+      const officialExpected = OFFICIAL_READER_PASSWORDS[normalizedReaderName];
+      const expectedPassword = (officialExpected || selectedReader.password || 'ANJAR123').toUpperCase();
       const inputPass = passwordInput.trim().toUpperCase();
       const isPassValid =
         inputPass === expectedPassword ||
+        (officialExpected && inputPass === officialExpected.toUpperCase()) ||
         inputPass === '123456' ||
         inputPass === 'SIMBA' ||
         inputPass === 'SIMBA123' ||
@@ -324,6 +337,27 @@ export const ModalLogin: React.FC<ModalLoginProps> = ({
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+
+                {selectedReader && (
+                  <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                    <span>
+                      Password:{' '}
+                      <strong className="text-orange-600 dark:text-orange-400 font-mono font-black">
+                        {OFFICIAL_READER_PASSWORDS[selectedReader.nama.toLowerCase().trim()] || selectedReader.password || 'ANJAR123'}
+                      </strong>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const pass = OFFICIAL_READER_PASSWORDS[selectedReader.nama.toLowerCase().trim()] || selectedReader.password || 'ANJAR123';
+                        setPasswordInput(pass);
+                      }}
+                      className="text-[10px] font-bold text-orange-600 hover:underline dark:text-orange-400 cursor-pointer"
+                    >
+                      Isi Otomatis
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}

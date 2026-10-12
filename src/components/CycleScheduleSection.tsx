@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { CycleSchedule, IndustryCustomer, MeterReader, ReaderCategory } from '../types';
 import {
   Calendar,
@@ -20,7 +20,7 @@ import {
   Check,
   Search
 } from 'lucide-react';
-import { downloadYearlyCycleScheduleTemplate } from '../utils/excelDateHelper';
+import { downloadYearlyCycleScheduleTemplate, MONTH_NAMES_ID } from '../utils/excelDateHelper';
 import { CycleCalendarGridView } from './CycleCalendarGridView';
 import { showColorfulAlert, showToast } from '../utils/notificationSystem';
 
@@ -31,6 +31,8 @@ interface CycleScheduleSectionProps {
   onOpenImportModal: () => void;
   onUpdateSchedule: (schedule: CycleSchedule) => void;
   onUpdateCustomersBatch?: (updatedCustomers: IndustryCustomer[]) => void;
+  currentUploadMonth?: string;
+  onMonthChange?: (month: string) => void;
 }
 
 export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
@@ -39,18 +41,31 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
   meterReaders,
   onOpenImportModal,
   onUpdateSchedule,
-  onUpdateCustomersBatch
+  onUpdateCustomersBatch,
+  currentUploadMonth,
+  onMonthChange
 }) => {
   const [editingSchedule, setEditingSchedule] = useState<CycleSchedule | null>(null);
   const [editingShiftModal, setEditingShiftModal] = useState<CycleSchedule | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<string>('September 2026');
+  // Synchronized with current running month (e.g. current calendar month) or currentUploadMonth
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
+    if (currentUploadMonth && currentUploadMonth !== 'ALL') return currentUploadMonth;
+    return `${MONTH_NAMES_ID[new Date().getMonth()]} 2026`;
+  });
   const [expandedShiftCycle, setExpandedShiftCycle] = useState<string | null>(null);
+
+  // Sync selectedMonth when currentUploadMonth changes from outside
+  useEffect(() => {
+    if (currentUploadMonth && currentUploadMonth !== 'ALL') {
+      setSelectedMonth(currentUploadMonth);
+    }
+  }, [currentUploadMonth]);
 
   // Form states for Shift Modal
   const [shiftCycle, setShiftCycle] = useState<string>('Cycle 3');
-  const [shiftDate, setShiftDate] = useState<string>('2026-09-09');
-  const [shiftHariH, setShiftHariH] = useState<number>(9);
-  const [shiftHariHOriginal, setShiftHariHOriginal] = useState<number>(8);
+  const [shiftDate, setShiftDate] = useState<string>('2026-10-08');
+  const [shiftHariH, setShiftHariH] = useState<number>(8);
+  const [shiftHariHOriginal, setShiftHariHOriginal] = useState<number>(7);
   const [shiftAlasan, setShiftAlasan] = useState<
     'Target Volume Industri' | 'Penyesuaian Hari Kerja/Libur' | 'Maintenance Jaringan Pipa' | 'Permintaan Khusus Pelanggan' | 'Lainnya'
   >('Target Volume Industri');
@@ -92,7 +107,8 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
       }
     }
 
-    const defaultHariH = [7, 8, 9, 10, 11, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25][idx] || 7 + idx;
+    // Strictly start on tanggal 6!
+    const defaultHariH = [6, 7, 8, 9, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 26][idx] || 6 + idx;
 
     // Shifted customer ids for this cycle
     const shiftedCustsInCycle = cycleCusts.filter(c => c.adaPergeseran);
@@ -100,10 +116,10 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
 
     return {
       cycle: cName,
-      bulan: found?.bulan || 'September 2026',
+      bulan: found?.bulan || selectedMonth,
       hariH: found?.hariH || defaultHariH,
-      tanggalMulai: found?.tanggalMulai || `${String(defaultHariH).padStart(2, '0')} Sep 2026`,
-      tanggalSelesai: found?.tanggalSelesai || `${String(defaultHariH + 1).padStart(2, '0')} Sep 2026`,
+      tanggalMulai: found?.tanggalMulai || `${String(found?.hariH || defaultHariH).padStart(2, '0')} ${selectedMonth.slice(0, 3)} 2026`,
+      tanggalSelesai: found?.tanggalSelesai || `${String((found?.hariH || defaultHariH) + 1).padStart(2, '0')} ${selectedMonth.slice(0, 3)} 2026`,
       petugasUtama: found?.petugasUtama || defaultPetugas,
       kategoriPetugas: found?.kategoriPetugas || defaultKategori,
       catatan: found?.catatan || '',
@@ -178,12 +194,17 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
       setSelectedShiftedCustomerIds(cycleCusts.map(c => c.id));
     }
 
+    const targetMonthParts = (schedule?.bulan || selectedMonth).split(' ');
+    const targetMonthName = targetMonthParts[0] || 'Oktober';
+    const targetMonthYear = targetMonthParts[1] || '2026';
+    const monthShort = targetMonthName.slice(0, 3);
+
     setEditingShiftModal(schedule || {
       cycle: targetCycle,
       bulan: selectedMonth,
       hariH: actualH,
-      tanggalMulai: `${formattedDay} Sep 2026`,
-      tanggalSelesai: `${String(actualH + 1).padStart(2, '0')} Sep 2026`,
+      tanggalMulai: `${formattedDay} ${monthShort} ${targetMonthYear}`,
+      tanggalSelesai: `${String(actualH + 1).padStart(2, '0')} ${monthShort} ${targetMonthYear}`,
       petugasUtama: 'Petugas Lapangan'
     } as CycleSchedule);
   };
@@ -207,14 +228,19 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
     const existing = scheduleList.find((s) => s.cycle.toLowerCase() === shiftCycle.toLowerCase());
     const selisih = shiftHariH - shiftHariHOriginal;
     const formattedHariH = String(shiftHariH).padStart(2, '0');
-    const newTanggalStr = `${formattedHariH} Sep 2026`;
+    const targetMonthStr = existing?.bulan || selectedMonth;
+    const targetMonthParts = targetMonthStr.split(' ');
+    const targetMonthName = targetMonthParts[0] || 'Oktober';
+    const targetMonthYear = targetMonthParts[1] || '2026';
+    const monthShort = targetMonthName.slice(0, 3);
+    const newTanggalStr = `${formattedHariH} ${monthShort} ${targetMonthYear}`;
 
     const updatedSchedule: CycleSchedule = {
       cycle: shiftCycle,
-      bulan: existing?.bulan || selectedMonth,
+      bulan: targetMonthStr,
       hariH: shiftHariH,
       tanggalMulai: newTanggalStr,
-      tanggalSelesai: `${String(Math.min(31, shiftHariH + 1)).padStart(2, '0')} Sep 2026`,
+      tanggalSelesai: `${String(Math.min(31, shiftHariH + 1)).padStart(2, '0')} ${monthShort} ${targetMonthYear}`,
       petugasUtama: existing?.petugasUtama || 'Petugas Lapangan',
       kategoriPetugas: existing?.kategoriPetugas,
       catatan: existing?.catatan || 'Jadwal mengalami pergeseran hari baca',
@@ -361,7 +387,10 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
       <CycleCalendarGridView
         cycleSchedules={cycleSchedules}
         selectedMonth={selectedMonth}
-        onMonthChange={setSelectedMonth}
+        onMonthChange={(m) => {
+          setSelectedMonth(m);
+          onMonthChange?.(m);
+        }}
       />
 
       {/* SECTION: Keterangan Pergeseran Hari Baca untuk Pemenuhan Target Volume */}

@@ -62,6 +62,7 @@ interface OverviewViewProps {
   currentUser: UserProfile;
   onSyncNow?: () => void;
   isSyncing?: boolean;
+  selectedBulan?: string;
 }
 
 // Helper to format reading timestamp with date, hours, minutes, and seconds
@@ -116,7 +117,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   onInputCcnb,
   currentUser,
   onSyncNow,
-  isSyncing = false
+  isSyncing = false,
+  selectedBulan
 }) => {
   const [isImportScheduleOpen, setIsImportScheduleOpen] = useState<boolean>(false);
   const [industrySearchQuery, setIndustrySearchQuery] = useState<string>('');
@@ -340,6 +342,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             cycleSchedules={cycleSchedules}
             onSelectCycle={onSelectCycle}
             onOpenImportSchedule={() => setIsImportScheduleOpen(true)}
+            selectedBulan={selectedBulan}
           />
 
           {/* Tingkat Keterbacaan Meter per Cycle */}

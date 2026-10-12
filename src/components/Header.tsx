@@ -353,7 +353,9 @@ export const Header: React.FC<HeaderProps> = ({
                     {MONTH_NAMES.map((mName) => {
                       const fullMonthStr = `${mName} ${calendarYear}`;
                       const isSelected = selectedBulan === fullMonthStr;
-                      const isCurrentMonth = mName === 'September' && calendarYear === 2026;
+                      const realCurMIdx = new Date().getMonth();
+                      const realCurMName = MONTH_NAMES[realCurMIdx];
+                      const isCurrentMonth = mName === realCurMName && calendarYear === new Date().getFullYear();
 
                       return (
                         <button
@@ -371,7 +373,7 @@ export const Header: React.FC<HeaderProps> = ({
                         >
                           <div>{mName.slice(0, 3)}</div>
                           {isCurrentMonth && !isSelected && (
-                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-orange-500 absolute top-1.5 right-1.5"></span>
+                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-orange-500 absolute top-1.5 right-1.5" title="Bulan Berjalan"></span>
                           )}
                         </button>
                       );
@@ -383,12 +385,13 @@ export const Header: React.FC<HeaderProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        onBulanChange(`September ${calendarYear}`);
+                        const realCurM = MONTH_NAMES[new Date().getMonth()];
+                        onBulanChange(`${realCurM} ${calendarYear}`);
                         setIsCalendarOpen(false);
                       }}
                       className="w-full py-1.5 text-center text-[11px] font-bold text-[#0055A5] dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 rounded-lg transition"
                     >
-                      Bulan Berjalan: September {calendarYear}
+                      Bulan Berjalan: {MONTH_NAMES[new Date().getMonth()]} {calendarYear}
                     </button>
                     <button
                       type="button"

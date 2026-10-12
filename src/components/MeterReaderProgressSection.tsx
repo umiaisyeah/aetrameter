@@ -31,6 +31,7 @@ interface MeterReaderProgressSectionProps {
   cycleSchedules: CycleSchedule[];
   onSelectCycle: (cycle: string) => void;
   onOpenImportSchedule: () => void;
+  selectedBulan?: string;
 }
 
 export const MeterReaderProgressSection: React.FC<MeterReaderProgressSectionProps> = ({
@@ -38,7 +39,8 @@ export const MeterReaderProgressSection: React.FC<MeterReaderProgressSectionProp
   meterReaders,
   cycleSchedules,
   onSelectCycle,
-  onOpenImportSchedule
+  onOpenImportSchedule,
+  selectedBulan
 }) => {
   const [selectedReaderFilter, setSelectedReaderFilter] = useState<string>('ALL');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('ALL');
@@ -407,6 +409,7 @@ export const MeterReaderProgressSection: React.FC<MeterReaderProgressSectionProp
       {viewMode === 'matrix' && (
         <CycleCalendarGridView
           cycleSchedules={cycleSchedules}
+          selectedMonth={selectedBulan !== 'ALL' ? selectedBulan : undefined}
           onSelectCycle={onSelectCycle}
         />
       )}

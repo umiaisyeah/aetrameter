@@ -120,8 +120,12 @@ export default function App() {
           return parsed.map((r: MeterReader) => {
             const role = getReaderCategory(r.nama);
             const company = getReaderCompany(r.nama);
+            const initMatch = INITIAL_METER_READERS.find(
+              (init) => init.nama.toLowerCase().trim() === r.nama.toLowerCase().trim() || init.id === r.id
+            );
             return {
               ...r,
+              password: initMatch?.password || r.password,
               kategori: role,
               perusahaan: company
             };
@@ -1186,6 +1190,7 @@ export default function App() {
               currentUser={currentUser}
               onSyncNow={handleSyncNow}
               isSyncing={isSyncingLive}
+              selectedBulan={selectedBulan}
             />
           )}
 
@@ -1204,6 +1209,8 @@ export default function App() {
               onImportCycleSchedules={handleImportCycleSchedules}
               onUpdateCycleSchedule={handleUpdateCycleSchedule}
               currentUser={currentUser}
+              selectedBulan={selectedBulan}
+              onBulanChange={setSelectedBulan}
             />
           )}
 

@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { CycleSchedule } from '../types';
-import { Calendar, ChevronLeft, ChevronRight, Info, UserCheck, Shield } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Info, UserCheck, Shield, Sparkles } from 'lucide-react';
 import { MONTH_NAMES_ID, MONTH_CODES } from '../utils/excelDateHelper';
 import { getReaderCategory } from '../utils/readerAssignmentHelper';
 
@@ -13,17 +13,40 @@ interface CycleCalendarGridViewProps {
 
 export const CycleCalendarGridView: React.FC<CycleCalendarGridViewProps> = ({
   cycleSchedules,
-  selectedMonth = 'September 2026',
+  selectedMonth,
   onMonthChange,
   onSelectCycle
 }) => {
-  const [currentMonthIndex, setCurrentMonthIndex] = useState<number>(8); // September (0-indexed = 8)
+  // Synchronized with current running month (October = index 9) or selectedMonth
+  const getInitialMonthIndex = (): number => {
+    if (selectedMonth && selectedMonth !== 'ALL') {
+      const idx = MONTH_NAMES_ID.findIndex((m) => selectedMonth.toLowerCase().includes(m.toLowerCase()));
+      if (idx !== -1) return idx;
+    }
+    return new Date().getMonth(); // Default: Bulan Berjalan (e.g. Oktober)
+  };
+
+  const [currentMonthIndex, setCurrentMonthIndex] = useState<number>(getInitialMonthIndex);
   const [hoveredCycle, setHoveredCycle] = useState<CycleSchedule | null>(null);
+
+  // Sync with selectedMonth prop whenever it changes
+  useEffect(() => {
+    if (selectedMonth && selectedMonth !== 'ALL') {
+      const idx = MONTH_NAMES_ID.findIndex((m) => selectedMonth.toLowerCase().includes(m.toLowerCase()));
+      if (idx !== -1) {
+        setCurrentMonthIndex(idx);
+      }
+    } else if (selectedMonth === 'ALL') {
+      setCurrentMonthIndex(new Date().getMonth());
+    }
+  }, [selectedMonth]);
 
   const year = 2026;
   const currentMonthName = MONTH_NAMES_ID[currentMonthIndex];
   const currentMonthCode = MONTH_CODES[currentMonthIndex];
   const daysInMonth = new Date(year, currentMonthIndex + 1, 0).getDate();
+  const realCurrentMonthIdx = new Date().getMonth();
+  const isCurrentRunningMonth = currentMonthIndex === realCurrentMonthIdx;
 
   // Find Sunday / Red Days (Sunday=0) for this month
   const sundayDays = useMemo(() => {
@@ -37,15 +60,15 @@ export const CycleCalendarGridView: React.FC<CycleCalendarGridViewProps> = ({
     return sundays;
   }, [year, currentMonthIndex, daysInMonth]);
 
-  // Map schedules for this month
+  // Map schedules for this month - Strictly starts from tanggal 6!
   const monthSchedules = useMemo(() => {
-    // Get all working days (Monday-Friday) in the current month
-    const workingDays: number[] = [];
-    for (let d = 1; d <= daysInMonth; d++) {
+    // Working days (Monday-Friday) in current month starting from day 6
+    const workingDaysFrom6: number[] = [];
+    for (let d = 6; d <= daysInMonth; d++) {
       const date = new Date(year, currentMonthIndex, d);
       const dayOfWeek = date.getDay();
       if (dayOfWeek >= 1 && dayOfWeek <= 5) {
-        workingDays.push(d);
+        workingDaysFrom6.push(d);
       }
     }
 
@@ -58,31 +81,21 @@ export const CycleCalendarGridView: React.FC<CycleCalendarGridViewProps> = ({
             s.bulan?.toLowerCase().includes(currentMonthCode.toLowerCase()))
       );
 
+      // Default: cycle plotting begins on tanggal 6!
+      let hariH: number;
       if (found && found.hariH) {
-        let hDay = found.hariH;
-        const dCheck = new Date(year, currentMonthIndex, hDay);
-        if (dCheck.getDay() === 0 || dCheck.getDay() === 6) {
-          const closest = workingDays.reduce((prev, curr) => 
-            Math.abs(curr - hDay) < Math.abs(prev - hDay) ? curr : prev
-          , workingDays[0] || 1);
-          hDay = closest;
-        }
-        return {
-          ...found,
-          hariH: hDay
-        };
-      }
-
-      let hariH = 7 + i;
-      if (currentMonthIndex === 8) {
-        // September 2026 exact mapping from image
-        const exactHariH = [7, 8, 9, 10, 11, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25];
-        hariH = exactHariH[i] || 7 + i;
+        hariH = found.hariH;
+      } else if (workingDaysFrom6.length >= 15) {
+        hariH = workingDaysFrom6[i] || (6 + i);
       } else {
-        // For other months: strictly schedule on Monday-Friday (working days)
-        const step = Math.max(1, Math.floor(workingDays.length / 16));
-        const index = Math.min(i * step, workingDays.length - 1);
-        hariH = workingDays[index] || (i + 1);
+        // Fallback: Start strictly at day 6, skip Sundays for subsequent cycles
+        let cur = 6;
+        for (let step = 0; step < i; step++) {
+          cur++;
+          const dCheck = new Date(year, currentMonthIndex, cur);
+          if (dCheck.getDay() === 0) cur++;
+        }
+        hariH = Math.min(daysInMonth, cur);
       }
 
       const praBaca = Math.max(1, hariH - 1);
@@ -102,17 +115,27 @@ export const CycleCalendarGridView: React.FC<CycleCalendarGridViewProps> = ({
         kategoriPetugas: found?.petugasUtama && found.petugasUtama !== 'Belum Ditugaskan'
           ? getReaderCategory(found.petugasUtama)
           : found?.kategoriPetugas,
-        catatan: found?.catatan || `Plotting Matriks Kalender ${currentMonthName} (Hari Kerja Senin-Jumat)`
+        catatan: found?.catatan || `Plotting Matriks Kalender ${currentMonthName} (Hari H: Tgl ${hariH})`
       };
     });
   }, [cycleSchedules, currentMonthIndex, currentMonthName, currentMonthCode, daysInMonth, year]);
 
   const handlePrevMonth = () => {
-    setCurrentMonthIndex((prev) => (prev > 0 ? prev - 1 : 11));
+    const nextIdx = currentMonthIndex > 0 ? currentMonthIndex - 1 : 11;
+    setCurrentMonthIndex(nextIdx);
+    onMonthChange?.(`${MONTH_NAMES_ID[nextIdx]} 2026`);
   };
 
   const handleNextMonth = () => {
-    setCurrentMonthIndex((prev) => (prev < 11 ? prev + 1 : 0));
+    const nextIdx = currentMonthIndex < 11 ? currentMonthIndex + 1 : 0;
+    setCurrentMonthIndex(nextIdx);
+    onMonthChange?.(`${MONTH_NAMES_ID[nextIdx]} 2026`);
+  };
+
+  const handleJumpCurrentMonth = () => {
+    const curIdx = new Date().getMonth();
+    setCurrentMonthIndex(curIdx);
+    onMonthChange?.(`${MONTH_NAMES_ID[curIdx]} 2026`);
   };
 
   return (
@@ -168,6 +191,20 @@ export const CycleCalendarGridView: React.FC<CycleCalendarGridViewProps> = ({
             title="Bulan Berikutnya"
           >
             <ChevronRight className="w-4 h-4" />
+          </button>
+
+          <button
+            onClick={handleJumpCurrentMonth}
+            className={`px-2.5 py-1.5 text-xs font-black rounded-xl border transition flex items-center gap-1.5 shadow-xs cursor-pointer ${
+              isCurrentRunningMonth
+                ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-amber-500/20'
+                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-amber-100 dark:hover:bg-amber-950/40 border-slate-300 dark:border-slate-600'
+            }`}
+            title="Sinkronkan ke Bulan Berjalan"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+            <span className="hidden sm:inline">Bulan Berjalan ({MONTH_NAMES_ID[realCurrentMonthIdx]})</span>
+            <span className="sm:hidden">Bulan Ini</span>
           </button>
         </div>
       </div>

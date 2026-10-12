@@ -67,7 +67,7 @@ export const ImportCycleScheduleModal: React.FC<ImportCycleScheduleModalProps> =
   };
 
   // Distinct months in parsed data
-  const monthsInParsed = Array.from(new Set(parsedData.map((p) => p.bulan || 'September 2026')));
+  const monthsInParsed = Array.from(new Set(parsedData.map((p) => p.bulan || 'Oktober 2026')));
 
   const displayedPreview = parsedData.filter((item) => {
     if (selectedPreviewMonth === 'ALL') return true;
