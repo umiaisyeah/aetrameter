@@ -10,20 +10,36 @@ export const KabupatenTangerangLogo: React.FC<{
   className?: string;
   size?: number;
   showText?: boolean;
+  customSrc?: string | null;
+  onClick?: () => void;
+  title?: string;
 }> = ({
   className = 'h-16 w-auto',
   size = 56,
   showText = true,
+  customSrc,
+  onClick,
+  title,
 }) => {
   const [imgError, setImgError] = React.useState(false);
 
+  React.useEffect(() => {
+    setImgError(false);
+  }, [customSrc]);
+
+  const activeSrc = customSrc || kabTangerangLogoImg;
+
   return (
-    <div className={`flex flex-col items-center justify-center text-center select-none ${className}`}>
+    <div
+      onClick={onClick}
+      title={title}
+      className={`flex flex-col items-center justify-center text-center select-none ${className}`}
+    >
       {!imgError ? (
         <img
-          src={kabTangerangLogoImg}
-          alt="Lambang Resmi Pemerintah Kabupaten Tangerang"
-          className="object-contain filter drop-shadow-sm"
+          src={activeSrc}
+          alt="Lambang Pemerintah Kabupaten Tangerang"
+          className="object-contain filter drop-shadow-sm max-w-full"
           style={{ height: `${size}px`, width: 'auto', maxHeight: '100%' }}
           referrerPolicy="no-referrer"
           onError={() => setImgError(true)}
@@ -176,19 +192,38 @@ export const KabupatenTangerangLogo: React.FC<{
  * Official PT Aetra Air Tangerang Corporate Brand Logo
  * Rendered using authentic brand logo asset matching the official invoice, with SVG fallback
  */
-export const AetraOfficialLogo: React.FC<{ className?: string; height?: number }> = ({
+export const AetraOfficialLogo: React.FC<{
+  className?: string;
+  height?: number;
+  customSrc?: string | null;
+  onClick?: () => void;
+  title?: string;
+}> = ({
   className = 'h-11 w-auto',
-  height = 44
+  height = 44,
+  customSrc,
+  onClick,
+  title,
 }) => {
   const [imgError, setImgError] = React.useState(false);
 
+  React.useEffect(() => {
+    setImgError(false);
+  }, [customSrc]);
+
+  const activeSrc = customSrc || aetraOfficialLogoImg;
+
   return (
-    <div className={`shrink-0 flex items-center justify-center select-none ${className}`}>
+    <div
+      onClick={onClick}
+      title={title}
+      className={`shrink-0 flex items-center justify-center select-none ${className}`}
+    >
       {!imgError ? (
         <img
-          src={aetraOfficialLogoImg}
+          src={activeSrc}
           alt="Official PT Aetra Air Tangerang Logo"
-          className="object-contain filter drop-shadow-sm"
+          className="object-contain filter drop-shadow-sm max-w-full"
           style={{ height: `${height}px`, width: 'auto', maxHeight: '100%' }}
           referrerPolicy="no-referrer"
           onError={() => setImgError(true)}

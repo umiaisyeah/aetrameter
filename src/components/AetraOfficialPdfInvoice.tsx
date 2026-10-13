@@ -23,11 +23,16 @@ import {
   CheckCircle2,
   Sparkles,
   QrCode,
-  Stamp
+  Stamp,
+  Sliders,
+  Settings2,
+  Image as ImageIcon
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { showToast } from '../utils/notificationSystem';
+import { useInvoiceLogoConfig } from '../utils/invoiceLogoStorage';
+import { InvoiceLogoSettingsModal } from './InvoiceLogoSettingsModal';
 
 interface AetraOfficialPdfInvoiceProps {
   customer: IndustryCustomer;
@@ -40,6 +45,10 @@ export const AetraOfficialPdfInvoice: React.FC<AetraOfficialPdfInvoiceProps> = (
 }) => {
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [eMeteraiMode, setEMeteraiMode] = useState<'placeholder' | 'peruri_digital'>('placeholder');
+  const [isLogoModalOpen, setIsLogoModalOpen] = useState(false);
+  const [logoModalInitialTab, setLogoModalInitialTab] = useState<'kabTangerang' | 'aetra' | 'preview'>('kabTangerang');
+
+  const { config: logoConfig } = useInvoiceLogoConfig();
 
   const inv: InvoiceCalculationResult = calculateAetraInvoice(customer);
 
@@ -172,6 +181,21 @@ export const AetraOfficialPdfInvoice: React.FC<AetraOfficialPdfInvoiceProps> = (
               </button>
             )}
 
+            {/* Manual Logo Adjustment / Switcher Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setLogoModalInitialTab('kabTangerang');
+                setIsLogoModalOpen(true);
+              }}
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-amber-200 border border-amber-500/40 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+              title="Atur atau ganti logo Aetra dan Kab. Tangerang secara manual"
+            >
+              <Sliders className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Ganti</span>
+              <span>Logo Faktur</span>
+            </button>
+
             <button
               type="button"
               onClick={handleDownloadPdf}
@@ -219,8 +243,28 @@ export const AetraOfficialPdfInvoice: React.FC<AetraOfficialPdfInvoiceProps> = (
                 {/* Left Part: Pemda Kab Tangerang Logo + Aetra Address + Aetra Logo */}
                 <div className="flex-1 p-2.5 sm:p-3 flex items-center justify-between border-r-2 border-[#0055A5] gap-3">
                   {/* Logo Pemda Kabupaten Tangerang */}
-                  <div className="shrink-0 flex items-center justify-center pl-1">
-                    <KabupatenTangerangLogo size={52} />
+                  <div className="shrink-0 flex items-center justify-center pl-1 group relative">
+                    <div
+                      onClick={() => {
+                        setLogoModalInitialTab('kabTangerang');
+                        setIsLogoModalOpen(true);
+                      }}
+                      className="cursor-pointer transition-transform hover:scale-105 relative rounded-md p-0.5 hover:ring-2 hover:ring-blue-400/50 print:hover:ring-0 print:cursor-default"
+                      title="Klik untuk ganti Logo Pemda Kabupaten Tangerang secara manual"
+                    >
+                      <KabupatenTangerangLogo
+                        size={logoConfig.kabTangerangSize}
+                        showText={logoConfig.showKabTangerangText}
+                        customSrc={logoConfig.kabTangerangLogoUrl}
+                      />
+                      {/* Hover edit badge (hidden on print and html2canvas) */}
+                      <span
+                        data-html2canvas-ignore="true"
+                        className="print:hidden absolute -bottom-2 -left-1 opacity-0 group-hover:opacity-100 transition-opacity bg-blue-700 text-white text-[7.5px] font-black px-1.5 py-0.5 rounded shadow pointer-events-none whitespace-nowrap z-20"
+                      >
+                        ✏️ Ganti Logo
+                      </span>
+                    </div>
                   </div>
 
                   {/* Company Info (Centered) */}
@@ -240,8 +284,27 @@ export const AetraOfficialPdfInvoice: React.FC<AetraOfficialPdfInvoiceProps> = (
                   </div>
 
                   {/* Logo Aetra Tangerang */}
-                  <div className="shrink-0 flex items-center justify-center pr-1">
-                    <AetraOfficialLogo height={46} />
+                  <div className="shrink-0 flex items-center justify-center pr-1 group relative">
+                    <div
+                      onClick={() => {
+                        setLogoModalInitialTab('aetra');
+                        setIsLogoModalOpen(true);
+                      }}
+                      className="cursor-pointer transition-transform hover:scale-105 relative rounded-md p-0.5 hover:ring-2 hover:ring-orange-400/50 print:hover:ring-0 print:cursor-default"
+                      title="Klik untuk ganti Logo PT Aetra Air Tangerang secara manual"
+                    >
+                      <AetraOfficialLogo
+                        height={logoConfig.aetraHeight}
+                        customSrc={logoConfig.aetraLogoUrl}
+                      />
+                      {/* Hover edit badge (hidden on print and html2canvas) */}
+                      <span
+                        data-html2canvas-ignore="true"
+                        className="print:hidden absolute -bottom-2 -right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-orange-600 text-white text-[7.5px] font-black px-1.5 py-0.5 rounded shadow pointer-events-none whitespace-nowrap z-20"
+                      >
+                        ✏️ Ganti Logo
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -809,6 +872,13 @@ export const AetraOfficialPdfInvoice: React.FC<AetraOfficialPdfInvoiceProps> = (
           </div>
         </div>
       </div>
+
+      {/* Manual Invoice Logo Adjustment Modal */}
+      <InvoiceLogoSettingsModal
+        isOpen={isLogoModalOpen}
+        onClose={() => setIsLogoModalOpen(false)}
+        initialTab={logoModalInitialTab}
+      />
     </div>,
     document.body
   );
