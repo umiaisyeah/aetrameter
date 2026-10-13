@@ -20,9 +20,13 @@ import {
   Check,
   Search
 } from 'lucide-react';
-import { downloadYearlyCycleScheduleTemplate, MONTH_NAMES_ID } from '../utils/excelDateHelper';
+import { downloadYearlyCycleScheduleTemplate, MONTH_NAMES_ID, MONTH_CODES } from '../utils/excelDateHelper';
 import { CycleCalendarGridView } from './CycleCalendarGridView';
 import { showColorfulAlert, showToast } from '../utils/notificationSystem';
+import {
+  getPlottedCycleSchedule,
+  formatIndonesianDateFromISO
+} from '../utils/cyclePlottingHelper';
 
 interface CycleScheduleSectionProps {
   cycleSchedules: CycleSchedule[];
@@ -63,9 +67,13 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
 
   // Form states for Shift Modal
   const [shiftCycle, setShiftCycle] = useState<string>('Cycle 3');
+  const [shiftMonth, setShiftMonth] = useState<string>(() => {
+    if (currentUploadMonth && currentUploadMonth !== 'ALL') return currentUploadMonth;
+    return `${MONTH_NAMES_ID[new Date().getMonth()]} 2026`;
+  });
   const [shiftDate, setShiftDate] = useState<string>('2026-10-08');
   const [shiftHariH, setShiftHariH] = useState<number>(8);
-  const [shiftHariHOriginal, setShiftHariHOriginal] = useState<number>(7);
+  const [shiftHariHOriginal, setShiftHariHOriginal] = useState<number>(8);
   const [shiftAlasan, setShiftAlasan] = useState<
     'Target Volume Industri' | 'Penyesuaian Hari Kerja/Libur' | 'Maintenance Jaringan Pipa' | 'Permintaan Khusus Pelanggan' | 'Lainnya'
   >('Target Volume Industri');
@@ -162,22 +170,41 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
     );
   }, [currentCycleCustomers, shiftSearchQuery]);
 
+  // Dynamic Plotted Schedule Info for selected cycle & month in modal
+  const modalPlottedInfo = useMemo(() => {
+    return getPlottedCycleSchedule(shiftCycle, shiftMonth, cycleSchedules);
+  }, [shiftCycle, shiftMonth, cycleSchedules]);
+
+  // Parsed date of current shiftDate input
+  const currentParsedDate = useMemo(() => {
+    return formatIndonesianDateFromISO(shiftDate);
+  }, [shiftDate]);
+
   const handleOpenShiftModal = (schedule?: any) => {
     const targetCycle = schedule ? schedule.cycle : 'Cycle 3';
+    const targetMonth = schedule?.bulan || selectedMonth || `${MONTH_NAMES_ID[new Date().getMonth()]} 2026`;
+    
     setShiftCycle(targetCycle);
+    setShiftMonth(targetMonth);
 
-    const orig = schedule?.hariHOriginal || schedule?.hariH || 8;
-    const actualH = schedule?.hariH || 9;
+    // Dapatkan data jadwal yang diplot kalender untuk cycle dan bulan ini
+    const plotted = getPlottedCycleSchedule(targetCycle, targetMonth, cycleSchedules);
+
+    const hasShiftSaved = schedule?.adaPergeseran ?? plotted.hasShift;
+    const orig = schedule?.hariHOriginal || plotted.originalHariH;
+    const actualH = schedule?.hariH || (hasShiftSaved ? plotted.currentHariH : orig);
+
     setShiftHariHOriginal(orig);
     setShiftHariH(actualH);
 
-    // Format date string for date picker (YYYY-MM-DD)
-    const formattedDay = String(actualH).padStart(2, '0');
-    setShiftDate(`2026-09-${formattedDay}`);
+    // Format string tanggal kalender YYYY-MM-DD disesuaikan dengan bulan & cycle yang diplot
+    const formattedDateStr = `${plotted.year}-${String(plotted.monthIndex + 1).padStart(2, '0')}-${String(actualH).padStart(2, '0')}`;
+    setShiftDate(formattedDateStr);
 
-    setShiftAlasan(schedule?.alasanPergeseran || 'Target Volume Industri');
+    setShiftAlasan(schedule?.alasanPergeseran || (plotted.alasanPergeseran as any) || 'Target Volume Industri');
     setShiftKeterangan(
       schedule?.keteranganPergeseran ||
+        plotted.keteranganPergeseran ||
         'Pergeseran jadwal hari baca untuk penyesuaian operasional pabrik industri.'
     );
 
@@ -185,7 +212,7 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
 
     // Pre-select industries that are shifted in this cycle
     const cycleCusts = customers.filter((c) => c.cycle.toLowerCase() === targetCycle.toLowerCase());
-    const existingShiftedIds = schedule?.shiftedCustomerIds || cycleCusts.filter(c => c.adaPergeseran).map(c => c.id);
+    const existingShiftedIds = schedule?.shiftedCustomerIds || plotted.shiftedCustomerIds || cycleCusts.filter(c => c.adaPergeseran).map(c => c.id);
     
     if (existingShiftedIds && existingShiftedIds.length > 0) {
       setSelectedShiftedCustomerIds(existingShiftedIds);
@@ -194,25 +221,31 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
       setSelectedShiftedCustomerIds(cycleCusts.map(c => c.id));
     }
 
-    const targetMonthParts = (schedule?.bulan || selectedMonth).split(' ');
-    const targetMonthName = targetMonthParts[0] || 'Oktober';
-    const targetMonthYear = targetMonthParts[1] || '2026';
-    const monthShort = targetMonthName.slice(0, 3);
-
+    const monthShort = plotted.monthName.slice(0, 3);
     setEditingShiftModal(schedule || {
       cycle: targetCycle,
-      bulan: selectedMonth,
+      bulan: targetMonth,
       hariH: actualH,
-      tanggalMulai: `${formattedDay} ${monthShort} ${targetMonthYear}`,
-      tanggalSelesai: `${String(actualH + 1).padStart(2, '0')} ${monthShort} ${targetMonthYear}`,
+      tanggalMulai: `${String(actualH).padStart(2, '0')} ${monthShort} ${plotted.year}`,
+      tanggalSelesai: `${String(Math.min(plotted.daysInMonth, actualH + 1)).padStart(2, '0')} ${monthShort} ${plotted.year}`,
       petugasUtama: 'Petugas Lapangan'
     } as CycleSchedule);
   };
 
   const handleCycleChangeInModal = (cName: string) => {
     setShiftCycle(cName);
+
+    // Tanggal di kalender seketika disesuaikan dengan cycle yang dipilih pada bulan ini!
+    const plotted = getPlottedCycleSchedule(cName, shiftMonth, cycleSchedules);
+    const orig = plotted.originalHariH;
+    const actualH = plotted.hasShift ? plotted.currentHariH : orig;
+
+    setShiftHariHOriginal(orig);
+    setShiftHariH(actualH);
+    setShiftDate(plotted.hasShift ? plotted.formattedCurrentDate : plotted.formattedOriginalDate);
+
     const cycleCusts = customers.filter((c) => c.cycle.toLowerCase() === cName.toLowerCase());
-    const existingSch = scheduleList.find(s => s.cycle.toLowerCase() === cName.toLowerCase());
+    const existingSch = cycleSchedules.find(s => s.cycle.toLowerCase() === cName.toLowerCase() && (s.bulan?.toLowerCase().includes(plotted.monthName.toLowerCase()) || !s.bulan));
     const shifted = cycleCusts.filter(c => c.adaPergeseran).map(c => c.id);
     if (existingSch?.shiftedCustomerIds && existingSch.shiftedCustomerIds.length > 0) {
       setSelectedShiftedCustomerIds(existingSch.shiftedCustomerIds);
@@ -223,12 +256,39 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
     }
   };
 
+  const handleMonthChangeInModal = (newMonth: string) => {
+    setShiftMonth(newMonth);
+
+    // Tanggal di kalender seketika disesuaikan dengan bulan yang dipilih dan cycle yang terplot!
+    const plotted = getPlottedCycleSchedule(shiftCycle, newMonth, cycleSchedules);
+    const orig = plotted.originalHariH;
+    const actualH = plotted.hasShift ? plotted.currentHariH : orig;
+
+    setShiftHariHOriginal(orig);
+    setShiftHariH(actualH);
+    setShiftDate(plotted.hasShift ? plotted.formattedCurrentDate : plotted.formattedOriginalDate);
+  };
+
+  const handleQuickShiftOffset = (offset: number) => {
+    const plotted = modalPlottedInfo;
+    const targetDay = Math.max(1, Math.min(plotted.daysInMonth, shiftHariHOriginal + offset));
+    setShiftHariH(targetDay);
+    const newDateStr = `${plotted.year}-${String(plotted.monthIndex + 1).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;
+    setShiftDate(newDateStr);
+  };
+
+  const handleResetToPlottedDate = () => {
+    const plotted = modalPlottedInfo;
+    setShiftHariH(plotted.originalHariH);
+    setShiftDate(plotted.formattedOriginalDate);
+  };
+
   const handleSaveShift = (e: React.FormEvent) => {
     e.preventDefault();
     const existing = scheduleList.find((s) => s.cycle.toLowerCase() === shiftCycle.toLowerCase());
     const selisih = shiftHariH - shiftHariHOriginal;
     const formattedHariH = String(shiftHariH).padStart(2, '0');
-    const targetMonthStr = existing?.bulan || selectedMonth;
+    const targetMonthStr = shiftMonth || existing?.bulan || selectedMonth;
     const targetMonthParts = targetMonthStr.split(' ');
     const targetMonthName = targetMonthParts[0] || 'Oktober';
     const targetMonthYear = targetMonthParts[1] || '2026';
@@ -391,6 +451,9 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
           setSelectedMonth(m);
           onMonthChange?.(m);
         }}
+        onSelectCycle={(c) => {
+          handleOpenShiftModal({ cycle: c, bulan: selectedMonth });
+        }}
       />
 
       {/* SECTION: Keterangan Pergeseran Hari Baca untuk Pemenuhan Target Volume */}
@@ -512,9 +575,7 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
                     </p>
 
                     <div className="text-[11px] text-slate-400 flex items-center gap-3 font-mono">
-                      <span>Petugas: <strong className="text-slate-700 dark:text-slate-300">{shift.petugasUtama}</strong></span>
-                      <span>·</span>
-                      <span>Total Industri di Cycle: <strong>{shift.totalIndustri} Pelanggan</strong></span>
+                      <span>Total Industri di Cycle: <strong className="text-slate-700 dark:text-slate-300">{shift.totalIndustri} Pelanggan</strong></span>
                     </div>
                   </div>
 
@@ -577,8 +638,12 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
                                       </span>
                                     )}
                                   </div>
-                                  <div className="text-[10px] text-slate-400 font-mono">
-                                    Stand Lalu: {cust.lalu.toLocaleString()} m³ | Petugas: {cust.petugasBaca || shift.petugasUtama}
+                                  <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono mt-0.5 flex flex-wrap items-center gap-2">
+                                    <span>Stand Lalu: {cust.lalu.toLocaleString()} m³</span>
+                                    <span>·</span>
+                                    <span className="text-slate-700 dark:text-slate-300">
+                                      Petugas Pembaca: <strong className="font-bold text-[#0055A5] dark:text-blue-400">{cust.petugasBaca || shift.petugasUtama || 'Petugas Lapangan'}</strong>
+                                    </span>
                                   </div>
                                 </div>
                                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
@@ -617,8 +682,6 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
                 <th className="p-3">Nama Cycle</th>
                 <th className="p-3">Hari H Baca Meter</th>
                 <th className="p-3">Rentang Tanggal</th>
-                <th className="p-3">Petugas Pembaca Lapangan</th>
-                <th className="p-3">Kategori</th>
                 <th className="p-3 text-center">Industri Terdaftar</th>
                 <th className="p-3 text-center">Status Siklus</th>
                 <th className="p-3">Keterangan &amp; Pergeseran</th>
@@ -648,22 +711,6 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
                   </td>
                   <td className="p-3 font-semibold text-slate-700 dark:text-slate-200">
                     {row.tanggalMulai} - {row.tanggalSelesai}
-                  </td>
-                  <td className="p-3">
-                    <span className="font-bold text-slate-800 dark:text-slate-200">
-                      {row.petugasUtama}
-                    </span>
-                  </td>
-                  <td className="p-3">
-                    <span
-                      className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        row.kategoriPetugas === 'Key Account'
-                          ? 'bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300'
-                          : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
-                      }`}
-                    >
-                      {row.kategoriPetugas || 'Petugas'}
-                    </span>
                   </td>
                   <td className="p-3 text-center font-mono font-bold text-slate-700 dark:text-slate-200">
                     {row.totalIndustri}
@@ -755,33 +802,80 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
             </div>
 
             <form onSubmit={handleSaveShift} className="space-y-3.5 text-xs">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">
-                  1. Pilih Cycle yang Mengalami Pergeseran:
-                </label>
-                <select
-                  value={shiftCycle}
-                  onChange={(e) => handleCycleChangeInModal(e.target.value)}
-                  className="w-full p-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 font-bold text-slate-800 dark:text-white cursor-pointer"
-                >
-                  {allCycles.map((c) => (
-                    <option key={c} value={c}>
-                      {c} ({customers.filter(cust => cust.cycle.toLowerCase() === c.toLowerCase()).length} Industri)
-                    </option>
-                  ))}
-                </select>
+              {/* 1. Pilih Bulan & Cycle yang Mengalami Pergeseran */}
+              <div className="space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase mb-1 flex items-center justify-between">
+                      <span>1A. Bulan Pelaksanaan:</span>
+                      <span className="text-[10px] font-mono text-emerald-600 font-bold">{modalPlottedInfo.monthCode}</span>
+                    </label>
+                    <select
+                      value={shiftMonth}
+                      onChange={(e) => handleMonthChangeInModal(e.target.value)}
+                      className="w-full p-2.5 border-2 border-slate-300 dark:border-slate-600 focus:border-[#0055A5] rounded-xl bg-slate-50 dark:bg-slate-700 font-bold text-slate-800 dark:text-white cursor-pointer"
+                    >
+                      {MONTH_NAMES_ID.map((mName, mIdx) => {
+                        const mOption = `${mName} 2026`;
+                        return (
+                          <option key={mOption} value={mOption}>
+                            {mName} 2026 ({MONTH_CODES[mIdx]})
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">
+                      1B. Pilih Cycle:
+                    </label>
+                    <select
+                      value={shiftCycle}
+                      onChange={(e) => handleCycleChangeInModal(e.target.value)}
+                      className="w-full p-2.5 border-2 border-slate-300 dark:border-slate-600 focus:border-[#0055A5] rounded-xl bg-slate-50 dark:bg-slate-700 font-bold text-slate-800 dark:text-white cursor-pointer"
+                    >
+                      {allCycles.map((c) => (
+                        <option key={c} value={c}>
+                          {c} ({customers.filter(cust => cust.cycle.toLowerCase() === c.toLowerCase()).length} Industri)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Info Bar: Jadwal Normal Terplot */}
+                <div className="flex flex-wrap items-center justify-between gap-1.5 p-2 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-[11px]">
+                  <div className="flex items-center gap-1.5 text-blue-900 dark:text-blue-200">
+                    <Sparkles className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    <span>Jadwal Normal Terplot:</span>
+                    <strong className="text-[#0055A5] dark:text-blue-400 font-extrabold">
+                      {modalPlottedInfo.origDayName}, Tgl {shiftHariHOriginal} {modalPlottedInfo.monthName} {modalPlottedInfo.year}
+                    </strong>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-mono">
+                    Hari Kerja Matriks
+                  </span>
+                </div>
               </div>
 
-              {/* Kalender Pilih Hari H Aktual Pergeseran */}
-              <div className="p-3 bg-amber-50/70 dark:bg-amber-950/40 rounded-2xl border border-amber-200 dark:border-amber-800 space-y-2">
-                <label className="block text-[11px] font-extrabold text-amber-800 dark:text-amber-300 uppercase flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>2. Pilih Hari H Aktual Pergeseran (Kalender):</span>
-                </label>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 items-center">
+              {/* 2. Kalender Pilih Hari H Aktual Pergeseran (Disesuaikan dengan Bulan & Cycle) */}
+              <div className="p-3.5 bg-amber-50/80 dark:bg-amber-950/40 rounded-2xl border-2 border-amber-300 dark:border-amber-700 space-y-2.5 shadow-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="block text-[11px] font-extrabold text-amber-900 dark:text-amber-200 uppercase flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>2. Pilih Hari H Aktual Pergeseran (Kalender):</span>
+                  </label>
+                  <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100/90 dark:bg-amber-900/60 px-2 py-0.5 rounded-full font-mono">
+                    {modalPlottedInfo.monthName} {modalPlottedInfo.year}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-center">
                   <div>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Pilih Tanggal di Kalender:</span>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1 font-semibold">
+                      Tanggal di Kalender:
+                    </span>
                     <input
                       type="date"
                       value={shiftDate}
@@ -789,29 +883,111 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
                         const val = e.target.value;
                         setShiftDate(val);
                         if (val) {
-                          const parts = val.split('-');
-                          const dayNum = parseInt(parts[2], 10);
-                          if (!isNaN(dayNum)) {
-                            setShiftHariH(dayNum);
+                          const parsed = formatIndonesianDateFromISO(val);
+                          if (parsed) {
+                            setShiftHariH(parsed.day);
+                            // Jika navigasi bulan kalender diubah ke bulan lain, sinkronkan shiftMonth
+                            const targetMonthStr = `${parsed.monthName} ${parsed.year}`;
+                            if (targetMonthStr !== shiftMonth) {
+                              setShiftMonth(targetMonthStr);
+                              const recheck = getPlottedCycleSchedule(shiftCycle, targetMonthStr, cycleSchedules);
+                              setShiftHariHOriginal(recheck.originalHariH);
+                            }
                           }
                         }
                       }}
-                      className="w-full p-2 border-2 border-amber-400 dark:border-amber-500 rounded-xl bg-white dark:bg-slate-800 font-bold text-slate-900 dark:text-white font-mono text-xs cursor-pointer focus:ring-2 focus:ring-amber-500"
+                      className="w-full p-2.5 border-2 border-amber-400 dark:border-amber-500 rounded-xl bg-white dark:bg-slate-800 font-black text-slate-900 dark:text-white font-mono text-xs cursor-pointer focus:ring-2 focus:ring-amber-500 shadow-xs"
                     />
+                    <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1 truncate">
+                      📅 {currentParsedDate?.fullDisplay || shiftDate}
+                    </p>
                   </div>
 
-                  <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-amber-200 dark:border-amber-800 text-[11px] space-y-1 font-mono">
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Hari H Asli:</span>
-                      <span className="font-bold text-slate-800 dark:text-slate-200">Tgl {shiftHariHOriginal}</span>
+                  <div className="p-2.5 rounded-xl bg-white/90 dark:bg-slate-800/90 border border-amber-200 dark:border-amber-800 text-[11px] space-y-1.5 font-mono shadow-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500">Jadwal Normal:</span>
+                      <span className="font-bold text-slate-800 dark:text-slate-200">
+                        Tgl {shiftHariHOriginal} ({modalPlottedInfo.origDayName})
+                      </span>
                     </div>
-                    <div className="flex justify-between border-t border-amber-100 dark:border-slate-700 pt-1">
+                    <div className="flex justify-between items-center border-t border-amber-100 dark:border-slate-700 pt-1.5">
                       <span className="text-amber-800 dark:text-amber-300 font-bold">Hari H Baru:</span>
                       <span className="font-black text-amber-600 dark:text-amber-400">
-                        Tgl {shiftHariH} ({shiftHariH - shiftHariHOriginal >= 0 ? `+${shiftHariH - shiftHariHOriginal}` : shiftHariH - shiftHariHOriginal} Hari)
+                        Tgl {shiftHariH} ({currentParsedDate?.dayName || ''})
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center border-t border-slate-100 dark:border-slate-700/80 pt-1">
+                      <span className="text-[10px] text-slate-400">Status Pergeseran:</span>
+                      <span
+                        className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                          shiftHariH === shiftHariHOriginal
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                            : shiftHariH > shiftHariHOriginal
+                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                            : 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300'
+                        }`}
+                      >
+                        {shiftHariH === shiftHariHOriginal
+                          ? '✓ Normal (0 Hari)'
+                          : shiftHariH > shiftHariHOriginal
+                          ? `+${shiftHariH - shiftHariHOriginal} Hari (Mundur)`
+                          : `${shiftHariH - shiftHariHOriginal} Hari (Maju)`}
                       </span>
                     </div>
                   </div>
+                </div>
+
+                {/* Sunday/Libur Warning */}
+                {currentParsedDate?.isSunday && (
+                  <div className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-200 text-[11px] flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>
+                      <strong>Perhatian:</strong> Tanggal yang dipilih jatuh pada hari <strong>Minggu (Libur Operasional)</strong>. Pastikan petugas lapangan tetap terjadwal.
+                    </span>
+                  </div>
+                )}
+
+                {/* Quick Shortcut Buttons */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[10px] font-bold text-slate-400 mr-1">Aksi Cepat:</span>
+                  <button
+                    type="button"
+                    onClick={handleResetToPlottedDate}
+                    className="px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-lg text-[10px] font-bold transition flex items-center gap-1 cursor-pointer"
+                    title={`Kembalikan ke tanggal normal terplot (${modalPlottedInfo.origDayName}, Tgl ${shiftHariHOriginal})`}
+                  >
+                    <RefreshCw className="w-3 h-3 text-emerald-600" />
+                    <span>Reset ke Tgl Normal ({shiftHariHOriginal})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleQuickShiftOffset(1)}
+                    className="px-2 py-1 bg-amber-100 dark:bg-amber-900/60 hover:bg-amber-200 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700 rounded-lg text-[10px] font-black transition cursor-pointer"
+                  >
+                    +1 Hari
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickShiftOffset(2)}
+                    className="px-2 py-1 bg-amber-100 dark:bg-amber-900/60 hover:bg-amber-200 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700 rounded-lg text-[10px] font-black transition cursor-pointer"
+                  >
+                    +2 Hari
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickShiftOffset(3)}
+                    className="px-2 py-1 bg-amber-100 dark:bg-amber-900/60 hover:bg-amber-200 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700 rounded-lg text-[10px] font-black transition cursor-pointer"
+                  >
+                    +3 Hari
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickShiftOffset(-1)}
+                    className="px-2 py-1 bg-sky-100 dark:bg-sky-900/60 hover:bg-sky-200 text-sky-900 dark:text-sky-200 border border-sky-300 dark:border-sky-700 rounded-lg text-[10px] font-black transition cursor-pointer"
+                  >
+                    -1 Hari
+                  </button>
                 </div>
               </div>
 
@@ -892,8 +1068,15 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
                               }}
                               className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 shrink-0 cursor-pointer"
                             />
-                            <span className="font-mono font-black text-[#0055A5] dark:text-blue-400 shrink-0">{c.id}</span>
-                            <span className="truncate font-semibold">{c.nama}</span>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 truncate">
+                                <span className="font-mono font-black text-[#0055A5] dark:text-blue-400 shrink-0">{c.id}</span>
+                                <span className="truncate font-semibold">{c.nama}</span>
+                              </div>
+                              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                                Petugas: <strong className="text-slate-700 dark:text-slate-300 font-semibold">{c.petugasBaca || 'Petugas Lapangan'}</strong>
+                              </div>
+                            </div>
                           </div>
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 shrink-0">
                             {c.kelas}
