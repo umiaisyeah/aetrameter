@@ -103,7 +103,8 @@ export function getPlottedCycleSchedule(
   const found = cycleSchedules.find(
     (s) =>
       s.cycle.toLowerCase() === `cycle ${cycleNum}` &&
-      (s.bulan?.toLowerCase().includes(monthName.toLowerCase()) ||
+      (!s.bulan ||
+        s.bulan?.toLowerCase().includes(monthName.toLowerCase()) ||
         s.bulan?.toLowerCase().includes(monthCode.toLowerCase()))
   );
 

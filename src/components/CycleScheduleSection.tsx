@@ -86,72 +86,99 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
   const [selectedShiftedCustomerIds, setSelectedShiftedCustomerIds] = useState<string[]>([]);
 
   // Merge default 15 cycles with imported schedules
-  const allCycles = Array.from({ length: 15 }, (_, i) => `Cycle ${i + 1}`);
+  const allCycles = useMemo(() => Array.from({ length: 15 }, (_, i) => `Cycle ${i + 1}`), []);
 
-  const scheduleList = allCycles.map((cName, idx) => {
-    const found = cycleSchedules.find((s) => s.cycle.toLowerCase() === cName.toLowerCase());
-    const cycleCusts = customers.filter((c) => c.cycle.toLowerCase() === cName.toLowerCase());
-    const completed = cycleCusts.filter((c) => c.status === 'Verified' || c.status === 'Invoiced').length;
+  const scheduleList = useMemo(() => {
+    return allCycles.map((cName) => {
+      // Dapatkan plotting matriks kalender real-time untuk bulan berjalan (selectedMonth)
+      const plotted = getPlottedCycleSchedule(cName, selectedMonth, cycleSchedules);
+      const cycleCusts = customers.filter((c) => c.cycle.toLowerCase() === cName.toLowerCase());
+      const completed = cycleCusts.filter((c) => c.status === 'Verified' || c.status === 'Invoiced').length;
 
-    let defaultPetugas = 'Belum Ditugaskan';
-    let defaultKategori: ReaderCategory | undefined = undefined;
-
-    // 1. Utamakan sinkronisasi dari input petugas baca di database industri pada cycle ini
-    const custWithReader = cycleCusts.find((c) => c.petugasBaca && c.petugasBaca.trim() !== '');
-    if (custWithReader && custWithReader.petugasBaca) {
-      defaultPetugas = custWithReader.petugasBaca;
-      const rMatch = meterReaders.find((r) => r.nama.toLowerCase() === custWithReader.petugasBaca!.toLowerCase());
-      defaultKategori = rMatch?.kategori || custWithReader.kategoriPetugas;
-    } else if (found?.petugasUtama && found.petugasUtama !== 'Belum Ditugaskan') {
-      defaultPetugas = found.petugasUtama;
-      defaultKategori = found.kategoriPetugas;
-    } else {
-      const readerForCycle = meterReaders.find((r) =>
-        r.assignedCycles?.some((ac) => ac.toLowerCase() === cName.toLowerCase())
+      const found = cycleSchedules.find(
+        (s) =>
+          s.cycle.toLowerCase() === cName.toLowerCase() &&
+          (!s.bulan ||
+            s.bulan.toLowerCase().includes(plotted.monthName.toLowerCase()) ||
+            s.bulan.toLowerCase().includes(plotted.monthCode.toLowerCase()))
       );
-      if (readerForCycle && cycleCusts.length > 0) {
-        defaultPetugas = readerForCycle.nama;
-        defaultKategori = readerForCycle.kategori;
+
+      let defaultPetugas = 'Belum Ditugaskan';
+      let defaultKategori: ReaderCategory | undefined = undefined;
+
+      // 1. Utamakan sinkronisasi dari input petugas baca di database industri pada cycle ini
+      const custWithReader = cycleCusts.find((c) => c.petugasBaca && c.petugasBaca.trim() !== '');
+      if (custWithReader && custWithReader.petugasBaca) {
+        defaultPetugas = custWithReader.petugasBaca;
+        const rMatch = meterReaders.find((r) => r.nama.toLowerCase() === custWithReader.petugasBaca!.toLowerCase());
+        defaultKategori = rMatch?.kategori || custWithReader.kategoriPetugas;
+      } else if (found?.petugasUtama && found.petugasUtama !== 'Belum Ditugaskan') {
+        defaultPetugas = found.petugasUtama;
+        defaultKategori = found.kategoriPetugas;
+      } else {
+        const readerForCycle = meterReaders.find((r) =>
+          r.assignedCycles?.some((ac) => ac.toLowerCase() === cName.toLowerCase())
+        );
+        if (readerForCycle && cycleCusts.length > 0) {
+          defaultPetugas = readerForCycle.nama;
+          defaultKategori = readerForCycle.kategori;
+        }
       }
-    }
 
-    // Strictly start on tanggal 6!
-    const defaultHariH = [6, 7, 8, 9, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 26][idx] || 6 + idx;
+      // Shifted customer ids for this cycle
+      const shiftedCustsInCycle = cycleCusts.filter((c) => c.adaPergeseran);
+      const shiftedIds = found?.shiftedCustomerIds || plotted.shiftedCustomerIds || shiftedCustsInCycle.map((c) => c.id);
 
-    // Shifted customer ids for this cycle
-    const shiftedCustsInCycle = cycleCusts.filter(c => c.adaPergeseran);
-    const shiftedIds = found?.shiftedCustomerIds || shiftedCustsInCycle.map(c => c.id);
+      const hasShift = found?.adaPergeseran ?? plotted.hasShift;
+      const hariH = found?.hariH || (hasShift ? plotted.currentHariH : plotted.originalHariH);
+      const hariHOriginal = found?.hariHOriginal || plotted.originalHariH;
+      const selisih = hasShift ? (found?.selisihHariPergeseran ?? (hariH - hariHOriginal)) : 0;
 
-    return {
-      cycle: cName,
-      bulan: found?.bulan || selectedMonth,
-      hariH: found?.hariH || defaultHariH,
-      tanggalMulai: found?.tanggalMulai || `${String(found?.hariH || defaultHariH).padStart(2, '0')} ${selectedMonth.slice(0, 3)} 2026`,
-      tanggalSelesai: found?.tanggalSelesai || `${String((found?.hariH || defaultHariH) + 1).padStart(2, '0')} ${selectedMonth.slice(0, 3)} 2026`,
-      petugasUtama: found?.petugasUtama || defaultPetugas,
-      kategoriPetugas: found?.kategoriPetugas || defaultKategori,
-      catatan: found?.catatan || '',
-      adaPergeseran: found?.adaPergeseran || (cName === 'Cycle 3' && !found),
-      hariHOriginal: found?.hariHOriginal || (cName === 'Cycle 3' ? 8 : defaultHariH),
-      selisihHariPergeseran: found?.selisihHariPergeseran || (cName === 'Cycle 3' ? 1 : 0),
-      alasanPergeseran: found?.alasanPergeseran || (cName === 'Cycle 3' ? 'Target Volume Industri' : undefined),
-      keteranganPergeseran:
-        found?.keteranganPergeseran ||
-        (cName === 'Cycle 3'
-          ? 'Pergeseran H+1 hari untuk mengakomodasi akumulasi jam kerja shift pabrik.'
-          : ''),
-      shiftedCustomerIds: shiftedIds,
-      shiftedCount: shiftedIds.length,
-      totalIndustri: cycleCusts.length,
-      completed,
-      status:
-        cycleCusts.length > 0 && completed === cycleCusts.length
-          ? 'Selesai'
-          : completed > 0
-          ? 'Sedang Berjalan'
-          : 'Terjadwal'
-    };
-  });
+      const praBaca = Math.max(1, hariH - 1);
+      const verif = Math.min(plotted.daysInMonth, hariH + 1);
+      const billing = Math.min(plotted.daysInMonth, hariH + 2);
+      const monthShort = plotted.monthName.slice(0, 3);
+
+      const tanggalMulai = found?.tanggalMulai || `${String(hariH).padStart(2, '0')} ${monthShort} ${plotted.year}`;
+      const tanggalSelesai = found?.tanggalSelesai || `${String(verif).padStart(2, '0')} ${monthShort} ${plotted.year}`;
+
+      return {
+        cycle: cName,
+        bulan: selectedMonth,
+        hariH,
+        hariHOriginal,
+        tglPraBaca: praBaca,
+        tglVerifikasi: verif,
+        tglBilling: billing,
+        monthName: plotted.monthName,
+        monthShort,
+        year: plotted.year,
+        currDayName: plotted.currDayName,
+        origDayName: plotted.origDayName,
+        fullDisplayCurrent: plotted.fullDisplayCurrent,
+        fullDisplayOriginal: plotted.fullDisplayOriginal,
+        tanggalMulai,
+        tanggalSelesai,
+        petugasUtama: found?.petugasUtama || defaultPetugas,
+        kategoriPetugas: found?.kategoriPetugas || defaultKategori,
+        catatan: found?.catatan || (hasShift ? `Pergeseran jadwal hari baca (Tgl ${hariHOriginal} → ${hariH})` : `Plotting Matriks ${plotted.monthName} (Hari H: Tgl ${hariH})`),
+        adaPergeseran: hasShift,
+        selisihHariPergeseran: selisih,
+        alasanPergeseran: found?.alasanPergeseran || (hasShift ? plotted.alasanPergeseran || 'Target Volume Industri' : undefined),
+        keteranganPergeseran: found?.keteranganPergeseran || (hasShift ? (plotted.keteranganPergeseran || 'Pergeseran jadwal hari baca untuk pemenuhan target volume.') : ''),
+        shiftedCustomerIds: shiftedIds,
+        shiftedCount: shiftedIds.length,
+        totalIndustri: cycleCusts.length,
+        completed,
+        status:
+          cycleCusts.length > 0 && completed === cycleCusts.length
+            ? 'Selesai'
+            : completed > 0
+            ? 'Sedang Berjalan'
+            : 'Terjadwal'
+      };
+    });
+  }, [allCycles, selectedMonth, cycleSchedules, customers, meterReaders]);
 
   // Shifted cycles list
   const shiftedSchedules = scheduleList.filter((s) => s.adaPergeseran);
@@ -350,11 +377,13 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
     if (!existing) return;
 
     const origHariH = existing.hariHOriginal || existing.hariH;
+    const mShort = (existing.monthShort || selectedMonth.slice(0, 3));
+    const mYear = existing.year || 2026;
     const reverted: CycleSchedule = {
       ...existing,
       hariH: origHariH,
-      tanggalMulai: `${String(origHariH).padStart(2, '0')} Sep 2026`,
-      tanggalSelesai: `${String(origHariH + 1).padStart(2, '0')} Sep 2026`,
+      tanggalMulai: `${String(origHariH).padStart(2, '0')} ${mShort} ${mYear}`,
+      tanggalSelesai: `${String(Math.min(31, origHariH + 1)).padStart(2, '0')} ${mShort} ${mYear}`,
       adaPergeseran: false,
       hariHOriginal: undefined,
       selisihHariPergeseran: undefined,
@@ -664,14 +693,47 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
 
       {/* Schedule Table List */}
       <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs overflow-hidden">
-        <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/80 flex justify-between items-center">
+        <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div>
-            <h4 className="font-extrabold text-slate-800 dark:text-white text-sm">
-              Daftar Rinci Tanggal Pembacaan Tiap Cycle (1 - 15)
-            </h4>
-            <p className="text-[11px] text-slate-400">
-              Menampilkan Hari H baca meter, rentang tanggal verifikasi, serta status pergeseran target volume
+            <div className="flex flex-wrap items-center gap-2">
+              <h4 className="font-extrabold text-slate-800 dark:text-white text-sm flex items-center gap-2">
+                <span>Daftar Rinci Tanggal Pembacaan Tiap Cycle (1 - 15)</span>
+              </h4>
+              <span className="text-[11px] font-black px-2.5 py-0.5 rounded-full bg-blue-600 text-white font-mono shadow-xs">
+                {selectedMonth}
+              </span>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700 flex items-center gap-1.5 shadow-2xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Real-Time Matriks Plotting</span>
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+              Hari H &amp; rentang tanggal pembacaan tiap cycle disesuaikan secara real-time dengan tanggal matriks plotting jadwal cycle bulan berjalan ({selectedMonth}).
             </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+              Pilih Bulan Matriks:
+            </span>
+            <select
+              value={selectedMonth}
+              onChange={(e) => {
+                const newM = e.target.value;
+                setSelectedMonth(newM);
+                onMonthChange?.(newM);
+              }}
+              className="text-xs font-bold bg-white dark:bg-slate-700 border-2 border-blue-200 dark:border-blue-800 rounded-xl px-3 py-1.5 text-[#0055A5] dark:text-blue-300 shadow-xs focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            >
+              {MONTH_NAMES_ID.map((m) => {
+                const label = `${m} 2026`;
+                return (
+                  <option key={label} value={label}>
+                    {label}
+                  </option>
+                );
+              })}
+            </select>
           </div>
         </div>
 
@@ -702,15 +764,37 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
                     </div>
                   </td>
                   <td className="p-3 font-bold text-slate-800 dark:text-slate-200">
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-5 h-5 rounded-md bg-[#FFF200] border border-amber-300 font-black text-black text-[11px] flex items-center justify-center shrink-0">
+                    <div className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-md bg-[#FFF200] border border-amber-300 font-black text-black text-xs flex items-center justify-center shrink-0 shadow-xs">
                         {row.hariH}
                       </span>
-                      <span>Tanggal {row.hariH}</span>
+                      <div>
+                        <div className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1">
+                          <span>{row.currDayName ? `${row.currDayName}, ` : ''}Tgl {row.hariH}</span>
+                          <span className="text-[10px] font-semibold text-slate-400 font-mono">({row.monthShort})</span>
+                        </div>
+                        {row.adaPergeseran ? (
+                          <div className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1">
+                            <span>Matriks Asli: {row.origDayName ? `${row.origDayName}, ` : ''}Tgl {row.hariHOriginal}</span>
+                            <span className="text-[9px] px-1 py-0.2 rounded bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 font-bold">
+                              {row.selisihHariPergeseran > 0 ? `+${row.selisihHariPergeseran}h` : `${row.selisihHariPergeseran}h`}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                            Jadwal Matriks Kalender
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="p-3 font-semibold text-slate-700 dark:text-slate-200">
-                    {row.tanggalMulai} - {row.tanggalSelesai}
+                    <div className="font-bold text-slate-800 dark:text-slate-100">
+                      {row.tanggalMulai} - {row.tanggalSelesai}
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                      Pra-baca: Tgl {row.tglPraBaca} • Verif: Tgl {row.tglVerifikasi}
+                    </div>
                   </td>
                   <td className="p-3 text-center font-mono font-bold text-slate-700 dark:text-slate-200">
                     {row.totalIndustri}
@@ -741,7 +825,7 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
                         ⚠️ Pergeseran (Tgl {row.hariHOriginal} → {row.hariH}): {row.keteranganPergeseran}
                       </span>
                     ) : (
-                      row.catatan || 'Jadwal Normal'
+                      row.catatan || `Jadwal Matriks ${row.currDayName}, ${row.hariH} ${row.monthShort}`
                     )}
                   </td>
                   <td className="p-3 text-center">
@@ -759,14 +843,14 @@ export const CycleScheduleSection: React.FC<CycleScheduleSectionProps> = ({
                             catatan: row.catatan
                           })
                         }
-                        className="px-2 py-1 text-xs font-semibold text-[#0055A5] dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition inline-flex items-center gap-1"
+                        className="px-2 py-1 text-xs font-semibold text-[#0055A5] dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition inline-flex items-center gap-1 cursor-pointer"
                       >
                         <Edit2 className="w-3 h-3" />
                         <span>Edit</span>
                       </button>
                       <button
                         onClick={() => handleOpenShiftModal(row)}
-                        className="px-2 py-1 text-xs font-semibold text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded-lg transition inline-flex items-center gap-1"
+                        className="px-2 py-1 text-xs font-semibold text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded-lg transition inline-flex items-center gap-1 cursor-pointer"
                         title="Atur pergeseran hari baca untuk cycle ini"
                       >
                         <TrendingUp className="w-3 h-3" />
